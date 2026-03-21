@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Filter, FileSpreadsheet } from 'lucide-react';
+import { Search, Download, Filter } from 'lucide-react';
 
 const RawData: React.FC = () => {
   const [data, setData] = useState<any[]>([]);

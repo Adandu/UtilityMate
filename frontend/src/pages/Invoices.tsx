@@ -14,7 +14,6 @@ interface Invoice {
 const Invoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
   
   const fetchInvoices = async () => {
     try {
