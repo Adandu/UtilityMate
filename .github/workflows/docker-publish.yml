@@ -1,4 +1,4 @@
-name: Publish Docker Images
+name: Publish Docker Image
 
 on:
   push:
@@ -7,8 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # Use lowercase for repository name
-  IMAGE_BASE: ghcr.io/${{ github.repository }}
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -16,15 +15,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-
-    strategy:
-      matrix:
-        service: [api, web]
-        include:
-          - service: api
-            context: ./backend
-          - service: web
-            context: ./frontend
 
     steps:
       - name: Checkout repository
@@ -44,7 +34,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_BASE }}-${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,format=short
@@ -53,7 +43,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
+          context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

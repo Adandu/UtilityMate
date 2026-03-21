@@ -1,51 +1,14 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: utilitymate_db
-    restart: always
-    environment:
-      POSTGRES_USER: utilitymate_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-utilitymate_pass}
-      POSTGRES_DB: utilitymate
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - utilitymate_net
-
-  api:
-    build: ./backend
-    container_name: utilitymate_api
-    restart: always
-    environment:
-      DATABASE_URL: postgresql://utilitymate_user:${DB_PASSWORD:-utilitymate_pass}@db:5432/utilitymate
-      SECRET_KEY: ${SECRET_KEY:-your_secret_key_change_me}
-      ALLOWED_ORIGINS: "http://localhost:80,http://localhost"
-      UPLOAD_DIR: "/app/data/invoices"
-    depends_on:
-      - db
-    volumes:
-      - ./data/invoices:/app/data/invoices
-    networks:
-      - utilitymate_net
-    expose:
-      - "8000"
-
-  web:
-    build: ./frontend
-    container_name: utilitymate_web
+  utilitymate:
+    build: .
+    container_name: utilitymate
     restart: always
     ports:
       - "80:80"
-    depends_on:
-      - api
-    networks:
-      - utilitymate_net
-
-networks:
-  utilitymate_net:
-    driver: bridge
-
-volumes:
-  postgres_data:
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-your_secret_key_change_me}
+      - ALLOWED_ORIGINS=http://localhost:80,http://localhost
+    volumes:
+      - ./data:/app/data
