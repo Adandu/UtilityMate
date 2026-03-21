@@ -20,15 +20,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          body: |
-            ## UtilityMate - Antigravity Edition
-            This release includes automated builds and deployment configurations.
-            
-            ### Highlights
-            - **Design Overhaul**: Integration of Stitch Design Language (M3).
-            - **Security**: JWT-based authentication and rate limiting.
-            - **Performance**: Consolidated single-container architecture.
-            - **Infrastructure**: Automated CI/CD via GitHub Actions and GHCR.
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

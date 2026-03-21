@@ -1,0 +1,28 @@
+changelog:
+  exclude:
+    labels:
+      - ignore
+    authors:
+      - octocat
+  categories:
+    - title: 🚀 New Features
+      labels:
+        - enhancement
+        - feature
+    - title: 🛠️ Improvements
+      labels:
+        - improvement
+        - refactor
+        - perf
+        - docs
+        - style
+    - title: 🐛 Bug Fixes
+      labels:
+        - bug
+        - fix
+    - title: 📦 Dependencies
+      labels:
+        - dependencies
+    - title: 🧪 Testing
+      labels:
+        - test
