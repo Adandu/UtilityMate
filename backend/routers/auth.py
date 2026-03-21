@@ -19,6 +19,8 @@ def register_user(request: Request, user: api_schemas.UserCreate, db: Session = 
     # Basic password strength check
     if len(user.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+    if len(user.password) > 72:
+        raise HTTPException(status_code=400, detail="Password must be at most 72 characters long")
         
     hashed_password = auth_utils.get_password_hash(user.password)
     new_user = database_models.User(email=user.email, hashed_password=hashed_password)
