@@ -15,3 +15,4 @@ python-dotenv
 pytest
 httpx
 slowapi
+email-validator
