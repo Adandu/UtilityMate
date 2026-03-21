@@ -7,6 +7,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from .routers import auth, categories, providers, locations, invoices, consumption
+from .database.session import engine
+from .models.database_models import Base
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +23,9 @@ elif os.path.exists("VERSION"):
     with open("VERSION", "r") as f:
         VERSION = f.read().strip()
 
+# Create database tables on startup
+Base.metadata.create_all(bind=engine)
+
 # Initialize Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="UtilityMate API", version=VERSION)
@@ -28,7 +33,7 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS - Externalize origins
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost,http://localhost:5173").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost,http://127.0.0.1,http://localhost:5173").split(",")
 
 app.add_middleware(
     CORSMiddleware,
