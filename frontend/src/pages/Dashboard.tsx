@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
-import { TrendingUp, Calendar, Plus, Zap, Flame, Loader2 } from 'lucide-react';
+import { TrendingUp, Calendar, Plus, Loader2 } from 'lucide-react';
 import api from '../utils/api';
 
 const Dashboard: React.FC = () => {

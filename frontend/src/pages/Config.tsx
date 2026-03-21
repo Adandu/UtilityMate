@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Building2, Moon, Sun, Plus, Shield, Laptop, Zap, Droplets, Flame, Trash2, Loader2 } from 'lucide-react';
+import { MapPin, Building2, Moon, Sun, Plus, Shield, Zap, Droplets, Flame, Loader2 } from 'lucide-react';
 import api from '../utils/api';
 
 interface Location {
