@@ -7,7 +7,8 @@ from ..database.session import get_db
 from ..models import database_models
 from ..schemas import api_schemas
 from ..utils import auth_utils
-from ..main import limiter, logger
+from ..utils.rate_limiter import limiter
+from ..utils.logging_config import logger
 
 router = APIRouter()
 

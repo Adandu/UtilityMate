@@ -1,21 +1,17 @@
 import os
-import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from .routers import auth, categories, providers, locations, invoices, consumption
 from .database.session import engine
 from .models.database_models import Base
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from .utils.logging_config import logger
+from .utils.rate_limiter import limiter
 
 # Load version
-VERSION = os.getenv("APP_VERSION", "1.1.3")
+VERSION = os.getenv("APP_VERSION", "1.1.7")
 try:
     if os.path.exists("../VERSION"):
         with open("../VERSION", "r") as f:
@@ -29,8 +25,6 @@ except Exception:
 # Create database tables on startup
 Base.metadata.create_all(bind=engine)
 
-# Initialize Rate Limiter
-limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="UtilityMate API", version=VERSION)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -51,7 +45,7 @@ async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; connect-src 'self'"
     return response
 
 @app.exception_handler(Exception)

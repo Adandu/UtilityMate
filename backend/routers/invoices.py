@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime, timezone
 import os
@@ -9,7 +9,7 @@ from ..database.session import get_db
 from ..models import database_models
 from ..schemas import api_schemas
 from ..utils import auth_utils, parser
-from ..main import logger
+from ..utils.logging_config import logger
 
 router = APIRouter()
 
@@ -21,7 +21,6 @@ MAX_FILE_SIZE = 5 * 1024 * 1024 # 5MB
 
 def get_file_hash(file_content: bytes):
     return hashlib.sha256(file_content).hexdigest()
-from sqlalchemy.orm import Session, joinedload
 
 @router.get("/", response_model=List[api_schemas.Invoice])
 def read_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
