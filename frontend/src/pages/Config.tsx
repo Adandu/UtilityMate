@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Building2, Moon, Sun, Plus, Shield, Zap, Droplets, Flame, Loader2, X } from 'lucide-react';
+import { MapPin, Building2, Moon, Sun, Plus, Shield, Zap, Droplets, Flame, Loader2, X, Tag } from 'lucide-react';
 import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -18,6 +18,7 @@ interface Provider {
 interface Category {
   id: number;
   name: string;
+  unit: string;
 }
 
 const Config: React.FC = () => {
@@ -62,7 +63,6 @@ const Config: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
 
-    // Sync with backend
     try {
       if (user) {
         const response = await api.put('/auth/me', { email: user.email }, { params: { theme_pref: newTheme } });
@@ -80,18 +80,31 @@ const Config: React.FC = () => {
       const response = await api.post('/locations/', { name, address: '' });
       setLocations([...locations, response.data]);
     } catch (error) {
-      alert('Failed to add location. Check console for details.');
-      console.error(error);
+      alert('Failed to add location.');
     }
   };
 
   const handleDeleteLocation = async (id: number) => {
-    if (!window.confirm('Delete this location? All related invoices will be affected.')) return;
+    if (!window.confirm('Delete this location?')) return;
     try {
       await api.delete(`/locations/${id}`);
       setLocations(locations.filter(l => l.id !== id));
     } catch (error) {
       alert('Failed to delete location');
+    }
+  };
+
+  const handleAddCategory = async () => {
+    const name = prompt('Enter Category Name (e.g. Electricity):');
+    if (!name) return;
+    const unit = prompt('Enter Unit (e.g. kWh):');
+    if (!unit) return;
+    
+    try {
+      const response = await api.post('/categories/', { name, unit });
+      setCategories([...categories, response.data]);
+    } catch (error) {
+      alert('Failed to add category');
     }
   };
 
@@ -127,15 +140,14 @@ const Config: React.FC = () => {
         <p className="text-on-surface-variant font-medium opacity-70">Configure your providers, asset locations, and preferences.</p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Environment Control */}
-        <section className="lg:col-span-4 space-y-6 text-on-surface">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-on-surface">
+        {/* Sidebar / Preferences */}
+        <section className="lg:col-span-4 space-y-6">
           <div className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant shadow-sm">
             <div className="flex items-center gap-3 text-blue-600 mb-8">
               <Shield size={24} />
               <h3 className="font-headline text-xl font-extrabold text-on-surface">Preferences</h3>
             </div>
-            
             <div className="space-y-4">
               <div className="p-4 bg-surface-container rounded-2xl flex items-center justify-between group cursor-pointer hover:bg-surface-container-high transition-colors" onClick={toggleTheme}>
                 <div className="flex items-center gap-3">
@@ -147,7 +159,7 @@ const Config: React.FC = () => {
                     <p className="text-[10px] text-on-surface-variant font-bold opacity-60 uppercase">{theme} THEME</p>
                   </div>
                 </div>
-                <div className="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-700 relative transition-colors text-on-surface">
+                <div className="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-700 relative transition-colors">
                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${theme === 'dark' ? 'left-7' : 'left-1'}`}></div>
                 </div>
               </div>
@@ -156,7 +168,31 @@ const Config: React.FC = () => {
         </section>
 
         {/* Asset & Service Management */}
-        <div className="lg:col-span-8 space-y-8 text-on-surface">
+        <div className="lg:col-span-8 space-y-8">
+          {/* Categories */}
+          <section className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant shadow-sm">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-3 text-purple-600">
+                <Tag size={24} />
+                <h3 className="font-headline text-xl font-extrabold text-on-surface">Utility Categories</h3>
+              </div>
+              <button 
+                onClick={handleAddCategory}
+                className="w-10 h-10 bg-purple-600 text-white rounded-xl flex items-center justify-center hover:bg-purple-700 transition-colors shadow-lg shadow-purple-500/20"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {categories.map((cat) => (
+                <div key={cat.id} className="p-4 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl flex flex-col items-center justify-center text-center">
+                  <span className="font-headline font-bold text-on-surface">{cat.name}</span>
+                  <span className="text-[10px] font-black uppercase text-on-surface-variant opacity-40 mt-1">{cat.unit}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
           {/* Locations */}
           <section className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant shadow-sm">
             <div className="flex justify-between items-center mb-8">
@@ -171,7 +207,6 @@ const Config: React.FC = () => {
                 <Plus size={20} />
               </button>
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {locations.length === 0 ? (
                 <p className="col-span-2 text-center text-sm text-on-surface-variant opacity-50 py-4">No locations defined. Add one to start tracking invoices.</p>
@@ -208,7 +243,6 @@ const Config: React.FC = () => {
                 <Plus size={20} />
               </button>
             </div>
-            
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {providers.map((prov) => (
                 <div key={prov.id} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl hover:shadow-md transition-all group">
@@ -235,7 +269,6 @@ const Config: React.FC = () => {
                 <X size={24} />
               </button>
             </div>
-            
             <form onSubmit={handleAddProvider} className="p-8 space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Provider Name</label>
@@ -248,7 +281,6 @@ const Config: React.FC = () => {
                   placeholder="e.g. Enel, Orange"
                 />
               </div>
-
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Utility Category</label>
                 <select 
@@ -261,7 +293,6 @@ const Config: React.FC = () => {
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-
               <button 
                 type="submit"
                 className="w-full py-4 bg-amber-600 text-white font-black rounded-2xl shadow-lg shadow-amber-500/20 flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] active:scale-95 mt-8"
