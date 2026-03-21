@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
+import { Shield, ArrowRight, Loader2 } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (token: string) => void;
@@ -30,48 +31,52 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       onLogin(response.data.access_token);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid email or password');
+      setError(err.response?.data?.detail || 'Invalid credentials. Access Denied.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-full">
-      <div className="w-full max-w-md p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg transition-colors">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome Back</h2>
-          <p className="text-gray-500 dark:text-gray-400 mt-2">Log in to manage your UtilityMate dashboard</p>
+    <div className="flex flex-col items-center justify-center min-h-full bg-surface">
+      <div className="w-full max-w-md p-10 bg-surface-container-low rounded-[2rem] border border-outline-variant shadow-2xl shadow-slate-200 dark:shadow-none transition-all animate-in zoom-in-95 duration-500">
+        <div className="text-center mb-10">
+          <div className="w-16 h-16 bg-primary-container rounded-2xl flex items-center justify-center text-on-primary-fixed mx-auto mb-6 shadow-lg">
+            <Shield size={32} />
+          </div>
+          <h2 className="font-headline text-3xl font-black text-on-surface tracking-tight">Identity Verification</h2>
+          <p className="text-on-surface-variant font-medium mt-2 opacity-60 uppercase text-[10px] tracking-[0.2em]">UtilityMate Secure Gateway</p>
         </div>
         
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm">
+          <div className="mb-6 p-4 bg-error-container text-error border border-error/20 rounded-xl text-xs font-bold flex items-center gap-3 animate-shake">
+            <span className="material-symbols-outlined text-sm">report</span>
             {error}
           </div>
         )}
         
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Terminal Address</label>
             <input 
               type="email" 
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition"
-              placeholder="you@example.com"
+              className="w-full p-4 rounded-2xl bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
+              placeholder="operator@antigravity.io"
               disabled={loading}
             />
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Access Key</label>
             <input 
               type="password" 
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition"
+              className="w-full p-4 rounded-2xl bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
               placeholder="••••••••"
               disabled={loading}
             />
@@ -80,19 +85,24 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <button 
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:transform-none"
+            className="w-full py-4 bg-primary-container text-white font-black rounded-2xl shadow-lg shadow-blue-900/20 flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:transform-none mt-8 group"
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : (
+              <>
+                <span className="uppercase tracking-[0.1em] text-sm">Establish Connection</span>
+                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
           </button>
         </form>
         
-        <div className="mt-6 text-center text-sm">
-          <span className="text-gray-500 dark:text-gray-400">Don't have an account? </span>
+        <div className="mt-10 text-center">
+          <p className="text-xs font-bold text-on-surface-variant opacity-40 uppercase tracking-widest mb-4">Unauthorized Access Restricted</p>
           <button 
             onClick={() => navigate('/register')}
-            className="text-blue-600 dark:text-blue-400 font-medium hover:underline"
+            className="text-blue-600 dark:text-blue-400 text-xs font-black uppercase tracking-widest hover:underline decoration-2 underline-offset-4"
           >
-            Create one
+            Request Credentials
           </button>
         </div>
       </div>

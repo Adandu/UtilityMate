@@ -23,9 +23,9 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+      <div className="min-h-screen bg-surface transition-colors duration-300">
         {isAuthenticated && <Sidebar onLogout={logout} />}
-        <main className="flex-1 overflow-auto p-8">
+        <main className="flex-1">
           <Routes>
             <Route path="/login" element={!isAuthenticated ? <Login onLogin={login} /> : <Navigate to="/" />} />
             <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />

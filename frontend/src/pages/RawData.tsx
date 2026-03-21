@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Filter } from 'lucide-react';
+import { Search, Download, Filter, FileText, Database, ChevronRight } from 'lucide-react';
 
 const RawData: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
@@ -16,64 +16,74 @@ const RawData: React.FC = () => {
   }, []);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <header className="flex justify-between items-center">
+    <div className="ml-64 p-8 min-h-screen bg-surface transition-colors duration-300 animate-in fade-in duration-500">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Raw Data Explorer</h2>
-          <p className="text-gray-500 dark:text-gray-400">Search and export all historical records.</p>
+          <h2 className="font-headline text-3xl font-extrabold text-on-surface text-on-surface">Data Warehouse</h2>
+          <p className="text-on-surface-variant font-medium opacity-70 text-on-surface-variant">Low-level analytical view of all processed utility records.</p>
         </div>
         
-        <button className="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-bold shadow-lg transition transform hover:scale-[1.02]">
+        <button className="flex items-center gap-2 bg-secondary-container text-on-secondary-container px-8 py-3 rounded-2xl font-bold shadow-sm hover:bg-secondary-fixed transition-all active:scale-95">
           <Download size={20} />
-          <span>Export CSV</span>
+          <span className="uppercase tracking-widest text-xs">Export Dataset</span>
         </button>
       </header>
 
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <div className="bg-surface-container-low rounded-3xl border border-outline-variant shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-outline-variant flex flex-col md:flex-row gap-4 justify-between bg-surface-container-lowest/50">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-50" size={18} />
             <input 
               type="text" 
-              placeholder="Search by provider, location, or category..."
-              className="w-full pl-11 p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 transition"
+              placeholder="Query logs..."
+              className="w-full pl-12 pr-4 py-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="flex items-center space-x-2 px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-            <Filter size={20} />
-            <span>Filters</span>
+          <button className="flex items-center gap-2 px-6 py-3 rounded-xl border border-outline-variant text-on-surface-variant font-bold hover:bg-surface-container transition-colors">
+            <Filter size={18} />
+            <span className="text-[10px] uppercase tracking-[0.2em]">Surgical Filter</span>
           </button>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-xs font-bold uppercase tracking-wider">
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Provider</th>
-                <th className="px-4 py-3">Index Value</th>
-                <th className="px-4 py-3">Total Cost</th>
-                <th className="px-4 py-3 text-right">Unit Price</th>
+              <tr className="text-on-surface-variant text-[10px] font-black uppercase tracking-[0.2em] border-b border-outline-variant bg-surface-container-low">
+                <th className="px-6 py-4">Timestamp</th>
+                <th className="px-6 py-4">Context</th>
+                <th className="px-6 py-4 text-center">Category</th>
+                <th className="px-6 py-4">Source</th>
+                <th className="px-6 py-4 text-right">Value</th>
+                <th className="px-6 py-4 text-right">Settlement</th>
+                <th className="px-6 py-4"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody className="divide-y divide-outline-variant/30">
               {data.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition text-sm">
-                  <td className="px-4 py-4 text-gray-600 dark:text-gray-400">{row.date}</td>
-                  <td className="px-4 py-4 text-gray-900 dark:text-white font-medium">{row.location}</td>
-                  <td className="px-4 py-4">
-                    <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded text-xs font-bold">
+                <tr key={row.id} className="hover:bg-surface-container-high/30 transition-colors group">
+                  <td className="px-6 py-5 font-mono text-[11px] text-on-surface-variant">{row.date}</td>
+                  <td className="px-6 py-5">
+                    <span className="font-black text-on-surface tracking-tight uppercase text-xs">{row.location}</span>
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-[9px] font-black uppercase tracking-widest border border-blue-200/50 dark:border-blue-800/50">
                       {row.category}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-gray-600 dark:text-gray-400">{row.provider}</td>
-                  <td className="px-4 py-4 text-gray-900 dark:text-white font-mono">{row.index}</td>
-                  <td className="px-4 py-4 text-gray-900 dark:text-white font-bold">{row.cost.toFixed(2)} RON</td>
-                  <td className="px-4 py-4 text-right text-gray-500">{(row.cost / row.index).toFixed(4)}</td>
+                  <td className="px-6 py-5 text-on-surface font-bold text-sm">{row.provider}</td>
+                  <td className="px-6 py-5 text-right">
+                    <div className="font-mono text-xs font-bold text-on-surface">{row.index.toLocaleString()}</div>
+                  </td>
+                  <td className="px-6 py-5 text-right font-black text-on-surface">
+                    {row.cost.toFixed(2)} <span className="text-[9px] opacity-40">RON</span>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <button className="p-2 text-on-surface-variant hover:text-on-surface opacity-0 group-hover:opacity-100 transition-all">
+                      <ChevronRight size={18} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

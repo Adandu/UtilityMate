@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Tag, Building2, Moon, Sun, Plus } from 'lucide-react';
+import { MapPin, Tag, Building2, Moon, Sun, Plus, Shield, Laptop, Zap, Droplets, Flame } from 'lucide-react';
 
 const Config: React.FC = () => {
   const [theme, setTheme] = useState('light');
@@ -11,88 +11,131 @@ const Config: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <header>
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Configuration</h2>
-        <p className="text-gray-500 dark:text-gray-400">Manage your locations, providers, and preferences.</p>
+    <div className="ml-64 p-8 min-h-screen bg-surface transition-colors duration-300 animate-in fade-in duration-500">
+      <header className="mb-10">
+        <h2 className="font-headline text-3xl font-extrabold text-on-surface">System Parameters</h2>
+        <p className="text-on-surface-variant font-medium opacity-70">Configure your environmental variables, providers, and asset locations.</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Locations Section */}
-        <section className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center space-x-3 text-blue-600 dark:text-blue-400">
-              <MapPin size={24} />
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Locations</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Environment Control */}
+        <section className="lg:col-span-4 space-y-6">
+          <div className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant shadow-sm">
+            <div className="flex items-center gap-3 text-blue-600 mb-8">
+              <Shield size={24} />
+              <h3 className="font-headline text-xl font-extrabold text-on-surface">Global Access</h3>
             </div>
-            <button className="p-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 transition">
-              <Plus size={20} />
-            </button>
-          </div>
-          <div className="space-y-3">
-            {['AP12', 'AP15'].map((loc) => (
-              <div key={loc} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg group">
-                <span className="font-medium text-gray-900 dark:text-white">{loc}</span>
-                <button className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">Remove</button>
+            
+            <div className="space-y-4">
+              <div className="p-4 bg-surface-container rounded-2xl flex items-center justify-between group cursor-pointer hover:bg-surface-container-high transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center text-on-surface shadow-sm">
+                    {theme === 'light' ? <Sun size={20} /> : <Moon size={20} />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-on-surface uppercase tracking-tight">Display Mode</p>
+                    <p className="text-[10px] text-on-surface-variant font-bold opacity-60">SYSTEM THEME</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={toggleTheme}
+                  className="w-12 h-6 rounded-full bg-slate-200 dark:bg-slate-700 relative transition-colors"
+                >
+                  <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${theme === 'dark' ? 'left-7' : 'left-1'}`}></div>
+                </button>
               </div>
-            ))}
+
+              <div className="p-4 bg-surface-container rounded-2xl flex items-center justify-between group cursor-pointer hover:bg-surface-container-high transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center text-on-surface shadow-sm">
+                    <Laptop size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-on-surface uppercase tracking-tight">Auth Controls</p>
+                    <p className="text-[10px] text-on-surface-variant font-bold opacity-60">SECURITY GATEWAY</p>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-on-surface-variant opacity-40">chevron_right</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-primary-container p-8 rounded-3xl text-white shadow-xl shadow-blue-900/20 relative overflow-hidden">
+            <div className="relative z-10">
+              <h4 className="font-headline text-lg font-black mb-2">Antigravity Cloud</h4>
+              <p className="text-xs font-medium opacity-70 mb-6">Your data is synchronized across the MasterChief infrastructure.</p>
+              <button className="px-6 py-2.5 bg-white text-blue-900 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-50 transition-colors">
+                Node Status
+              </button>
+            </div>
+            <div className="absolute -right-6 -bottom-6 opacity-10 rotate-45">
+              <Zap size={140} />
+            </div>
           </div>
         </section>
 
-        {/* Categories Section */}
-        <section className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center space-x-3 text-emerald-600 dark:text-emerald-400">
-              <Tag size={24} />
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Categories</h3>
-            </div>
-            <button className="p-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 transition">
-              <Plus size={20} />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {['Electricity', 'Water', 'Gas', 'Internet'].map((cat) => (
-              <div key={cat} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-gray-900 dark:text-white font-medium text-center">
-                {cat}
+        {/* Asset & Service Management */}
+        <div className="lg:col-span-8 space-y-8">
+          {/* Locations */}
+          <section className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant shadow-sm">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-3 text-emerald-600">
+                <MapPin size={24} />
+                <h3 className="font-headline text-xl font-extrabold text-on-surface">Asset Locations</h3>
               </div>
-            ))}
-          </div>
-        </section>
+              <button className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/20">
+                <Plus size={20} />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {['AP12', 'AP15'].map((loc) => (
+                <div key={loc} className="flex justify-between items-center p-5 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl group hover:border-emerald-500/50 transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600">
+                      <MapPin size={20} />
+                    </div>
+                    <span className="font-headline font-bold text-on-surface text-lg">{loc}</span>
+                  </div>
+                  <button className="text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-all font-black text-[10px] uppercase tracking-widest">Decommission</button>
+                </div>
+              ))}
+            </div>
+          </section>
 
-        {/* Providers Section */}
-        <section className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors md:col-span-2">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center space-x-3 text-amber-600 dark:text-amber-400">
+          {/* Providers */}
+          <section className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant shadow-sm">
+            <div className="flex items-center gap-3 text-amber-600 mb-8">
               <Building2 size={24} />
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Active Providers</h3>
+              <h3 className="font-headline text-xl font-extrabold text-on-surface">Service Providers</h3>
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {['Hidroelectrica', 'ENGIE', 'Apa Nova', 'Digi', 'Orange'].map((prov) => (
-              <div key={prov} className="flex items-center justify-between p-4 border border-gray-100 dark:border-gray-700 rounded-xl hover:shadow-md transition">
-                <span className="font-bold text-gray-800 dark:text-gray-200">{prov}</span>
-                <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded font-bold uppercase">Romania</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Preferences Section */}
-        <section className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-colors md:col-span-2">
-          <h3 className="text-xl font-bold mb-6 text-gray-900 dark:text-white">System Preferences</h3>
-          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
-            <div>
-              <div className="font-bold text-gray-900 dark:text-white">Display Theme</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Switch between light and dark modes.</div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[
+                { name: 'Hidroelectrica', type: 'Zap' },
+                { name: 'ENGIE', type: 'Flame' },
+                { name: 'Apa Nova', type: 'Droplets' },
+                { name: 'Digi', type: 'Laptop' },
+                { name: 'Orange', type: 'Laptop' }
+              ].map((prov) => (
+                <div key={prov.name} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl hover:shadow-md transition-all group">
+                  <div className="w-12 h-12 rounded-2xl bg-surface-container flex items-center justify-center text-on-surface-variant mb-4 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/20 group-hover:text-amber-600 transition-colors">
+                    {prov.type === 'Zap' && <Zap size={24} />}
+                    {prov.type === 'Flame' && <Flame size={24} />}
+                    {prov.type === 'Droplets' && <Droplets size={24} />}
+                    {prov.type === 'Laptop' && <Laptop size={24} />}
+                  </div>
+                  <span className="font-headline font-bold text-on-surface text-center leading-tight">{prov.name}</span>
+                  <span className="text-[9px] font-black uppercase text-on-surface-variant opacity-40 mt-2 tracking-widest">Active</span>
+                </div>
+              ))}
+              <button className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-outline-variant rounded-2xl hover:border-amber-500/50 hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-all group">
+                <Plus size={24} className="text-outline group-hover:text-amber-500 transition-colors" />
+                <span className="text-[10px] font-bold text-on-surface-variant group-hover:text-amber-500 mt-2 uppercase tracking-widest text-center">Register Provider</span>
+              </button>
             </div>
-            <button 
-              onClick={toggleTheme}
-              className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow transition-all border border-gray-200 dark:border-gray-600"
-            >
-              {theme === 'light' ? <Moon size={24} className="text-gray-600" /> : <Sun size={24} className="text-amber-400" />}
-            </button>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   );
