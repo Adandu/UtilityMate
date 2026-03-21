@@ -33,12 +33,21 @@ COPY --from=build-stage /app/frontend/dist /usr/share/nginx/html
 COPY frontend/nginx.conf /etc/nginx/sites-available/default
 RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
-# Copy and prepare entrypoint script
+# Prepare entrypoint script
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-# Create persistent data directory
-RUN mkdir -p /app/data
+# Create appuser and set permissions
+RUN useradd -u 1000 appuser && \
+    mkdir -p /app/data && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /var/lib/nginx && \
+    chown -R appuser:appuser /var/log/nginx && \
+    touch /run/nginx.pid && \
+    chown appuser:appuser /run/nginx.pid
+
+# Switch to non-root user
+USER appuser
 
 # Expose port 80 (Nginx)
 EXPOSE 80

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import List, Optional
 from datetime import date, datetime
 
@@ -43,6 +43,19 @@ class Location(LocationBase):
     class Config:
         from_attributes = True
 
+class ProviderSimple(BaseModel):
+    id: int
+    name: str
+    category: Category
+    class Config:
+        from_attributes = True
+
+class LocationSimple(BaseModel):
+    id: int
+    name: str
+    class Config:
+        from_attributes = True
+
 # Invoice Schemas
 class InvoiceBase(BaseModel):
     location_id: int
@@ -54,6 +67,13 @@ class InvoiceBase(BaseModel):
     consumption_value: Optional[float] = None
     status: str = "unpaid"
 
+    @field_validator('billing_date')
+    @classmethod
+    def billing_date_not_in_future(cls, v: date) -> date:
+        if v > date.today():
+            raise ValueError('Billing date cannot be in the future')
+        return v
+
 class InvoiceCreate(InvoiceBase):
     pass
 
@@ -62,6 +82,8 @@ class Invoice(InvoiceBase):
     user_id: int
     pdf_path: Optional[str] = None
     created_at: datetime
+    provider: Optional[ProviderSimple] = None
+    location: Optional[LocationSimple] = None
     class Config:
         from_attributes = True
 
@@ -71,6 +93,13 @@ class ConsumptionIndexBase(BaseModel):
     category_id: int
     value: float
     reading_date: date
+
+    @field_validator('reading_date')
+    @classmethod
+    def reading_date_not_in_future(cls, v: date) -> date:
+        if v > date.today():
+            raise ValueError('Reading date cannot be in the future')
+        return v
 
 class ConsumptionIndexCreate(ConsumptionIndexBase):
     pass

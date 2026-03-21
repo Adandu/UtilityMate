@@ -64,7 +64,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full p-4 rounded-2xl bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
-              placeholder="operator@antigravity.io"
+              placeholder="user@example.com"
               disabled={loading}
             />
           </div>

@@ -71,12 +71,15 @@ class InvoiceParser:
         # Simple date finder
         date_match = re.search(r"(\d{2}\.\d{2}\.\d{4})", text)
         if date_match:
-            result["billing_date"] = datetime.strptime(date_match.group(1), "%d.%m.%Y").date()
+            try:
+                result["billing_date"] = datetime.strptime(date_match.group(1), "%d.%m.%Y").date()
+            except ValueError:
+                pass
             
         # Amount often follows "Total" or "RON"
         amount_match = re.search(r"total[:\s]+([\d,\.]+)", text, re.IGNORECASE)
         if amount_match:
             try:
                 result["amount"] = float(amount_match.group(1).replace(",", "."))
-            except:
+            except (ValueError, TypeError):
                 pass

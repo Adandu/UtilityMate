@@ -5,22 +5,35 @@ from ..database.session import get_db
 from ..models import database_models
 from ..schemas import api_schemas
 
+from ..utils import auth_utils
+
 router = APIRouter()
 
 @router.get("/", response_model=List[api_schemas.Provider])
-def read_providers(db: Session = Depends(get_db)):
-    return db.query(database_models.Provider).all()
+def read_providers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return db.query(database_models.Provider).offset(skip).limit(limit).all()
 
 @router.post("/", response_model=api_schemas.Provider)
-def create_provider(provider: api_schemas.ProviderCreate, db: Session = Depends(get_db)):
+def create_provider(provider: api_schemas.ProviderCreate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
     db_provider = database_models.Provider(**provider.dict())
     db.add(db_provider)
     db.commit()
     db.refresh(db_provider)
     return db_provider
 
+@router.put("/{provider_id}", response_model=api_schemas.Provider)
+def update_provider(provider_id: int, provider: api_schemas.ProviderCreate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
+    db_provider = db.query(database_models.Provider).filter(database_models.Provider.id == provider_id).first()
+    if not db_provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    for key, value in provider.dict().items():
+        setattr(db_provider, key, value)
+    db.commit()
+    db.refresh(db_provider)
+    return db_provider
+
 @router.post("/seed")
-def seed_providers(db: Session = Depends(get_db)):
+def seed_providers(db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
     providers_data = [
         {"category": "Electricity", "names": ["Hidroelectrica", "Enel", "Electrica Furnizare", "E.ON"]},
         {"category": "Gas", "names": ["ENGIE", "E.ON"]},

@@ -9,11 +9,11 @@ from ..utils import auth_utils
 router = APIRouter()
 
 @router.get("/", response_model=List[api_schemas.Category])
-def read_categories(db: Session = Depends(get_db)):
-    return db.query(database_models.Category).all()
+def read_categories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return db.query(database_models.Category).offset(skip).limit(limit).all()
 
 @router.post("/", response_model=api_schemas.Category)
-def create_category(category: api_schemas.CategoryCreate, db: Session = Depends(get_db)):
+def create_category(category: api_schemas.CategoryCreate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
     db_category = database_models.Category(**category.dict())
     db.add(db_category)
     db.commit()
@@ -21,7 +21,7 @@ def create_category(category: api_schemas.CategoryCreate, db: Session = Depends(
     return db_category
 
 @router.post("/seed")
-def seed_categories(db: Session = Depends(get_db)):
+def seed_categories(db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
     categories = [
         {"name": "Electricity", "unit": "kWh"},
         {"name": "Water", "unit": "m3"},

@@ -15,13 +15,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load version
-VERSION = "unknown"
-if os.path.exists("../VERSION"):
-    with open("../VERSION", "r") as f:
-        VERSION = f.read().strip()
-elif os.path.exists("VERSION"):
-    with open("VERSION", "r") as f:
-        VERSION = f.read().strip()
+VERSION = os.getenv("APP_VERSION", "1.1.3")
+try:
+    if os.path.exists("../VERSION"):
+        with open("../VERSION", "r") as f:
+            VERSION = f.read().strip()
+    elif os.path.exists("VERSION"):
+        with open("VERSION", "r") as f:
+            VERSION = f.read().strip()
+except Exception:
+    logger.warning("Could not read VERSION file, using fallback")
 
 # Create database tables on startup
 Base.metadata.create_all(bind=engine)

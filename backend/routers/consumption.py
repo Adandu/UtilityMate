@@ -9,8 +9,8 @@ from ..utils import auth_utils
 router = APIRouter()
 
 @router.get("/", response_model=List[api_schemas.ConsumptionIndex])
-def read_consumption_indexes(db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
-    return db.query(database_models.ConsumptionIndex).filter(database_models.ConsumptionIndex.user_id == current_user.id).all()
+def read_consumption_indexes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
+    return db.query(database_models.ConsumptionIndex).filter(database_models.ConsumptionIndex.user_id == current_user.id).offset(skip).limit(limit).all()
 
 @router.post("/", response_model=api_schemas.ConsumptionIndex)
 def create_consumption_index(index: api_schemas.ConsumptionIndexCreate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):

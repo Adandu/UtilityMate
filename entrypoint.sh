@@ -5,20 +5,35 @@ mkdir -p /app/data/invoices
 
 # Initialize database if needed (runs the init_db script)
 echo "Initializing database..."
-python -m backend.init_db
+python -m backend.init_db || { echo "Database initialization failed"; exit 1; }
 
 # Start Backend (FastAPI) in the background
 echo "Starting FastAPI backend..."
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 > /app/data/backend.log 2>&1 &
+BACKEND_PID=$!
 
 # Wait for backend to be ready
 echo "Waiting for backend to be ready..."
-for i in {1..10}; do
+MAX_RETRIES=15
+for ((i=1; i<=MAX_RETRIES; i++)); do
+    # Check if backend process is still running
+    if ! kill -0 $BACKEND_PID > /dev/null 2>&1; then
+        echo "Backend process died! Check /app/data/backend.log"
+        cat /app/data/backend.log
+        exit 1
+    fi
+
     if curl -s http://127.0.0.1:8000/ > /dev/null; then
         echo "Backend is up!"
         break
     fi
-    echo "Still waiting... ($i/10)"
+    
+    if [ $i -eq $MAX_RETRIES ]; then
+        echo "Backend failed to start after $MAX_RETRIES seconds"
+        exit 1
+    fi
+    
+    echo "Still waiting... ($i/$MAX_RETRIES)"
     sleep 1
 done
 

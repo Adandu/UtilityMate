@@ -19,10 +19,16 @@ api.interceptors.response.use(
   (error) => {
     const url = error.config?.url ?? '';
     const isAuthRoute = url.includes('/auth/login') || url.includes('/auth/register');
+    
     if (error.response?.status === 401 && !isAuthRoute) {
       localStorage.removeItem('token');
       window.location.href = '/login';
+    } else if (!error.response) {
+      console.error('Network Error: Please check your internet connection.');
+    } else if (error.response.status >= 500) {
+      console.error('Server Error:', error.response.data?.detail || 'An unexpected error occurred.');
     }
+    
     return Promise.reject(error);
   }
 );
