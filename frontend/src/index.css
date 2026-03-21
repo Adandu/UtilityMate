@@ -2,6 +2,8 @@
 @config "../tailwind.config.js";
 
 :root {
+  --color-surface: #f8f9ff;
+  --color-on-surface: #0b1c30;
   --color-secondary-fixed: #d5e3fd;
   --color-on-primary-fixed: #131b2e;
   --color-tertiary-fixed: #6ffbbe;
@@ -52,15 +54,24 @@
 }
 
 .dark {
-  --color-surface: #0b1c30;
-  --color-on-surface: #eaf1ff;
-  --color-surface-container: #13243a;
-  --color-surface-container-low: #0d1c2f;
-  --color-surface-container-high: #1a2b42;
-  --color-surface-container-lowest: #051121;
-  --color-outline-variant: #3a485c;
-  --color-on-surface-variant: #b9c7e0;
-  --color-background: #051121;
+  --color-surface: #0b1c30 !important;
+  --color-on-surface: #eaf1ff !important;
+  --color-surface-container: #13243a !important;
+  --color-surface-container-low: #0d1c2f !important;
+  --color-surface-container-high: #1a2b42 !important;
+  --color-surface-container-lowest: #051121 !important;
+  --color-outline-variant: #3a485c !important;
+  --color-on-surface-variant: #b9c7e0 !important;
+  --color-background: #051121 !important;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 @layer base {
