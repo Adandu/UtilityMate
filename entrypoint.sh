@@ -9,7 +9,7 @@ python -m backend.init_db || { echo "Database initialization failed"; exit 1; }
 
 # Start Backend (FastAPI) in the background
 echo "Starting FastAPI backend..."
-uvicorn backend.main:app --host 127.0.0.1 --port 8000 > /app/data/backend.log 2>&1 &
+uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
 # Wait for backend to be ready
@@ -18,8 +18,7 @@ MAX_RETRIES=15
 for ((i=1; i<=MAX_RETRIES; i++)); do
     # Check if backend process is still running
     if ! kill -0 $BACKEND_PID > /dev/null 2>&1; then
-        echo "Backend process died! Check /app/data/backend.log"
-        cat /app/data/backend.log
+        echo "Backend process died! Check container logs for details."
         exit 1
     fi
 
