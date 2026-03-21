@@ -15,7 +15,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
           </div>
           <div>
             <h1 className="font-headline text-lg font-extrabold text-slate-900 dark:text-slate-50">UtilityMate</h1>
-            <p className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold opacity-60">Asset Oversight v1.1.8</p>
+            <p className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold opacity-60">Asset Oversight v1.1.9</p>
           </div>
         </div>
         
