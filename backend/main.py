@@ -12,9 +12,18 @@ from .routers import auth, categories, providers, locations, invoices, consumpti
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Load version
+VERSION = "unknown"
+if os.path.exists("../VERSION"):
+    with open("../VERSION", "r") as f:
+        VERSION = f.read().strip()
+elif os.path.exists("VERSION"):
+    with open("VERSION", "r") as f:
+        VERSION = f.read().strip()
+
 # Initialize Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="UtilityMate API")
+app = FastAPI(title="UtilityMate API", version=VERSION)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -47,7 +56,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to UtilityMate API - Antigravity Edition"}
+    return {
+        "message": "Welcome to UtilityMate API - Antigravity Edition",
+        "version": VERSION
+    }
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

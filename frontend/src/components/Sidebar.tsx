@@ -11,7 +11,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
     <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors">
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
         <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">UtilityMate</h1>
-        <p className="text-xs text-gray-500 dark:text-gray-400">Antigravity Edition</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">Antigravity Edition v1.0.0</p>
       </div>
       
       <nav className="flex-1 p-4 space-y-2">
