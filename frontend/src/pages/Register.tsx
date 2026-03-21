@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { Shield, ArrowRight, Loader2, UserPlus } from 'lucide-react';
+import { ArrowRight, Loader2, UserPlus } from 'lucide-react';
 
 const Register: React.FC = () => {
   const [email, setEmail] = useState('');

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Tag, Building2, Moon, Sun, Plus, Shield, Laptop, Zap, Droplets, Flame } from 'lucide-react';
+import { MapPin, Building2, Moon, Sun, Plus, Shield, Laptop, Zap, Droplets, Flame } from 'lucide-react';
 
 const Config: React.FC = () => {
   const [theme, setTheme] = useState('light');
