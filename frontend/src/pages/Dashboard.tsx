@@ -19,6 +19,8 @@ interface Widget {
 const Dashboard: React.FC = () => {
   const { user, setUser } = useAuth();
   const [period, setPeriod] = useState('6m');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,13 @@ const Dashboard: React.FC = () => {
         const total = invRes.data.reduce((acc: number, inv: any) => acc + inv.amount, 0);
         const lastReading = invRes.data.length > 0 ? invRes.data[0].invoice_date : 'N/A';
         setStats({ total, count: invRes.data.length, lastReading });
+
+        // Set initial custom start date to 1 year ago if not set
+        if (!customStartDate && invRes.data.length > 0) {
+          const oneYearAgo = new Date();
+          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+          setCustomStartDate(oneYearAgo.toISOString().split('T')[0]);
+        }
       } catch (error) {
         console.error('Failed to fetch dashboard data', error);
       } finally {
@@ -101,9 +110,11 @@ const Dashboard: React.FC = () => {
       return true;
     });
 
+    if (filteredInvoices.length === 0) return <div className="h-full flex items-center justify-center opacity-40 font-bold uppercase tracking-widest text-xs">No data for this criteria</div>;
+
     // Time-based aggregation for trends
     if (['consumption', 'price', 'price_per_unit'].includes(widget.type)) {
-      const now = new Date();
+      const now = period === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
       const monthsToShow: string[] = [];
       let startDate = new Date();
 
@@ -119,16 +130,22 @@ const Dashboard: React.FC = () => {
           const firstDate = new Date(Math.min(...invoices.map(inv => new Date(inv.invoice_date).getTime())));
           startDate = firstDate;
         } else {
-          startDate.setMonth(now.getMonth() - 5); // Default 6m
+          startDate.setMonth(now.getMonth() - 5);
         }
+      } else if (period === 'custom') {
+        if (customStartDate) startDate = new Date(customStartDate);
+        else startDate.setFullYear(now.getFullYear() - 1);
       }
 
       // Generate all months between startDate and now
       let current = new Date(startDate);
       current.setDate(1); // Start at beginning of month
-      while (current <= now) {
+      const endMonth = now.toISOString().substring(0, 7);
+      
+      while (current.toISOString().substring(0, 7) <= endMonth) {
         monthsToShow.push(current.toISOString().substring(0, 7));
         current.setMonth(current.getMonth() + 1);
+        if (monthsToShow.length > 120) break; // Safety break
       }
 
       const monthlyAggregation: { [key: string]: any } = {};
@@ -219,7 +236,27 @@ const Dashboard: React.FC = () => {
     // Provider-based aggregation
     if (widget.type === 'avg_price_provider' || widget.type === 'avg_cons_provider') {
       const providerStats: {[key: string]: { total: number, count: number, category: string }} = {};
-      filteredInvoices.forEach(inv => {
+      
+      // Filter invoices for provider stats based on the same date logic
+      const now = period === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
+      let startDate = new Date(0); // Default to beginning of time
+
+      if (period === '3m') {
+        startDate = new Date(); startDate.setMonth(now.getMonth() - 2); startDate.setDate(1);
+      } else if (period === '6m') {
+        startDate = new Date(); startDate.setMonth(now.getMonth() - 5); startDate.setDate(1);
+      } else if (period === '1y') {
+        startDate = new Date(); startDate.setFullYear(now.getFullYear() - 1); startDate.setMonth(now.getMonth() + 1); startDate.setDate(1);
+      } else if (period === 'custom') {
+        if (customStartDate) startDate = new Date(customStartDate);
+      }
+
+      const periodFilteredInvoices = filteredInvoices.filter(inv => {
+        const invDate = new Date(inv.invoice_date);
+        return invDate >= startDate && invDate <= now;
+      });
+
+      periodFilteredInvoices.forEach(inv => {
         const cat = inv.provider?.category?.name;
         if (widget.category !== 'All' && cat !== widget.category) return;
         const name = inv.provider?.name;
@@ -272,7 +309,25 @@ const Dashboard: React.FC = () => {
     // Location comparison widgets
     if (widget.type === 'compare_price_location' || widget.type === 'compare_cons_location') {
       const locationStats: {[key: string]: { total: number, count: number }} = {};
-      invoices.forEach(inv => {
+      
+      const now = period === 'custom' && customEndDate ? new Date(customEndDate) : new Date();
+      let startDate = new Date(0);
+      if (period === '3m') {
+        startDate = new Date(); startDate.setMonth(now.getMonth() - 2); startDate.setDate(1);
+      } else if (period === '6m') {
+        startDate = new Date(); startDate.setMonth(now.getMonth() - 5); startDate.setDate(1);
+      } else if (period === '1y') {
+        startDate = new Date(); startDate.setFullYear(now.getFullYear() - 1); startDate.setMonth(now.getMonth() + 1); startDate.setDate(1);
+      } else if (period === 'custom') {
+        if (customStartDate) startDate = new Date(customStartDate);
+      }
+
+      const periodFilteredInvoices = invoices.filter(inv => {
+        const invDate = new Date(inv.invoice_date);
+        return invDate >= startDate && invDate <= now;
+      });
+
+      periodFilteredInvoices.forEach(inv => {
         const cat = inv.provider?.category?.name;
         if (widget.category !== 'All' && cat !== widget.category) return;
         const locName = inv.location?.name || 'Unknown';
@@ -319,16 +374,41 @@ const Dashboard: React.FC = () => {
           <p className="text-on-surface-variant font-medium opacity-70">Surgical resource flow and spending intelligence.</p>
         </div>
         
-        <div className="flex bg-surface-container-low p-1 rounded-xl border border-outline-variant shadow-sm">
-          {['3m', '6m', '1y', 'all'].map((p) => (
-            <button 
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${period === p ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
-            >
-              {p === 'all' ? 'ALL TIME' : p.toUpperCase()}
-            </button>
-          ))}
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex bg-surface-container-low p-1 rounded-xl border border-outline-variant shadow-sm">
+            {['3m', '6m', '1y', 'all', 'custom'].map((p) => (
+              <button 
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-4 py-2 rounded-lg text-xs font-black transition-all duration-200 ${period === p ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                {p === 'all' ? 'ALL TIME' : p.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {period === 'custom' && (
+            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-xl border border-outline-variant">
+                <span className="text-[9px] font-black uppercase opacity-40">From</span>
+                <input 
+                  type="date" 
+                  value={customStartDate} 
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="bg-transparent text-xs font-bold outline-none border-none text-on-surface"
+                />
+              </div>
+              <div className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-xl border border-outline-variant">
+                <span className="text-[9px] font-black uppercase opacity-40">To</span>
+                <input 
+                  type="date" 
+                  value={customEndDate} 
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="bg-transparent text-xs font-bold outline-none border-none text-on-surface"
+                />
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
