@@ -34,21 +34,33 @@ const Config: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
 
   const fetchData = async () => {
+    setLoading(true);
+    
+    // Fetch locations
     try {
-      setLoading(true);
-      const [locRes, provRes, catRes] = await Promise.all([
-        api.get('/locations/'),
-        api.get('/providers/'),
-        api.get('/categories/')
-      ]);
+      const locRes = await api.get('/locations/');
       setLocations(locRes.data);
+    } catch (error) {
+      console.error('Failed to fetch locations', error);
+    }
+
+    // Fetch providers
+    try {
+      const provRes = await api.get('/providers/');
       setProviders(provRes.data);
+    } catch (error) {
+      console.error('Failed to fetch providers', error);
+    }
+
+    // Fetch categories
+    try {
+      const catRes = await api.get('/categories/');
       setCategories(catRes.data);
     } catch (error) {
-      console.error('Failed to fetch config data', error);
-    } finally {
-      setLoading(false);
+      console.error('Failed to fetch categories', error);
     }
+
+    setLoading(false);
   };
 
   useEffect(() => {
