@@ -1,4 +1,4 @@
-# UtilityMate - Antigravity Edition
+# UtilityMate
 
 UtilityMate is a modern, dockerized web application designed to manage and monitor utility invoices (Water, Gas, Electricity, etc.) with a specific focus on Romanian providers.
 

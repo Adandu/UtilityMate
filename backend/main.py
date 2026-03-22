@@ -62,7 +62,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to UtilityMate API - Antigravity Edition",
+        "message": "Welcome to UtilityMate API",
         "version": VERSION
     }
 
