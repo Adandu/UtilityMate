@@ -19,7 +19,7 @@ UPLOAD_DIR = os.getenv("UPLOAD_DIR", "data/invoices")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf"}
-MAX_FILE_SIZE = 10 * 1024 * 1024 # 10MB
+MAX_FILE_SIZE = 50 * 1024 * 1024 # 50MB
 
 def get_file_hash(file_content: bytes):
     return hashlib.sha256(file_content).hexdigest()
