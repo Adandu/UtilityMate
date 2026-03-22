@@ -87,9 +87,23 @@ class InvoiceUpdate(BaseModel):
     currency: Optional[str] = None
     consumption_value: Optional[float] = None
 
+    @field_validator('location_id', 'provider_id', mode='before')
+    @classmethod
+    def coerce_int(cls, v):
+        if isinstance(v, str) and v.isdigit():
+            return int(v)
+        return v
+
 class InvoiceBulkUpdate(BaseModel):
     invoice_ids: List[int]
     update_data: InvoiceUpdate
+
+    @field_validator('invoice_ids', mode='before')
+    @classmethod
+    def coerce_ids(cls, v):
+        if isinstance(v, list):
+            return [int(x) if isinstance(x, str) and x.isdigit() else x for x in v]
+        return v
 
 class Invoice(InvoiceBase):
     id: int
