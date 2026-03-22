@@ -177,12 +177,13 @@ const Dashboard: React.FC = () => {
               <YAxis axisLine={false} tickLine={false} tick={{fill: 'currentColor', fontSize: 10}} />
               <Tooltip 
                 formatter={(value: any, name: any) => {
-                  const unit = String(name).toLowerCase().includes('elec') ? 'kWh' : 'm³';
+                  // Find an invoice with this category to get the unit
+                  const sampleInv = invoices.find(inv => inv.provider?.category?.name === name);
+                  const unit = sampleInv?.provider?.category?.unit || (String(name).toLowerCase().includes('elec') ? 'kWh' : 'm³');
                   return [`${Number(value).toFixed(2)} RON/${unit}`, name];
                 }}
                 contentStyle={{ backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }} 
-              />
-              {(widget.category === 'All' || widget.category === 'Electricity') && <Line type="monotone" dataKey="electricity" stroke="#3b82f6" strokeWidth={3} name="Electricity" />}
+              />              {(widget.category === 'All' || widget.category === 'Electricity') && <Line type="monotone" dataKey="electricity" stroke="#3b82f6" strokeWidth={3} name="Electricity" />}
               {(widget.category === 'All' || widget.category === 'Gas') && <Line type="monotone" dataKey="gas" stroke="#f59e0b" strokeWidth={3} name="Gas" />}
               {(widget.category === 'All' || widget.category === 'Water') && <Line type="monotone" dataKey="water" stroke="#10b981" strokeWidth={3} name="Water" />}
             </LineChart>

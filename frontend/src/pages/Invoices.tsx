@@ -8,7 +8,7 @@ interface Invoice {
   id: number;
   provider_id: number;
   location_id: number;
-  provider: { name: string };
+  provider: { name: string, category: { name: string, unit: string } };
   location: { name: string };
   invoice_date: string;
   amount: number;
@@ -157,7 +157,16 @@ const Invoices: React.FC = () => {
         await fetchInvoices();
       }
     } catch (error: any) {
-      alert(error.response?.data?.detail || 'Upload failed');
+      console.error('Upload Error:', error);
+      let errorMsg = 'Upload failed';
+      if (error.response?.status === 413) {
+        errorMsg = 'Upload batch is too large for the server. Try uploading fewer files at once.';
+      } else if (error.response?.data?.detail) {
+        errorMsg = error.response.data.detail;
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      alert(errorMsg);
     } finally {
       setUploading(false);
     }
@@ -641,7 +650,7 @@ const Invoices: React.FC = () => {
                     {activeMenuId === invoice.id && (
                       <div 
                         ref={menuRef}
-                        className="absolute right-12 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-outline-variant rounded-2xl shadow-xl z-50 py-2 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+                        className="absolute right-12 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-outline-variant rounded-2xl shadow-xl z-10 py-2 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
                       >
                         <button 
                           onClick={() => handleEditClick(invoice)}

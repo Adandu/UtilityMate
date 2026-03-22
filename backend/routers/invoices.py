@@ -19,7 +19,7 @@ UPLOAD_DIR = os.getenv("UPLOAD_DIR", "data/invoices")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf"}
-MAX_FILE_SIZE = 5 * 1024 * 1024 # 5MB
+MAX_FILE_SIZE = 10 * 1024 * 1024 # 10MB
 
 def get_file_hash(file_content: bytes):
     return hashlib.sha256(file_content).hexdigest()
@@ -50,10 +50,20 @@ async def upload_invoices(
     db: Session = Depends(get_db),
     current_user: database_models.User = Depends(auth_utils.get_current_user)
 ):
+    logger.info("Bulk upload request: %s files from %s", len(files), current_user.email)
     results = []
     available_providers = db.query(database_models.Provider).filter(
         or_(database_models.Provider.user_id == None, database_models.Provider.user_id == current_user.id)
     ).all()
+
+    location = db.query(database_models.Location).filter(
+        database_models.Location.id == location_id,
+        database_models.Location.user_id == current_user.id
+    ).first()
+    
+    if not location:
+        logger.error("Upload failed: Location %s not found for user %s", location_id, current_user.email)
+        raise HTTPException(status_code=404, detail="Selected location not found")
 
     for file in files:
         file_path = ""
@@ -67,7 +77,7 @@ async def upload_invoices(
             # 2. Validation: File size
             content = await file.read()
             if len(content) > MAX_FILE_SIZE:
-                results.append({"filename": file.filename, "status": "error", "detail": "File too large (max 5MB)"})
+                results.append({"filename": file.filename, "status": "error", "detail": f"File too large ({len(content) // 1024}KB). Max 10MB."})
                 continue
                 
             if not content.startswith(b'%PDF'):
@@ -81,7 +91,7 @@ async def upload_invoices(
             
             existing_invoice = db.query(database_models.Invoice).filter(database_models.Invoice.pdf_path == file_path).first()
             if existing_invoice:
-                results.append({"filename": file.filename, "status": "error", "detail": "Invoice already uploaded"})
+                results.append({"filename": file.filename, "status": "error", "detail": "Invoice already exists in database"})
                 continue
 
             # 4. Save for parsing
@@ -91,12 +101,13 @@ async def upload_invoices(
             # 5. Detect provider
             pdf_text = parser.InvoiceParser.get_pdf_text(file_path)
             if not pdf_text:
-                results.append({"filename": file.filename, "status": "error", "detail": "Could not read text from PDF"})
+                results.append({"filename": file.filename, "status": "error", "detail": "Could not extract text from this PDF. Is it a scanned image?"})
                 continue
 
             provider = parser.InvoiceParser.detect_provider(pdf_text, available_providers)
             if not provider:
-                results.append({"filename": file.filename, "status": "error", "detail": "Could not identify utility provider. Please add the provider first."})
+                os.remove(file_path)
+                results.append({"filename": file.filename, "status": "error", "detail": "Could not identify utility provider. Please add the provider to your config first."})
                 continue
 
             # 6. Full parsing
@@ -118,14 +129,14 @@ async def upload_invoices(
             db.refresh(new_invoice)
             
             results.append({"filename": file.filename, "status": "success", "id": new_invoice.id})
-            logger.info("Invoice processed: %s for user %s", file.filename, current_user.email)
+            logger.info("Invoice processed successfully: %s", file.filename)
 
         except Exception as e:
-            logger.error(f"Error processing {file.filename}: {str(e)}\n{traceback.format_exc()}")
+            logger.error("Error processing %s: %s", file.filename, str(e))
             if file_path and os.path.exists(file_path): 
                 try: os.remove(file_path)
                 except: pass
-            results.append({"filename": file.filename, "status": "error", "detail": f"System error: {str(e)}"})
+            results.append({"filename": file.filename, "status": "error", "detail": f"Processing error: {str(e)}"})
 
     return results
 
