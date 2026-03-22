@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle } from 'lucide-react';
+import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle, AlertTriangle } from 'lucide-react';
 import api from '../utils/api';
 
 interface Invoice {
@@ -16,6 +16,13 @@ interface Invoice {
 interface Location { id: number; name: string; }
 interface Provider { id: number; name: string; }
 
+interface UploadResult {
+  filename: string;
+  status: 'success' | 'error';
+  detail?: string;
+  id?: number;
+}
+
 const Invoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -26,10 +33,10 @@ const Invoices: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [uploadResults, setUploadResults] = useState<UploadResult[] | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedLocation, setSelectedLocation] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState('');
 
   // Edit form state
   const [editDate, setEditDate] = useState('');
@@ -42,36 +49,26 @@ const Invoices: React.FC = () => {
 
   const fetchInvoices = async () => {
     setLoading(true);
-    // Fetch invoices
     try {
       const invRes = await api.get('/invoices/');
       setInvoices(invRes.data);
-    } catch (error) {
-      console.error('Failed to fetch invoices', error);
-    }
+    } catch (error) { console.error('Failed to fetch invoices', error); }
 
-    // Fetch locations
     try {
       const locRes = await api.get('/locations/');
       setLocations(locRes.data);
-    } catch (error) {
-      console.error('Failed to fetch locations', error);
-    }
+    } catch (error) { console.error('Failed to fetch locations', error); }
 
-    // Fetch providers
     try {
       const provRes = await api.get('/providers/');
       setProviders(provRes.data);
-    } catch (error) {
-      console.error('Failed to fetch providers', error);
-    }
+    } catch (error) { console.error('Failed to fetch providers', error); }
     
     setLoading(false);
   };
 
   useEffect(() => {
     fetchInvoices();
-    
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setActiveMenuId(null);
@@ -94,24 +91,29 @@ const Invoices: React.FC = () => {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedLocation || !selectedProvider || !fileInputRef.current?.files?.[0]) {
-      alert('Please fill all fields and select a PDF file.');
+    const files = fileInputRef.current?.files;
+    if (!selectedLocation || !files || files.length === 0) {
+      alert('Please select a location and at least one PDF file.');
       return;
     }
 
     setUploading(true);
+    setUploadResults(null);
     const formData = new FormData();
     formData.append('location_id', selectedLocation);
-    formData.append('provider_id', selectedProvider);
-    formData.append('file', fileInputRef.current.files[0]);
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
 
     try {
       const response = await api.post('/invoices/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      setInvoices([response.data, ...invoices]);
-      setShowUpload(false);
-      resetForm();
+      setUploadResults(response.data);
+      // Refresh list if any succeeded
+      if (response.data.some((r: any) => r.status === 'success')) {
+        await fetchInvoices();
+      }
     } catch (error: any) {
       alert(error.response?.data?.detail || 'Upload failed');
     } finally {
@@ -156,11 +158,11 @@ const Invoices: React.FC = () => {
 
   const resetForm = () => {
     setSelectedLocation('');
-    setSelectedProvider('');
     if (fileInputRef.current) fileInputRef.current.value = '';
+    setUploadResults(null);
   };
 
-  if (loading) return (
+  if (loading && invoices.length === 0) return (
     <div className="ml-64 flex items-center justify-center min-h-screen bg-surface">
       <Loader2 className="animate-spin text-emerald-500" size={48} />
     </div>
@@ -171,80 +173,118 @@ const Invoices: React.FC = () => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
         <div>
           <h2 className="font-headline text-3xl font-extrabold text-on-surface">Invoice Ledger</h2>
-          <p className="text-on-surface-variant font-medium opacity-70">Surgical management of your utility documentation.</p>
+          <p className="text-on-surface-variant font-medium opacity-70">Bulk management and automated provider detection.</p>
         </div>
         
         <button 
-          onClick={() => setShowUpload(true)}
+          onClick={() => { resetForm(); setShowUpload(true); }}
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95"
         >
           <Upload size={20} />
-          <span>Upload Document</span>
+          <span>Bulk Upload</span>
         </button>
       </header>
 
       {/* Upload Modal */}
       {showUpload && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[2rem] border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-[2rem] border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-8 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
-              <h3 className="font-headline text-xl font-black text-on-surface">Document Ingestion</h3>
+              <h3 className="font-headline text-xl font-black text-on-surface">Invoice Ingestion</h3>
               <button onClick={() => setShowUpload(false)} className="text-on-surface-variant hover:text-on-surface transition-colors">
                 <X size={24} />
               </button>
             </div>
             
-            <form onSubmit={handleUpload} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Asset Location</label>
-                <select 
-                  required
-                  value={selectedLocation}
-                  onChange={(e) => setSelectedLocation(e.target.value)}
-                  className="w-full p-4 rounded-2xl bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-medium appearance-none"
-                >
-                  <option value="">Select Location...</option>
-                  {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
-              </div>
+            <div className="p-8">
+              {!uploadResults ? (
+                <form onSubmit={handleUpload} className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Asset Location</label>
+                    <select 
+                      required
+                      value={selectedLocation}
+                      onChange={(e) => setSelectedLocation(e.target.value)}
+                      className="w-full p-4 rounded-2xl bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-medium appearance-none"
+                    >
+                      <option value="">Select Location for these invoices...</option>
+                      {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Service Provider</label>
-                <select 
-                  required
-                  value={selectedProvider}
-                  onChange={(e) => setSelectedProvider(e.target.value)}
-                  className="w-full p-4 rounded-2xl bg-surface-container border border-outline-variant text-on-surface focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-medium appearance-none"
-                >
-                  <option value="">Select Provider...</option>
-                  {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Select PDF Documents</label>
+                    <div className="border-2 border-dashed border-outline-variant rounded-2xl p-8 text-center hover:border-emerald-500/50 transition-colors">
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        accept=".pdf"
+                        multiple
+                        required
+                        className="hidden"
+                        id="bulk-file-upload"
+                      />
+                      <label htmlFor="bulk-file-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                        <Upload size={40} className="text-on-surface-variant opacity-40" />
+                        <span className="text-sm font-bold text-on-surface">Click to select multiple invoices</span>
+                        <span className="text-[10px] text-on-surface-variant uppercase tracking-widest">Automatic provider detection enabled</span>
+                      </label>
+                    </div>
+                  </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">PDF File</label>
-                <input 
-                  type="file" 
-                  ref={fileInputRef}
-                  accept=".pdf"
-                  required
-                  className="w-full p-4 rounded-2xl bg-surface-container border border-outline-variant text-on-surface file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:uppercase file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
-                />
-              </div>
-
-              <button 
-                type="submit"
-                disabled={uploading}
-                className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-              >
-                {uploading ? <Loader2 className="animate-spin" size={20} /> : (
-                  <>
-                    <Upload size={20} />
-                    <span className="uppercase tracking-[0.1em] text-sm">Analyze & Import</span>
-                  </>
-                )}
-              </button>
-            </form>
+                  <button 
+                    type="submit"
+                    disabled={uploading}
+                    className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-3 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                  >
+                    {uploading ? <Loader2 className="animate-spin" size={20} /> : (
+                      <>
+                        <Upload size={20} />
+                        <span className="uppercase tracking-[0.1em] text-sm">Process & Import</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-surface-container-low border-b border-outline-variant">
+                        <tr>
+                          <th className="px-4 py-3 font-black uppercase tracking-widest opacity-50">File</th>
+                          <th className="px-4 py-3 font-black uppercase tracking-widest opacity-50">Result</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant/30">
+                        {uploadResults.map((res, idx) => (
+                          <tr key={idx}>
+                            <td className="px-4 py-3 font-bold truncate max-w-[200px]">{res.filename}</td>
+                            <td className="px-4 py-3">
+                              {res.status === 'success' ? (
+                                <span className="text-emerald-500 font-black flex items-center gap-1 uppercase tracking-tighter">
+                                  <CheckCircle size={14} /> OK
+                                </span>
+                              ) : (
+                                <div className="text-error flex items-start gap-1">
+                                  <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                                  <span className="font-medium leading-tight">{res.detail}</span>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button 
+                    onClick={() => setShowUpload(false)}
+                    className="w-full py-4 bg-on-surface text-surface font-black rounded-2xl uppercase tracking-widest text-xs"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

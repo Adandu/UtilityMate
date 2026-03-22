@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 from typing import List, Optional
 from datetime import datetime, timezone
 import os
@@ -27,7 +28,7 @@ def read_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     return db.query(database_models.Invoice).options(
         joinedload(database_models.Invoice.provider).joinedload(database_models.Provider.category),
         joinedload(database_models.Invoice.location)
-    ).filter(database_models.Invoice.user_id == current_user.id).offset(skip).limit(limit).all()
+    ).filter(database_models.Invoice.user_id == current_user.id).order_by(database_models.Invoice.invoice_date.desc()).offset(skip).limit(limit).all()
 
 from fastapi.responses import FileResponse
 
@@ -42,77 +43,86 @@ def download_invoice(invoice_id: int, db: Session = Depends(get_db), current_use
     return FileResponse(invoice.pdf_path, media_type='application/pdf', filename=os.path.basename(invoice.pdf_path))
 
 @router.post("/upload")
-async def upload_invoice(
+async def upload_invoices(
     location_id: int = Form(...),
-    provider_id: int = Form(...),
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_user: database_models.User = Depends(auth_utils.get_current_user)
 ):
-    # 1. Validation: File extension
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+    results = []
     
-    # 2. Validation: File size and content
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="File too large (max 5MB)")
-        
-    if not content.startswith(b'%PDF'):
-        raise HTTPException(status_code=400, detail="Invalid PDF file content")
+    # Pre-fetch all available providers for this user (system defaults + custom)
+    available_providers = db.query(database_models.Provider).filter(
+        or_(database_models.Provider.user_id == None, database_models.Provider.user_id == current_user.id)
+    ).all()
 
-    # 3. Check for duplicate file (hash-based) BEFORE writing
-    file_hash = get_file_hash(content)
-    unique_filename = f"{current_user.id}_{file_hash}{ext}"
-    file_path = os.path.join(UPLOAD_DIR, unique_filename)
-    
-    existing_invoice = db.query(database_models.Invoice).filter(
-        database_models.Invoice.pdf_path == file_path
-    ).first()
-    if existing_invoice:
-        raise HTTPException(status_code=400, detail="This invoice has already been uploaded")
-    
-    # 4. Validation: Provider/Location
-    location = db.query(database_models.Location).filter(
-        database_models.Location.id == location_id,
-        database_models.Location.user_id == current_user.id
-    ).first()
-    if not location:
-        raise HTTPException(status_code=404, detail="Location not found")
-        
-    provider = db.query(database_models.Provider).filter(database_models.Provider.id == provider_id).first()
-    if not provider:
-        raise HTTPException(status_code=404, detail="Provider not found")
+    for file in files:
+        try:
+            # 1. Validation: File extension
+            ext = os.path.splitext(file.filename)[1].lower()
+            if ext not in ALLOWED_EXTENSIONS:
+                results.append({"filename": file.filename, "status": "error", "detail": "Only PDF files are allowed"})
+                continue
+            
+            # 2. Validation: File size
+            content = await file.read()
+            if len(content) > MAX_FILE_SIZE:
+                results.append({"filename": file.filename, "status": "error", "detail": "File too large (max 5MB)"})
+                continue
+                
+            if not content.startswith(b'%PDF'):
+                results.append({"filename": file.filename, "status": "error", "detail": "Invalid PDF file content"})
+                continue
 
-    # 5. Save file
-    with open(file_path, "wb") as buffer:
-        buffer.write(content)
+            # 3. Duplicate check
+            file_hash = get_file_hash(content)
+            unique_filename = f"{current_user.id}_{file_hash}{ext}"
+            file_path = os.path.join(UPLOAD_DIR, unique_filename)
+            
+            existing_invoice = db.query(database_models.Invoice).filter(database_models.Invoice.pdf_path == file_path).first()
+            if existing_invoice:
+                results.append({"filename": file.filename, "status": "error", "detail": "Invoice already uploaded"})
+                continue
 
-    # 6. Parse file
-    try:
-        parsed_data = parser.InvoiceParser.parse_pdf(file_path, provider.name)
-    except Exception as e:
-        os.remove(file_path)
-        raise HTTPException(status_code=500, detail=f"Failed to parse invoice: {str(e)}")
-    
-    # 7. Create invoice record
-    new_invoice = database_models.Invoice(
-        user_id=current_user.id,
-        location_id=location_id,
-        provider_id=provider_id,
-        invoice_date=parsed_data["invoice_date"] or datetime.now(timezone.utc).date(),
-        amount=parsed_data["amount"],
-        consumption_value=parsed_data["consumption_value"],
-        pdf_path=file_path,
-        currency="RON"
-    )
-    db.add(new_invoice)
-    db.commit()
-    db.refresh(new_invoice)
-    
-    logger.info("Invoice uploaded successfully: %s for user %s", file.filename, current_user.email)
-    return new_invoice
+            # 4. Temp save for parsing
+            with open(file_path, "wb") as buffer:
+                buffer.write(content)
+
+            # 5. Extract text and detect provider
+            pdf_text = parser.InvoiceParser.get_pdf_text(file_path)
+            provider = parser.InvoiceParser.detect_provider(pdf_text, available_providers)
+            
+            if not provider:
+                os.remove(file_path)
+                results.append({"filename": file.filename, "status": "error", "detail": "Could not identify utility provider. Please add the provider first or check the document."})
+                continue
+
+            # 6. Full parsing
+            parsed_data = parser.InvoiceParser.parse_pdf(pdf_text, provider.name)
+            
+            # 7. Create record
+            new_invoice = database_models.Invoice(
+                user_id=current_user.id,
+                location_id=location_id,
+                provider_id=provider.id,
+                invoice_date=parsed_data["invoice_date"] or datetime.now(timezone.utc).date(),
+                amount=parsed_data["amount"],
+                consumption_value=parsed_data["consumption_value"],
+                pdf_path=file_path,
+                currency="RON"
+            )
+            db.add(new_invoice)
+            db.commit()
+            db.refresh(new_invoice)
+            
+            results.append({"filename": file.filename, "status": "success", "id": new_invoice.id})
+            logger.info("Invoice processed: %s for user %s", file.filename, current_user.email)
+
+        except Exception as e:
+            if os.path.exists(file_path): os.remove(file_path)
+            results.append({"filename": file.filename, "status": "error", "detail": str(e)})
+
+    return results
 
 @router.patch("/{invoice_id}", response_model=api_schemas.Invoice)
 def update_invoice(invoice_id: int, invoice_update: api_schemas.InvoiceUpdate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
@@ -130,7 +140,6 @@ def update_invoice(invoice_id: int, invoice_update: api_schemas.InvoiceUpdate, d
     db.commit()
     db.refresh(invoice)
     
-    # Reload with relations
     return db.query(database_models.Invoice).options(
         joinedload(database_models.Invoice.provider).joinedload(database_models.Provider.category),
         joinedload(database_models.Invoice.location)
@@ -150,5 +159,4 @@ def delete_invoice(invoice_id: int, db: Session = Depends(get_db), current_user:
         
     db.delete(invoice)
     db.commit()
-    logger.info("Invoice %s deleted by user %s", invoice_id, current_user.email)
     return {"message": "Invoice deleted"}
