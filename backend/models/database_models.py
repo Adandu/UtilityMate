@@ -31,15 +31,17 @@ class Location(Base):
 class Category(Base):
     __tablename__ = "categories"
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True, nullable=False) # e.g. "Electricity", "Water"
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True) # Null for system defaults
+    name = Column(String, index=True, nullable=False) # Removed unique=True to allow same names for different users
     unit = Column(String, nullable=False) # e.g. "kWh", "m3"
     
-    providers = relationship("Provider", back_populates="category")
-    indexes = relationship("ConsumptionIndex", back_populates="category")
+    providers = relationship("Provider", back_populates="category", cascade="all, delete-orphan")
+    indexes = relationship("ConsumptionIndex", back_populates="category", cascade="all, delete-orphan")
 
 class Provider(Base):
     __tablename__ = "providers"
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True) # Null for system defaults
     category_id = Column(Integer, ForeignKey("categories.id"), index=True)
     name = Column(String, nullable=False) # e.g. "Hidroelectrica", "ENGIE"
     is_custom = Column(Boolean, default=False)

@@ -57,14 +57,28 @@ async def read_users_me(current_user: database_models.User = Depends(auth_utils.
 
 @router.put("/me", response_model=api_schemas.User)
 async def update_user_me(
-    user_update: api_schemas.UserBase, 
+    user_update: api_schemas.UserUpdate, 
     theme_pref: Optional[str] = None,
     db: Session = Depends(get_db), 
     current_user: database_models.User = Depends(auth_utils.get_current_user)
 ):
-    current_user.email = user_update.email
+    # If email is changing, require current_password
+    if user_update.email != current_user.email:
+        if not user_update.current_password:
+            raise HTTPException(status_code=400, detail="Current password required to change email")
+        if not auth_utils.verify_password(user_update.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=400, detail="Incorrect password")
+        
+        # Check if new email is already taken
+        db_user = db.query(database_models.User).filter(database_models.User.email == user_update.email).first()
+        if db_user:
+            raise HTTPException(status_code=400, detail="Email already in use")
+            
+        current_user.email = user_update.email
+
     if theme_pref:
         current_user.theme_pref = theme_pref
+        
     db.commit()
     db.refresh(current_user)
     return current_user

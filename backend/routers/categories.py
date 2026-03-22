@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List
 from ..database.session import get_db
 from ..models import database_models
@@ -9,12 +10,14 @@ from ..utils import auth_utils
 router = APIRouter()
 
 @router.get("/", response_model=List[api_schemas.Category])
-def read_categories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(database_models.Category).offset(skip).limit(limit).all()
+def read_categories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
+    return db.query(database_models.Category).filter(
+        or_(database_models.Category.user_id == None, database_models.Category.user_id == current_user.id)
+    ).offset(skip).limit(limit).all()
 
 @router.post("/", response_model=api_schemas.Category)
 def create_category(category: api_schemas.CategoryCreate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
-    db_category = database_models.Category(**category.dict())
+    db_category = database_models.Category(**category.dict(), user_id=current_user.id)
     db.add(db_category)
     db.commit()
     db.refresh(db_category)
@@ -31,16 +34,20 @@ def seed_categories(db: Session = Depends(get_db), current_user: database_models
         {"name": "Maintenance", "unit": "total"}
     ]
     for cat in categories:
-        if not db.query(database_models.Category).filter(database_models.Category.name == cat["name"]).first():
-            db.add(database_models.Category(**cat))
+        if not db.query(database_models.Category).filter(database_models.Category.name == cat["name"], database_models.Category.user_id == None).first():
+            db.add(database_models.Category(**cat, user_id=None))
     db.commit()
     return {"message": "Categories seeded"}
 
 @router.delete("/{category_id}")
 def delete_category(category_id: int, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
-    db_category = db.query(database_models.Category).filter(database_models.Category.id == category_id).first()
+    db_category = db.query(database_models.Category).filter(
+        database_models.Category.id == category_id,
+        database_models.Category.user_id == current_user.id
+    ).first()
+    
     if not db_category:
-        raise HTTPException(status_code=404, detail="Category not found")
+        raise HTTPException(status_code=404, detail="Category not found or not authorized to delete")
         
     # Guardrail: Check for associated providers
     providers_count = db.query(database_models.Provider).filter(database_models.Provider.category_id == category_id).count()

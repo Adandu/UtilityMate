@@ -12,6 +12,7 @@ class CategoryCreate(CategoryBase):
 
 class Category(CategoryBase):
     id: int
+    user_id: Optional[int] = None
     class Config:
         from_attributes = True
 
@@ -26,6 +27,7 @@ class ProviderCreate(ProviderBase):
 
 class Provider(ProviderBase):
     id: int
+    user_id: Optional[int] = None
     class Config:
         from_attributes = True
 
@@ -122,6 +124,9 @@ class ConsumptionIndex(ConsumptionIndexBase):
 # User Schemas
 class UserBase(BaseModel):
     email: EmailStr
+
+class UserUpdate(UserBase):
+    current_password: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str

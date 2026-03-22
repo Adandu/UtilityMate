@@ -15,14 +15,17 @@ const RawData: React.FC = () => {
   const [data, setData] = useState<InvoiceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setError(null);
         const response = await api.get('/invoices/');
         setData(response.data);
       } catch (error) {
         console.error('Failed to fetch raw data', error);
+        setError('Failed to load data from server.');
       } finally {
         setLoading(false);
       }
@@ -43,30 +46,42 @@ const RawData: React.FC = () => {
   );
 
   const handleExport = () => {
-    if (filteredData.length === 0) return;
-    const headers = ['Invoice Date', 'Location', 'Category', 'Provider', 'Consumption', 'Amount', 'Currency'];
-    const csvContent = [
-      headers.join(','),
-      ...filteredData.map(row => [
-        row.invoice_date,
-        row.location?.name,
-        row.provider?.category?.name,
-        row.provider?.name,
-        row.consumption_value,
-        row.amount,
-        'RON'
-      ].join(','))
-    ].join('\n');
+    if (error) {
+      alert('Cannot export: ' + error);
+      return;
+    }
+    if (filteredData.length === 0) {
+      alert('No data available to export.');
+      return;
+    }
+    
+    try {
+      const headers = ['Invoice Date', 'Location', 'Category', 'Provider', 'Consumption', 'Amount', 'Currency'];
+      const csvContent = [
+        headers.join(','),
+        ...filteredData.map(row => [
+          row.invoice_date,
+          `"${row.location?.name || 'N/A'}"`,
+          `"${row.provider?.category?.name || 'N/A'}"`,
+          `"${row.provider?.name || 'N/A'}"`,
+          row.consumption_value,
+          row.amount,
+          'RON'
+        ].join(','))
+      ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `utilitymate_export_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `utilitymate_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert('Failed to generate export file.');
+    }
   };
 
   return (
@@ -86,6 +101,12 @@ const RawData: React.FC = () => {
         </button>
       </header>
 
+      {error && (
+        <div className="mb-6 p-4 bg-error-container text-on-error-container rounded-2xl border border-error/20 flex items-center gap-3">
+          <Database size={20} />
+          <p className="text-sm font-bold">{error}</p>
+        </div>
+      )}
 
       <div className="bg-surface-container-low rounded-3xl border border-outline-variant shadow-sm overflow-hidden">
         <div className="p-6 border-b border-outline-variant flex flex-col md:flex-row gap-4 justify-between bg-surface-container-lowest/50">
