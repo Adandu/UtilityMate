@@ -118,9 +118,12 @@ const Dashboard: React.FC = () => {
         }
       });
 
-      const chartData = Object.values(monthlyAggregation)
-        .sort((a: any, b: any) => a.name.localeCompare(b.name))
-        .slice(period === '3m' ? -3 : period === '6m' ? -6 : -12);
+      const sortedAggregation = Object.values(monthlyAggregation)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+      const chartData = period === 'all' 
+        ? sortedAggregation 
+        : sortedAggregation.slice(period === '3m' ? -3 : period === '6m' ? -6 : -12);
 
       if (widget.type === 'consumption') {
         return (
@@ -290,13 +293,13 @@ const Dashboard: React.FC = () => {
         </div>
         
         <div className="flex bg-surface-container-low p-1 rounded-xl border border-outline-variant shadow-sm">
-          {['3m', '6m', '1y'].map((p) => (
+          {['3m', '6m', '1y', 'all'].map((p) => (
             <button 
               key={p}
               onClick={() => setPeriod(p)}
               className={`px-6 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${period === p ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
             >
-              {p.toUpperCase()}
+              {p === 'all' ? 'ALL TIME' : p.toUpperCase()}
             </button>
           ))}
         </div>
