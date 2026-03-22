@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, LineChart, Line, Cell
 } from 'recharts';
 import { TrendingUp, Calendar, Plus, Loader2, X, Droplets, BarChart3, PieChart, Info } from 'lucide-react';
 import api from '../utils/api';
@@ -121,9 +121,9 @@ const Dashboard: React.FC = () => {
             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'currentColor', fontSize: 10}} dy={10} />
             <YAxis axisLine={false} tickLine={false} tick={{fill: 'currentColor', fontSize: 10}} />
             <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }} />
-            {(widget.category === 'All' || widget.category === 'Electricity') && <Area type="monotone" dataKey="electricity" stroke="#3b82f6" fill="url(#colorElec)" strokeWidth={3} />}
-            {(widget.category === 'All' || widget.category === 'Gas') && <Area type="monotone" dataKey="gas" stroke="#f59e0b" fill="url(#colorGas)" strokeWidth={3} />}
-            {(widget.category === 'All' || widget.category === 'Water') && <Area type="monotone" dataKey="water" stroke="#10b981" fill="url(#colorWater)" strokeWidth={3} />}
+            {(widget.category === 'All' || widget.category === 'Electricity') && <Area type="monotone" dataKey="electricity" stroke="#3b82f6" fill="url(#colorElec)" strokeWidth={3} name="Electricity" />}
+            {(widget.category === 'All' || widget.category === 'Gas') && <Area type="monotone" dataKey="gas" stroke="#f59e0b" fill="url(#colorGas)" strokeWidth={3} name="Gas" />}
+            {(widget.category === 'All' || widget.category === 'Water') && <Area type="monotone" dataKey="water" stroke="#10b981" fill="url(#colorWater)" strokeWidth={3} name="Water" />}
           </AreaChart>
         </ResponsiveContainer>
       );
@@ -158,34 +158,68 @@ const Dashboard: React.FC = () => {
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: 'currentColor', fontSize: 10}} dy={10} />
             <YAxis axisLine={false} tickLine={false} tick={{fill: 'currentColor', fontSize: 10}} />
-            <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }} />
-            {(widget.category === 'All' || widget.category === 'Electricity') && <Line type="monotone" dataKey="electricity" stroke="#3b82f6" strokeWidth={3} name="Electricity RON/Unit" />}
-            {(widget.category === 'All' || widget.category === 'Gas') && <Line type="monotone" dataKey="gas" stroke="#f59e0b" strokeWidth={3} name="Gas RON/Unit" />}
-            {(widget.category === 'All' || widget.category === 'Water') && <Line type="monotone" dataKey="water" stroke="#10b981" strokeWidth={3} name="Water RON/Unit" />}
+            <Tooltip 
+              formatter={(value: any, name: any) => {
+                const unit = String(name).toLowerCase().includes('elec') ? 'kWh' : 'm³';
+                return [`${Number(value).toFixed(2)} RON/${unit}`, name];
+              }}
+              contentStyle={{ backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }} 
+            />
+            {(widget.category === 'All' || widget.category === 'Electricity') && <Line type="monotone" dataKey="electricity" stroke="#3b82f6" strokeWidth={3} name="Electricity" />}
+            {(widget.category === 'All' || widget.category === 'Gas') && <Line type="monotone" dataKey="gas" stroke="#f59e0b" strokeWidth={3} name="Gas" />}
+            {(widget.category === 'All' || widget.category === 'Water') && <Line type="monotone" dataKey="water" stroke="#10b981" strokeWidth={3} name="Water" />}
           </LineChart>
         </ResponsiveContainer>
       );
     }
 
     if (widget.type === 'avg_price_provider' || widget.type === 'avg_cons_provider') {
-      const providerStats: {[key: string]: { total: number, count: number }} = {};
+      const providerStats: {[key: string]: { total: number, count: number, category: string }} = {};
       invoices.forEach(inv => {
         const cat = inv.provider?.category?.name;
         if (widget.category !== 'All' && cat !== widget.category) return;
         const name = inv.provider?.name;
-        if (!providerStats[name]) providerStats[name] = { total: 0, count: 0 };
-        providerStats[name].total += widget.type === 'avg_price_provider' ? inv.amount : inv.consumption_value;
+        if (!providerStats[name]) providerStats[name] = { total: 0, count: 0, category: cat || '' };
+        providerStats[name].total += widget.type === 'avg_price_provider' ? inv.amount : (inv.consumption_value || 0);
         providerStats[name].count += 1;
       });
-      const barData = Object.entries(providerStats).map(([name, s]) => ({ name, value: s.total / s.count }));
+      
+      const barData = Object.entries(providerStats)
+        .map(([name, s]) => ({ 
+          name, 
+          value: s.total / s.count,
+          category: s.category
+        }))
+        .sort((a, b) => b.value - a.value);
+
+      const getBarColor = (cat: string) => {
+        const c = cat.toLowerCase();
+        if (c === 'electricity') return '#3b82f6';
+        if (c === 'gas') return '#f59e0b';
+        if (c === 'water') return '#10b981';
+        return 'var(--color-primary)';
+      };
+
       return (
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={barData} layout="vertical">
+          <BarChart data={barData} layout="vertical" margin={{ left: 20, right: 40 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="currentColor" opacity={0.1} />
             <XAxis type="number" hide />
             <YAxis type="category" dataKey="name" width={100} axisLine={false} tickLine={false} tick={{fill: 'currentColor', fontSize: 10}} />
-            <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }} />
-            <Bar dataKey="value" fill="var(--color-primary)" radius={[0, 4, 4, 0]} barSize={20} />
+            <Tooltip 
+              cursor={{fill: 'transparent'}} 
+              formatter={(value: any, _: any, props: any) => {
+                const cat = props.payload.category.toLowerCase();
+                const unit = widget.type === 'avg_price_provider' ? 'RON' : (cat === 'electricity' ? 'kWh' : 'm³');
+                return [`${Number(value).toFixed(2)} ${unit}`, 'Average'];
+              }}
+              contentStyle={{ backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }} 
+            />
+            <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={24}>
+              {barData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={getBarColor(entry.category)} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       );

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import os
 import shutil
 import hashlib
+import traceback
 from ..database.session import get_db
 from ..models import database_models
 from ..schemas import api_schemas
@@ -50,13 +51,12 @@ async def upload_invoices(
     current_user: database_models.User = Depends(auth_utils.get_current_user)
 ):
     results = []
-    
-    # Pre-fetch all available providers for this user (system defaults + custom)
     available_providers = db.query(database_models.Provider).filter(
         or_(database_models.Provider.user_id == None, database_models.Provider.user_id == current_user.id)
     ).all()
 
     for file in files:
+        file_path = ""
         try:
             # 1. Validation: File extension
             ext = os.path.splitext(file.filename)[1].lower()
@@ -84,17 +84,19 @@ async def upload_invoices(
                 results.append({"filename": file.filename, "status": "error", "detail": "Invoice already uploaded"})
                 continue
 
-            # 4. Temp save for parsing
+            # 4. Save for parsing
             with open(file_path, "wb") as buffer:
                 buffer.write(content)
 
-            # 5. Extract text and detect provider
+            # 5. Detect provider
             pdf_text = parser.InvoiceParser.get_pdf_text(file_path)
+            if not pdf_text:
+                results.append({"filename": file.filename, "status": "error", "detail": "Could not read text from PDF"})
+                continue
+
             provider = parser.InvoiceParser.detect_provider(pdf_text, available_providers)
-            
             if not provider:
-                os.remove(file_path)
-                results.append({"filename": file.filename, "status": "error", "detail": "Could not identify utility provider. Please add the provider first or check the document."})
+                results.append({"filename": file.filename, "status": "error", "detail": "Could not identify utility provider. Please add the provider first."})
                 continue
 
             # 6. Full parsing
@@ -119,8 +121,11 @@ async def upload_invoices(
             logger.info("Invoice processed: %s for user %s", file.filename, current_user.email)
 
         except Exception as e:
-            if os.path.exists(file_path): os.remove(file_path)
-            results.append({"filename": file.filename, "status": "error", "detail": str(e)})
+            logger.error(f"Error processing {file.filename}: {str(e)}\n{traceback.format_exc()}")
+            if file_path and os.path.exists(file_path): 
+                try: os.remove(file_path)
+                except: pass
+            results.append({"filename": file.filename, "status": "error", "detail": f"System error: {str(e)}"})
 
     return results
 
