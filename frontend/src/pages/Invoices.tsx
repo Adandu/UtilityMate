@@ -444,43 +444,45 @@ const Invoices: React.FC = () => {
               ) : (
                 <div className="space-y-6">
                   <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant text-on-surface">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-surface-container-low border-b border-outline-variant">
-                        <tr>
-                          <th className="px-4 py-3 font-black uppercase tracking-widest opacity-50">File</th>
-                          <th className="px-4 py-3 font-black uppercase tracking-widest opacity-50">Result</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-outline-variant/30">
-                        {uploadResults.map((res, idx) => (
-                          <tr key={idx}>
-                            <td className="px-4 py-3 font-bold truncate max-w-[200px]">{res.filename}</td>
-                            <td className="px-4 py-3">
-                              {res.status === 'success' ? (
-                                <span className="text-emerald-500 font-black flex items-center gap-1 uppercase tracking-tighter">
-                                  <CheckCircle size={14} /> OK
-                                </span>
-                              ) : (
-                                <div className="space-y-2">
-                                  <div className="text-error flex items-start gap-1">
-                                    <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-                                    <span className="font-medium leading-tight">{res.detail}</span>
-                                  </div>
-                                  {res.detail?.includes('identify utility provider') && (
-                                    <button 
-                                      onClick={() => navigate('/config')}
-                                      className="flex items-center gap-1 px-2 py-1 bg-surface-container-high rounded-lg text-[9px] font-black uppercase tracking-widest text-on-surface hover:bg-on-surface hover:text-surface transition-all"
-                                    >
-                                      <Plus size={10} /> Add Provider
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </td>
+                    <div className="max-h-[40vh] overflow-y-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-surface-container-low border-b border-outline-variant sticky top-0 z-10">
+                          <tr>
+                            <th className="px-4 py-3 font-black uppercase tracking-widest opacity-50">File</th>
+                            <th className="px-4 py-3 font-black uppercase tracking-widest opacity-50">Result</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-outline-variant/30">
+                          {uploadResults.map((res, idx) => (
+                            <tr key={idx}>
+                              <td className="px-4 py-3 font-bold truncate max-w-[200px]">{res.filename}</td>
+                              <td className="px-4 py-3">
+                                {res.status === 'success' ? (
+                                  <span className="text-emerald-500 font-black flex items-center gap-1 uppercase tracking-tighter">
+                                    <CheckCircle size={14} /> OK
+                                  </span>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <div className="text-error flex items-start gap-1">
+                                      <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                                      <span className="font-medium leading-tight">{res.detail}</span>
+                                    </div>
+                                    {res.detail?.includes('identify utility provider') && (
+                                      <button 
+                                        onClick={() => navigate('/config')}
+                                        className="flex items-center gap-1 px-2 py-1 bg-surface-container-high rounded-lg text-[9px] font-black uppercase tracking-widest text-on-surface hover:bg-on-surface hover:text-surface transition-all"
+                                      >
+                                        <Plus size={10} /> Add Provider
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                   <button 
                     onClick={() => setShowUpload(false)}

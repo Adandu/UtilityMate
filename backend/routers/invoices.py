@@ -86,7 +86,7 @@ async def upload_invoices(
 
             # 3. Duplicate check
             file_hash = get_file_hash(content)
-            unique_filename = f"{current_user.id}_{file_hash}{ext}"
+            unique_filename = f"{current_user.id}_{location_id}_{file_hash}{ext}"
             file_path = os.path.join(UPLOAD_DIR, unique_filename)
             
             existing_invoice = db.query(database_models.Invoice).filter(database_models.Invoice.pdf_path == file_path).first()
