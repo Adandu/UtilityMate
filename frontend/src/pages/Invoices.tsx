@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle, AlertTriangle, ArrowUp, ArrowDown, Square, CheckSquare } from 'lucide-react';
+import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle, AlertTriangle, ArrowUp, ArrowDown, Square, CheckSquare, Plus } from 'lucide-react';
 import api from '../utils/api';
 import { useSortableData } from '../hooks/useSortableData';
+import { useNavigate } from 'react-router-dom';
 
 interface Invoice {
   id: number;
@@ -25,6 +26,7 @@ interface UploadResult {
 }
 
 const Invoices: React.FC = () => {
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -384,7 +386,7 @@ const Invoices: React.FC = () => {
             <div className="p-8">
               {!uploadResults ? (
                 <form onSubmit={handleUpload} className="space-y-6">
-                  <div className="space-y-2">
+                  <div className="space-y-2 text-on-surface">
                     <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Asset Location</label>
                     <select 
                       required
@@ -432,7 +434,7 @@ const Invoices: React.FC = () => {
                 </form>
               ) : (
                 <div className="space-y-6">
-                  <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant">
+                  <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant text-on-surface">
                     <table className="w-full text-left text-xs">
                       <thead className="bg-surface-container-low border-b border-outline-variant">
                         <tr>
@@ -450,9 +452,19 @@ const Invoices: React.FC = () => {
                                   <CheckCircle size={14} /> OK
                                 </span>
                               ) : (
-                                <div className="text-error flex items-start gap-1">
-                                  <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-                                  <span className="font-medium leading-tight">{res.detail}</span>
+                                <div className="space-y-2">
+                                  <div className="text-error flex items-start gap-1">
+                                    <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                                    <span className="font-medium leading-tight">{res.detail}</span>
+                                  </div>
+                                  {res.detail?.includes('identify utility provider') && (
+                                    <button 
+                                      onClick={() => navigate('/config')}
+                                      className="flex items-center gap-1 px-2 py-1 bg-surface-container-high rounded-lg text-[9px] font-black uppercase tracking-widest text-on-surface hover:bg-on-surface hover:text-surface transition-all"
+                                    >
+                                      <Plus size={10} /> Add Provider
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -474,7 +486,7 @@ const Invoices: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* Single Edit Modal */}
       {showEdit && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[2rem] border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">

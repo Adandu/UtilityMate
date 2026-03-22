@@ -100,7 +100,7 @@ async def upload_invoices(
                 continue
 
             # 6. Full parsing
-            parsed_data = parser.InvoiceParser.parse_pdf(pdf_text, provider.name)
+            parsed_data = parser.InvoiceParser.parse_pdf(pdf_text, provider.name, location.name)
             
             # 7. Create record
             new_invoice = database_models.Invoice(
