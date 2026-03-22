@@ -145,6 +145,50 @@ def update_invoice(invoice_id: int, invoice_update: api_schemas.InvoiceUpdate, d
         joinedload(database_models.Invoice.location)
     ).filter(database_models.Invoice.id == invoice_id).first()
 
+@router.patch("/bulk")
+def bulk_update_invoices(
+    invoice_ids: List[int], 
+    invoice_update: api_schemas.InvoiceUpdate, 
+    db: Session = Depends(get_db), 
+    current_user: database_models.User = Depends(auth_utils.get_current_user)
+):
+    invoices = db.query(database_models.Invoice).filter(
+        database_models.Invoice.id.in_(invoice_ids),
+        database_models.Invoice.user_id == current_user.id
+    ).all()
+    
+    update_data = invoice_update.model_dump(exclude_unset=True)
+    if not update_data:
+        return {"message": "No updates provided"}
+        
+    for invoice in invoices:
+        for key, value in update_data.items():
+            setattr(invoice, key, value)
+            
+    db.commit()
+    return {"message": f"Successfully updated {len(invoices)} invoices"}
+
+@router.delete("/bulk")
+def bulk_delete_invoices(
+    invoice_ids: List[int], 
+    db: Session = Depends(get_db), 
+    current_user: database_models.User = Depends(auth_utils.get_current_user)
+):
+    invoices = db.query(database_models.Invoice).filter(
+        database_models.Invoice.id.in_(invoice_ids),
+        database_models.Invoice.user_id == current_user.id
+    ).all()
+    
+    deleted_count = 0
+    for invoice in invoices:
+        if invoice.pdf_path and os.path.exists(invoice.pdf_path):
+            os.remove(invoice.pdf_path)
+        db.delete(invoice)
+        deleted_count += 1
+        
+    db.commit()
+    return {"message": f"Successfully deleted {deleted_count} invoices"}
+
 @router.delete("/{invoice_id}")
 def delete_invoice(invoice_id: int, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
     invoice = db.query(database_models.Invoice).filter(

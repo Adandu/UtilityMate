@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle, AlertTriangle, ArrowUp, ArrowDown, Square, CheckSquare } from 'lucide-react';
 import api from '../utils/api';
 import { useSortableData } from '../hooks/useSortableData';
 
@@ -31,15 +31,17 @@ const Invoices: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [uploadResults, setUploadResults] = useState<UploadResult[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedLocation, setSelectedLocation] = useState('');
 
-  // Edit form state
+  // Form states
   const [editDate, setEditDate] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editConsumption, setEditConsumption] = useState('');
@@ -86,14 +88,45 @@ const Invoices: React.FC = () => {
     return sortConfig.direction === 'ascending' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
   };
 
+  const toggleSelectAll = () => {
+    if (selectedIds.length === invoices.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(invoices.map(inv => inv.id));
+    }
+  };
+
+  const toggleSelectOne = (id: number) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(i => i !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this invoice?')) return;
     try {
       await api.delete(`/invoices/${id}`);
       setInvoices(invoices.filter(inv => inv.id !== id));
+      setSelectedIds(selectedIds.filter(i => i !== id));
       setActiveMenuId(null);
     } catch (error) {
       alert('Failed to delete invoice');
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} selected invoices?`)) return;
+    try {
+      setUploading(true);
+      await api.delete('/invoices/bulk', { data: selectedIds });
+      setInvoices(invoices.filter(inv => !selectedIds.includes(inv.id)));
+      setSelectedIds([]);
+    } catch (error) {
+      alert('Bulk deletion failed');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -163,8 +196,37 @@ const Invoices: React.FC = () => {
     }
   };
 
+  const handleBulkUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedIds.length === 0) return;
+
+    setUploading(true);
+    const updates: any = {};
+    if (editDate) updates.invoice_date = editDate;
+    if (editAmount) updates.amount = parseFloat(editAmount);
+    if (editConsumption) updates.consumption_value = parseFloat(editConsumption);
+    if (editLocation) updates.location_id = parseInt(editLocation);
+    if (editProvider) updates.provider_id = parseInt(editProvider);
+
+    try {
+      await api.patch('/invoices/bulk', updates, { params: { invoice_ids: selectedIds.join(',') } });
+      await fetchInvoices();
+      setShowBulkEdit(false);
+      setSelectedIds([]);
+    } catch (error: any) {
+      alert('Bulk update failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const resetForm = () => {
     setSelectedLocation('');
+    setEditDate('');
+    setEditAmount('');
+    setEditConsumption('');
+    setEditLocation('');
+    setEditProvider('');
     if (fileInputRef.current) fileInputRef.current.value = '';
     setUploadResults(null);
   };
@@ -183,14 +245,130 @@ const Invoices: React.FC = () => {
           <p className="text-on-surface-variant font-medium opacity-70">Bulk management and automated provider detection.</p>
         </div>
         
-        <button 
-          onClick={() => { resetForm(); setShowUpload(true); }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95"
-        >
-          <Upload size={20} />
-          <span>Bulk Upload</span>
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => { resetForm(); setShowUpload(true); }}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95"
+          >
+            <Upload size={20} />
+            <span>Bulk Upload</span>
+          </button>
+        </div>
       </header>
+
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-on-surface text-surface px-8 py-4 rounded-3xl shadow-2xl z-40 flex items-center gap-8 animate-in slide-in-from-bottom-10 duration-300">
+          <div className="flex items-center gap-2 border-r border-surface/20 pr-8">
+            <span className="text-sm font-black uppercase tracking-widest">{selectedIds.length} Selected</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => { resetForm(); setShowBulkEdit(true); }}
+              className="flex items-center gap-2 hover:text-emerald-400 transition-colors font-bold uppercase tracking-widest text-xs"
+            >
+              <Edit size={18} /> Modify
+            </button>
+            <button 
+              onClick={handleBulkDelete}
+              className="flex items-center gap-2 hover:text-error transition-colors font-bold uppercase tracking-widest text-xs"
+            >
+              <Trash2 size={18} /> Delete
+            </button>
+            <button 
+              onClick={() => setSelectedIds([])}
+              className="ml-4 p-1 hover:bg-surface/10 rounded-full transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Edit Modal */}
+      {showBulkEdit && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[2rem] border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-outline-variant flex justify-between items-center bg-surface-container-low text-on-surface">
+              <h3 className="font-headline text-xl font-black">Bulk Modification</h3>
+              <button onClick={() => setShowBulkEdit(false)} className="text-on-surface-variant hover:text-on-surface transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleBulkUpdate} className="p-8 space-y-4">
+              <p className="text-xs text-on-surface-variant font-medium mb-4 italic text-on-surface">Only fields you fill will be updated for all {selectedIds.length} selected invoices.</p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Location</label>
+                  <select 
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface"
+                  >
+                    <option value="">Keep original</option>
+                    {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Provider</label>
+                  <select 
+                    value={editProvider}
+                    onChange={(e) => setEditProvider(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface"
+                  >
+                    <option value="">Keep original</option>
+                    {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Invoice Date</label>
+                <input 
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Amount (RON)</label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface font-mono"
+                    placeholder="Keep original"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Consumption</label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={editConsumption}
+                    onChange={(e) => setEditConsumption(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface font-mono"
+                    placeholder="Keep original"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setShowBulkEdit(false)} className="flex-1 py-4 bg-surface-container text-on-surface font-black rounded-2xl border border-outline-variant uppercase tracking-widest text-xs">Cancel</button>
+                <button type="submit" disabled={uploading} className="flex-2 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 px-8 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50">
+                  {uploading ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle size={20} /><span className="uppercase tracking-[0.1em] text-sm">Update All</span></>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Upload Modal */}
       {showUpload && (
@@ -369,24 +547,9 @@ const Invoices: React.FC = () => {
               </div>
 
               <div className="pt-4 flex gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setShowEdit(false)}
-                  className="flex-1 py-4 bg-surface-container text-on-surface font-black rounded-2xl border border-outline-variant uppercase tracking-widest text-xs"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  disabled={uploading}
-                  className="flex-2 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 px-8 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-                >
-                  {uploading ? <Loader2 className="animate-spin" size={20} /> : (
-                    <>
-                      <CheckCircle size={20} />
-                      <span className="uppercase tracking-[0.1em] text-sm">Save Changes</span>
-                    </>
-                  )}
+                <button type="button" onClick={() => setShowEdit(false)} className="flex-1 py-4 bg-surface-container text-on-surface font-black rounded-2xl border border-outline-variant uppercase tracking-widest text-xs">Cancel</button>
+                <button type="submit" disabled={uploading} className="flex-2 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 px-8 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50">
+                  {uploading ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle size={20} /><span className="uppercase tracking-[0.1em] text-sm">Save Changes</span></>}
                 </button>
               </div>
             </form>
@@ -399,7 +562,12 @@ const Invoices: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-on-surface-variant text-[10px] font-black uppercase tracking-[0.2em] border-b border-outline-variant">
-                <th className="px-8 py-5 cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('provider.name')}>
+                <th className="px-6 py-5 w-10">
+                  <button onClick={toggleSelectAll} className="p-1 hover:bg-surface-container-high rounded-lg transition-colors">
+                    {selectedIds.length === invoices.length && invoices.length > 0 ? <CheckSquare size={18} className="text-emerald-500" /> : <Square size={18} />}
+                  </button>
+                </th>
+                <th className="px-4 py-5 cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('provider.name')}>
                   <div className="flex items-center gap-1">Service Provider {getSortIcon('provider.name')}</div>
                 </th>
                 <th className="px-8 py-5 cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('location.name')}>
@@ -417,7 +585,7 @@ const Invoices: React.FC = () => {
             <tbody className="divide-y divide-outline-variant/30">
               {sortedInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
+                  <td colSpan={6} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center opacity-30">
                       <FileText size={64} strokeWidth={1} className="mb-4" />
                       <p className="font-headline text-lg font-bold">No Records Found</p>
@@ -426,8 +594,13 @@ const Invoices: React.FC = () => {
                   </td>
                 </tr>
               ) : sortedInvoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-surface-container-high/30 transition-colors group">
-                  <td className="px-8 py-6">
+                <tr key={invoice.id} className={`hover:bg-surface-container-high/30 transition-colors group ${selectedIds.includes(invoice.id) ? 'bg-emerald-50/30 dark:bg-emerald-900/10' : ''}`}>
+                  <td className="px-6 py-6">
+                    <button onClick={() => toggleSelectOne(invoice.id)} className="p-1 hover:bg-surface-container-high rounded-lg transition-colors">
+                      {selectedIds.includes(invoice.id) ? <CheckSquare size={18} className="text-emerald-500" /> : <Square size={18} className="opacity-30 group-hover:opacity-100" />}
+                    </button>
+                  </td>
+                  <td className="px-4 py-6">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-secondary-container flex items-center justify-center text-blue-600">
                         <FileText size={20} />
@@ -456,7 +629,7 @@ const Invoices: React.FC = () => {
                     {activeMenuId === invoice.id && (
                       <div 
                         ref={menuRef}
-                        className="absolute right-12 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-outline-variant rounded-2xl shadow-xl z-10 py-2 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
+                        className="absolute right-12 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-outline-variant rounded-2xl shadow-xl z-50 py-2 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
                       >
                         <button 
                           onClick={() => handleEditClick(invoice)}
