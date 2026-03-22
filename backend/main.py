@@ -5,8 +5,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from .routers import auth, categories, providers, locations, invoices, consumption
-from .database.session import engine
-from .models.database_models import Base
+from .database.session import engine, verify_and_migrate_db
 from .utils.logging_config import logger
 from .utils.rate_limiter import limiter
 
@@ -22,8 +21,12 @@ try:
 except Exception:
     logger.warning("Could not read VERSION file, using fallback")
 
-# Create database tables on startup
-Base.metadata.create_all(bind=engine)
+# Verify and migrate database on startup
+try:
+    verify_and_migrate_db()
+except Exception as e:
+    logger.error(f"Database migration failed: {e}")
+    # We continue as the app might still work or Base.metadata.create_all might have succeeded
 
 app = FastAPI(title="UtilityMate API", version=VERSION)
 app.state.limiter = limiter
