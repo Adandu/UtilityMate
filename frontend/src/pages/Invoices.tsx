@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle } from 'lucide-react';
 import api from '../utils/api';
 
 interface Invoice {
