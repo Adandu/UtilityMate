@@ -30,15 +30,14 @@ const Dashboard: React.FC = () => {
         const invoices = response.data;
         
         const total = invoices.reduce((acc: number, inv: any) => acc + inv.amount, 0);
-        const lastReading = invoices.length > 0 ? invoices[0].billing_date : 'N/A';
-        
+        const lastReading = invoices.length > 0 ? invoices[0].invoice_date : 'N/A';
+
         setStats({ total, count: invoices.length, lastReading });
-        
+
         const monthlyAggregation: { [key: string]: any } = {};
-        
+
         invoices.forEach((inv: any) => {
-          const month = inv.billing_date.substring(0, 7);
-          if (!monthlyAggregation[month]) {
+          const month = inv.invoice_date.substring(0, 7);          if (!monthlyAggregation[month]) {
             monthlyAggregation[month] = { name: month, electricity: 0, gas: 0, water: 0 };
           }
           const category = inv.provider?.category?.name?.toLowerCase();
@@ -159,6 +158,12 @@ const Dashboard: React.FC = () => {
                     <span className="text-[10px] font-bold text-amber-600 uppercase">Gas</span>
                   </div>
                 )}
+                {(widget.category === 'All' || widget.category === 'Water') && (
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase">Water</span>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -176,6 +181,10 @@ const Dashboard: React.FC = () => {
                       <linearGradient id="colorGas" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
                         <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorWater" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
@@ -196,6 +205,9 @@ const Dashboard: React.FC = () => {
                     )}
                     {(widget.category === 'All' || widget.category === 'Gas') && (
                       <Area type="monotone" dataKey="gas" stroke="#f59e0b" fillOpacity={1} fill="url(#colorGas)" strokeWidth={4} />
+                    )}
+                    {(widget.category === 'All' || widget.category === 'Water') && (
+                      <Area type="monotone" dataKey="water" stroke="#10b981" fillOpacity={1} fill="url(#colorWater)" strokeWidth={4} />
                     )}
                   </AreaChart>
                 </ResponsiveContainer>

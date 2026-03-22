@@ -4,7 +4,7 @@ import api from '../utils/api';
 
 interface InvoiceData {
   id: number;
-  billing_date: string;
+  invoice_date: string;
   location: { name: string };
   provider: { name: string, category: { name: string } };
   consumption_value: number;
@@ -44,11 +44,11 @@ const RawData: React.FC = () => {
 
   const handleExport = () => {
     if (filteredData.length === 0) return;
-    const headers = ['Date', 'Location', 'Category', 'Provider', 'Consumption', 'Amount', 'Currency'];
+    const headers = ['Invoice Date', 'Location', 'Category', 'Provider', 'Consumption', 'Amount', 'Currency'];
     const csvContent = [
       headers.join(','),
       ...filteredData.map(row => [
-        row.billing_date,
+        row.invoice_date,
         row.location?.name,
         row.provider?.category?.name,
         row.provider?.name,
@@ -109,7 +109,7 @@ const RawData: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-on-surface-variant text-[10px] font-black uppercase tracking-[0.2em] border-b border-outline-variant bg-surface-container-low">
-                <th className="px-6 py-4">Timestamp</th>
+                <th className="px-6 py-4">Invoice Date</th>
                 <th className="px-6 py-4">Context</th>
                 <th className="px-6 py-4 text-center">Category</th>
                 <th className="px-6 py-4">Source</th>
@@ -131,7 +131,7 @@ const RawData: React.FC = () => {
                 </tr>
               ) : filteredData.map((row) => (
                 <tr key={row.id} className="hover:bg-surface-container-high/30 transition-colors group">
-                  <td className="px-6 py-5 font-mono text-[11px] text-on-surface-variant">{row.billing_date}</td>
+                  <td className="px-6 py-5 font-mono text-[11px] text-on-surface-variant">{row.invoice_date}</td>
                   <td className="px-6 py-5">
                     <span className="font-black text-on-surface tracking-tight uppercase text-xs">{row.location?.name || 'N/A'}</span>
                   </td>

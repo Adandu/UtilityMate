@@ -41,20 +41,6 @@ def download_invoice(invoice_id: int, db: Session = Depends(get_db), current_use
         raise HTTPException(status_code=404, detail="Invoice PDF not found")
     return FileResponse(invoice.pdf_path, media_type='application/pdf', filename=os.path.basename(invoice.pdf_path))
 
-@router.patch("/{invoice_id}/status")
-def update_invoice_status(invoice_id: int, status: str, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
-    if status not in ['paid', 'unpaid', 'overdue']:
-        raise HTTPException(status_code=400, detail="Invalid status")
-    invoice = db.query(database_models.Invoice).filter(
-        database_models.Invoice.id == invoice_id,
-        database_models.Invoice.user_id == current_user.id
-    ).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    invoice.status = status
-    db.commit()
-    return {"message": "Status updated"}
-
 @router.post("/upload")
 async def upload_invoice(
     location_id: int = Form(...),
@@ -115,7 +101,7 @@ async def upload_invoice(
         user_id=current_user.id,
         location_id=location_id,
         provider_id=provider_id,
-        billing_date=parsed_data["billing_date"] or datetime.now(timezone.utc).date(),
+        invoice_date=parsed_data["invoice_date"] or datetime.now(timezone.utc).date(),
         amount=parsed_data["amount"],
         consumption_value=parsed_data["consumption_value"],
         pdf_path=file_path,
@@ -127,6 +113,28 @@ async def upload_invoice(
     
     logger.info("Invoice uploaded successfully: %s for user %s", file.filename, current_user.email)
     return new_invoice
+
+@router.patch("/{invoice_id}", response_model=api_schemas.Invoice)
+def update_invoice(invoice_id: int, invoice_update: api_schemas.InvoiceUpdate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
+    invoice = db.query(database_models.Invoice).filter(
+        database_models.Invoice.id == invoice_id,
+        database_models.Invoice.user_id == current_user.id
+    ).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    update_data = invoice_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(invoice, key, value)
+        
+    db.commit()
+    db.refresh(invoice)
+    
+    # Reload with relations
+    return db.query(database_models.Invoice).options(
+        joinedload(database_models.Invoice.provider).joinedload(database_models.Provider.category),
+        joinedload(database_models.Invoice.location)
+    ).filter(database_models.Invoice.id == invoice_id).first()
 
 @router.delete("/{invoice_id}")
 def delete_invoice(invoice_id: int, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):

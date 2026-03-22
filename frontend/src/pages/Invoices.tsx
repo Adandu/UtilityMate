@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, CheckCircle, Clock, Loader2, MoreVertical, X } from 'lucide-react';
+import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, AlertCircle } from 'lucide-react';
 import api from '../utils/api';
 
 interface Invoice {
   id: number;
+  provider_id: number;
+  location_id: number;
   provider: { name: string };
   location: { name: string };
-  billing_date: string;
+  invoice_date: string;
   amount: number;
-  status: string;
+  consumption_value?: number;
 }
 
 interface Location { id: number; name: string; }
@@ -20,11 +22,23 @@ const Invoices: React.FC = () => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedProvider, setSelectedProvider] = useState('');
+
+  // Edit form state
+  const [editDate, setEditDate] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editConsumption, setEditConsumption] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editProvider, setEditProvider] = useState('');
+
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const fetchInvoices = async () => {
     try {
@@ -45,6 +59,14 @@ const Invoices: React.FC = () => {
 
   useEffect(() => {
     fetchInvoices();
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleDelete = async (id: number) => {
@@ -52,6 +74,7 @@ const Invoices: React.FC = () => {
     try {
       await api.delete(`/invoices/${id}`);
       setInvoices(invoices.filter(inv => inv.id !== id));
+      setActiveMenuId(null);
     } catch (error) {
       alert('Failed to delete invoice');
     }
@@ -79,6 +102,41 @@ const Invoices: React.FC = () => {
       resetForm();
     } catch (error: any) {
       alert(error.response?.data?.detail || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleEditClick = (invoice: Invoice) => {
+    setEditingInvoice(invoice);
+    setEditDate(invoice.invoice_date);
+    setEditAmount(invoice.amount.toString());
+    setEditConsumption(invoice.consumption_value?.toString() || '');
+    setEditLocation(invoice.location_id.toString());
+    setEditProvider(invoice.provider_id.toString());
+    setShowEdit(true);
+    setActiveMenuId(null);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInvoice) return;
+
+    setUploading(true);
+    try {
+      const response = await api.patch(`/invoices/${editingInvoice.id}`, {
+        invoice_date: editDate,
+        amount: parseFloat(editAmount),
+        consumption_value: editConsumption ? parseFloat(editConsumption) : null,
+        location_id: parseInt(editLocation),
+        provider_id: parseInt(editProvider)
+      });
+      
+      setInvoices(invoices.map(inv => inv.id === editingInvoice.id ? response.data : inv));
+      setShowEdit(false);
+      setEditingInvoice(null);
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Update failed');
     } finally {
       setUploading(false);
     }
@@ -179,24 +237,120 @@ const Invoices: React.FC = () => {
         </div>
       )}
 
+      {/* Edit Modal */}
+      {showEdit && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[2rem] border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+              <div className="flex items-center gap-3">
+                <Edit className="text-blue-500" size={24} />
+                <h3 className="font-headline text-xl font-black text-on-surface">Modify Invoice</h3>
+              </div>
+              <button onClick={() => setShowEdit(false)} className="text-on-surface-variant hover:text-on-surface transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdate} className="p-8 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Location</label>
+                  <select 
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface"
+                  >
+                    {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Provider</label>
+                  <select 
+                    value={editProvider}
+                    onChange={(e) => setEditProvider(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface"
+                  >
+                    {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Invoice Date</label>
+                <input 
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Amount (RON)</label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Consumption</label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={editConsumption}
+                    onChange={(e) => setEditConsumption(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-surface-container border border-outline-variant text-on-surface font-mono"
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowEdit(false)}
+                  className="flex-1 py-4 bg-surface-container text-on-surface font-black rounded-2xl border border-outline-variant uppercase tracking-widest text-xs"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={uploading}
+                  className="flex-2 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 px-8 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                >
+                  {uploading ? <Loader2 className="animate-spin" size={20} /> : (
+                    <>
+                      <CheckCircle size={20} />
+                      <span className="uppercase tracking-[0.1em] text-sm">Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="bg-surface-container-low rounded-3xl border border-outline-variant shadow-sm overflow-hidden">
-        {/* Table structure remains the same but handles real data */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-on-surface-variant text-[10px] font-black uppercase tracking-[0.2em] border-b border-outline-variant">
                 <th className="px-8 py-5">Service Provider</th>
                 <th className="px-8 py-5">Asset Location</th>
-                <th className="px-8 py-5 text-center">Billing Date</th>
+                <th className="px-8 py-5 text-center">Invoice Date</th>
                 <th className="px-8 py-5 text-right">Settlement Amount</th>
-                <th className="px-8 py-5 text-center">Status</th>
-                <th className="px-8 py-5"></th>
+                <th className="px-8 py-5 text-right pr-12">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
               {invoices.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
+                  <td colSpan={5} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center opacity-30">
                       <FileText size={64} strokeWidth={1} className="mb-4" />
                       <p className="font-headline text-lg font-bold">No Records Found</p>
@@ -218,34 +372,42 @@ const Invoices: React.FC = () => {
                   <td className="px-8 py-6 text-center">
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-surface-container rounded-lg text-[11px] font-bold text-on-surface-variant border border-outline-variant">
                       <Clock size={12} />
-                      {invoice.billing_date}
+                      {invoice.invoice_date}
                     </div>
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="font-black text-on-surface text-lg">{invoice.amount.toFixed(2)} <span className="text-[10px] opacity-40 font-bold uppercase">RON</span></div>
                   </td>
-                  <td className="px-8 py-6 text-center">
-                    <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                      invoice.status === 'paid' 
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                      : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                    }`}>
-                      {invoice.status === 'paid' ? <CheckCircle size={12} /> : <Clock size={12} />}
-                      {invoice.status}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    <div className="flex justify-end items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => handleDelete(invoice.id)}
-                        className="p-2 text-on-surface-variant hover:text-error transition-colors"
+                  <td className="px-8 py-6 text-right pr-8 relative">
+                    <button 
+                      onClick={() => setActiveMenuId(activeMenuId === invoice.id ? null : invoice.id)}
+                      className="p-2 text-on-surface-variant hover:text-on-surface transition-colors rounded-full hover:bg-surface-container-high"
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+
+                    {activeMenuId === invoice.id && (
+                      <div 
+                        ref={menuRef}
+                        className="absolute right-12 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-outline-variant rounded-2xl shadow-xl z-10 py-2 min-w-[160px] animate-in fade-in zoom-in-95 duration-100"
                       >
-                        <Trash2 size={20} />
-                      </button>
-                      <button className="p-2 text-on-surface-variant hover:text-on-surface transition-colors">
-                        <MoreVertical size={20} />
-                      </button>
-                    </div>
+                        <button 
+                          onClick={() => handleEditClick(invoice)}
+                          className="w-full px-4 py-3 flex items-center gap-3 text-sm font-bold text-on-surface hover:bg-surface-container transition-colors"
+                        >
+                          <Edit size={16} className="text-blue-500" />
+                          Modify Record
+                        </button>
+                        <div className="h-px bg-outline-variant/30 my-1 mx-2"></div>
+                        <button 
+                          onClick={() => handleDelete(invoice.id)}
+                          className="w-full px-4 py-3 flex items-center gap-3 text-sm font-bold text-error hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                          Delete Permanently
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

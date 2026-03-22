@@ -53,18 +53,13 @@ class Invoice(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="CASCADE"), index=True)
     provider_id = Column(Integer, ForeignKey("providers.id"), index=True)
-    billing_date = Column(Date, nullable=False)
+    invoice_date = Column(Date, nullable=False)
     due_date = Column(Date, nullable=True)
     amount = Column(Float, nullable=False)
     currency = Column(String, default="RON")
     consumption_value = Column(Float, nullable=True)
     pdf_path = Column(String, nullable=True)
-    status = Column(String, default="unpaid") # paid, unpaid, overdue
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    
-    __table_args__ = (
-        CheckConstraint("status IN ('paid', 'unpaid', 'overdue')", name="status_check"),
-    )
     
     owner = relationship("User", back_populates="invoices")
     location = relationship("Location", back_populates="invoices")

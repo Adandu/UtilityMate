@@ -60,22 +60,30 @@ class LocationSimple(BaseModel):
 class InvoiceBase(BaseModel):
     location_id: int
     provider_id: int
-    billing_date: date
+    invoice_date: date
     due_date: Optional[date] = None
     amount: float
     currency: str = "RON"
     consumption_value: Optional[float] = None
-    status: str = "unpaid"
 
-    @field_validator('billing_date')
+    @field_validator('invoice_date')
     @classmethod
-    def billing_date_not_in_future(cls, v: date) -> date:
+    def invoice_date_not_in_future(cls, v: date) -> date:
         if v > date.today():
-            raise ValueError('Billing date cannot be in the future')
+            raise ValueError('Invoice date cannot be in the future')
         return v
 
 class InvoiceCreate(InvoiceBase):
     pass
+
+class InvoiceUpdate(BaseModel):
+    location_id: Optional[int] = None
+    provider_id: Optional[int] = None
+    invoice_date: Optional[date] = None
+    due_date: Optional[date] = None
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    consumption_value: Optional[float] = None
 
 class Invoice(InvoiceBase):
     id: int

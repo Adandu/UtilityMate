@@ -17,7 +17,7 @@ class InvoiceParser:
         
         result = {
             "provider": provider_name,
-            "billing_date": None,
+            "invoice_date": None,
             "due_date": None,
             "amount": 0.0,
             "consumption_value": 0.0,
@@ -38,18 +38,28 @@ class InvoiceParser:
 
     @staticmethod
     def _parse_hidroelectrica(text: str, result: Dict[str, Any]):
-        # Data facturării: 14.10.2025
-        billing_match = re.search(r"data\s+factur[aă]rii[:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        # Data facturării: 14.10.2025 or Data facturii
+        billing_match = re.search(r"data\s+factur(?:[aă]rii|ii)[:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
-            result["billing_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
+            result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
             
-        # Total de plată: 123,45
-        amount_match = re.search(r"total\s+de\s+plat[aă][:\s]+([\d,\.]+)", text, re.IGNORECASE)
+        # Total de plată: 123,45 or Total factura
+        amount_match = re.search(r"total\s+de\s+plat[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
+        if not amount_match:
+            amount_match = re.search(r"total\s+factur[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
+            
         if amount_match:
-            result["amount"] = float(amount_match.group(1).replace(",", "."))
+            # Clean up the amount string: remove thousands separator if it's a dot and the decimal is a comma
+            amount_str = amount_match.group(1)
+            if "," in amount_str and "." in amount_str:
+                amount_str = amount_str.replace(".", "")
+            amount_str = amount_str.replace(",", ".")
+            try:
+                result["amount"] = float(amount_str)
+            except ValueError:
+                pass
             
         # Index nou - Index vechi (Consumption)
-        # Often looks like: 12345 kWh
         consumption_match = re.search(r"(\d+)\s+kwh", text, re.IGNORECASE)
         if consumption_match:
             result["consumption_value"] = float(consumption_match.group(1))
@@ -59,12 +69,19 @@ class InvoiceParser:
         # Data emiterii: 15.10.2025
         billing_match = re.search(r"data\s+emiterii[:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
-            result["billing_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
+            result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
             
         # Total factura curenta: 234.56
-        amount_match = re.search(r"total\s+factur[aă]\s+curent[aă][:\s]+([\d,\.]+)", text, re.IGNORECASE)
+        amount_match = re.search(r"total\s+factur[aă]\s+curent[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
         if amount_match:
-            result["amount"] = float(amount_match.group(1).replace(",", "."))
+            amount_str = amount_match.group(1)
+            if "," in amount_str and "." in amount_str:
+                amount_str = amount_str.replace(".", "")
+            amount_str = amount_str.replace(",", ".")
+            try:
+                result["amount"] = float(amount_str)
+            except ValueError:
+                pass
 
     @staticmethod
     def _parse_generic(text: str, result: Dict[str, Any]):
@@ -72,14 +89,18 @@ class InvoiceParser:
         date_match = re.search(r"(\d{2}\.\d{2}\.\d{4})", text)
         if date_match:
             try:
-                result["billing_date"] = datetime.strptime(date_match.group(1), "%d.%m.%Y").date()
+                result["invoice_date"] = datetime.strptime(date_match.group(1), "%d.%m.%Y").date()
             except ValueError:
                 pass
             
         # Amount often follows "Total" or "RON"
-        amount_match = re.search(r"total[:\s]+([\d,\.]+)", text, re.IGNORECASE)
+        amount_match = re.search(r"total[:\s]+([\d\.,]+)", text, re.IGNORECASE)
         if amount_match:
+            amount_str = amount_match.group(1)
+            if "," in amount_str and "." in amount_str:
+                amount_str = amount_str.replace(".", "")
+            amount_str = amount_str.replace(",", ".")
             try:
-                result["amount"] = float(amount_match.group(1).replace(",", "."))
+                result["amount"] = float(amount_str)
             except (ValueError, TypeError):
                 pass
