@@ -90,9 +90,12 @@ class InvoiceUpdate(BaseModel):
     @field_validator('location_id', 'provider_id', mode='before')
     @classmethod
     def coerce_int(cls, v):
-        if isinstance(v, str) and v.isdigit():
+        if v is None or v == "":
+            return None
+        try:
             return int(v)
-        return v
+        except (ValueError, TypeError):
+            return v
 
 class InvoiceBulkUpdate(BaseModel):
     invoice_ids: List[int]
@@ -101,8 +104,11 @@ class InvoiceBulkUpdate(BaseModel):
     @field_validator('invoice_ids', mode='before')
     @classmethod
     def coerce_ids(cls, v):
+        if isinstance(v, str):
+            # Handle comma-separated string if it somehow arrives this way
+            return [int(x.strip()) for x in v.split(',') if x.strip().isdigit()]
         if isinstance(v, list):
-            return [int(x) if isinstance(x, str) and x.isdigit() else x for x in v]
+            return [int(x) if isinstance(x, (str, float)) else x for x in v]
         return v
 
 class Invoice(InvoiceBase):

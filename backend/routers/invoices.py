@@ -167,12 +167,15 @@ def bulk_update_invoices(
     db: Session = Depends(get_db), 
     current_user: database_models.User = Depends(auth_utils.get_current_user)
 ):
+    logger.info("Bulk update: User %s is updating IDs %s", current_user.email, bulk_update.invoice_ids)
     invoices = db.query(database_models.Invoice).filter(
         database_models.Invoice.id.in_(bulk_update.invoice_ids),
         database_models.Invoice.user_id == current_user.id
     ).all()
     
     update_data = bulk_update.update_data.model_dump(exclude_unset=True)
+    logger.info("Update payload: %s", update_data)
+    
     if not update_data:
         return {"message": "No updates provided"}
         
