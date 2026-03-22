@@ -213,11 +213,11 @@ const Invoices: React.FC = () => {
 
     setUploading(true);
     const updates: any = {};
-    if (editDate) updates.invoice_date = editDate;
-    if (editAmount) updates.amount = parseFloat(editAmount);
-    if (editConsumption) updates.consumption_value = parseFloat(editConsumption);
-    if (editLocation) updates.location_id = parseInt(editLocation);
-    if (editProvider) updates.provider_id = parseInt(editProvider);
+    if (editDate !== '') updates.invoice_date = editDate;
+    if (editAmount !== '') updates.amount = parseFloat(editAmount);
+    if (editConsumption !== '') updates.consumption_value = parseFloat(editConsumption);
+    if (editLocation !== '') updates.location_id = parseInt(editLocation);
+    if (editProvider !== '') updates.provider_id = parseInt(editProvider);
 
     try {
       await api.patch('/invoices/bulk', { 
@@ -227,8 +227,12 @@ const Invoices: React.FC = () => {
       await fetchInvoices();
       setShowBulkEdit(false);
       setSelectedIds([]);
+      resetForm();
     } catch (error: any) {
-      alert('Bulk update failed');
+      console.error('Bulk update failed:', error);
+      const detail = error.response?.data?.detail;
+      const message = Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : detail;
+      alert(`Bulk update failed: ${message || error.message || 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
