@@ -11,9 +11,13 @@ class InvoiceParser:
         Supports: Hidroelectrica, ENGIE, and generic patterns for others.
         """
         text = ""
-        with pdfplumber.open(file_path) as pdf:
-            for page in pdf.pages:
-                text += page.extract_text() + "\n"
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    text += page.extract_text() + "\n"
+        except Exception:
+            # Fallback if PDF reading fails
+            pass
         
         result = {
             "provider": provider_name,
@@ -24,7 +28,9 @@ class InvoiceParser:
             "currency": "RON"
         }
         
-        # Lowercase for easier matching
+        if not text:
+            return result
+            
         lower_text = text.lower()
         
         if "hidroelectrica" in provider_name.lower() or "hidroelectrica" in lower_text:
@@ -38,19 +44,21 @@ class InvoiceParser:
 
     @staticmethod
     def _parse_hidroelectrica(text: str, result: Dict[str, Any]):
-        # Data facturării: 14.10.2025 or Data facturii
-        billing_match = re.search(r"data\s+factur(?:[aă]rii|ii)[:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        # data de 13.02.2026 or Data facturării: 14.10.2025
+        billing_match = re.search(r"(?:data\s+de|data\s+factur(?:[aă]rii|ii)[:\s]+)\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
             result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
             
-        # Total de plată: 123,45 or Total factura
-        amount_match = re.search(r"total\s+de\s+plat[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
+        # Line might look like: 4 TOTAL DE PLATĂ FACTURĂ CURENTĂ (4=1+3) 71,60lei
+        # or Total de plată: 123,45
+        amount_match = re.search(r"total\s+de\s+plat[aă](?:.*?)\s+([\d\.,]+)lei", text, re.IGNORECASE)
+        if not amount_match:
+            amount_match = re.search(r"total\s+de\s+plat[aă](?:[^0-9,]+)?([\d\.,]+)", text, re.IGNORECASE)
         if not amount_match:
             amount_match = re.search(r"total\s+factur[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
             
         if amount_match:
-            # Clean up the amount string: remove thousands separator if it's a dot and the decimal is a comma
-            amount_str = amount_match.group(1)
+            amount_str = amount_match.group(1).strip()
             if "," in amount_str and "." in amount_str:
                 amount_str = amount_str.replace(".", "")
             amount_str = amount_str.replace(",", ".")
@@ -66,15 +74,15 @@ class InvoiceParser:
 
     @staticmethod
     def _parse_engie(text: str, result: Dict[str, Any]):
-        # Data emiterii: 15.10.2025
-        billing_match = re.search(r"data\s+emiterii[:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        # Data emiterii: 15.10.2025 or Data facturii: 15.10.2025 or any DD.MM.YYYY
+        billing_match = re.search(r"(?:data\s+emiterii[:\s]+|data\s+facturii[:\s]+)?(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
             result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
             
-        # Total factura curenta: 234.56
+        # Total factura curenta: 234.56 or TOTAL FACTURĂ CURENTĂ: 130,91
         amount_match = re.search(r"total\s+factur[aă]\s+curent[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
         if amount_match:
-            amount_str = amount_match.group(1)
+            amount_str = amount_match.group(1).strip()
             if "," in amount_str and "." in amount_str:
                 amount_str = amount_str.replace(".", "")
             amount_str = amount_str.replace(",", ".")
@@ -85,8 +93,12 @@ class InvoiceParser:
 
     @staticmethod
     def _parse_generic(text: str, result: Dict[str, Any]):
-        # Simple date finder
-        date_match = re.search(r"(\d{2}\.\d{2}\.\d{4})", text)
+        # Try to find a date following "data" or "date"
+        date_match = re.search(r"(?:data|date)[:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        if not date_match:
+            # Fallback to the first date found
+            date_match = re.search(r"(\d{2}\.\d{2}\.\d{4})", text)
+            
         if date_match:
             try:
                 result["invoice_date"] = datetime.strptime(date_match.group(1), "%d.%m.%Y").date()
