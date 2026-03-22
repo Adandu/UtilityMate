@@ -35,3 +35,18 @@ def seed_categories(db: Session = Depends(get_db), current_user: database_models
             db.add(database_models.Category(**cat))
     db.commit()
     return {"message": "Categories seeded"}
+
+@router.delete("/{category_id}")
+def delete_category(category_id: int, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
+    db_category = db.query(database_models.Category).filter(database_models.Category.id == category_id).first()
+    if not db_category:
+        raise HTTPException(status_code=404, detail="Category not found")
+        
+    # Guardrail: Check for associated providers
+    providers_count = db.query(database_models.Provider).filter(database_models.Provider.category_id == category_id).count()
+    if providers_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete category: it has associated utility providers. Please delete the providers first.")
+        
+    db.delete(db_category)
+    db.commit()
+    return {"message": "Category deleted"}

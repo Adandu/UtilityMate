@@ -41,20 +41,32 @@ const Invoices: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const fetchInvoices = async () => {
+    setLoading(true);
+    // Fetch invoices
     try {
-      const [invRes, locRes, provRes] = await Promise.all([
-        api.get('/invoices/'),
-        api.get('/locations/'),
-        api.get('/providers/')
-      ]);
+      const invRes = await api.get('/invoices/');
       setInvoices(invRes.data);
-      setLocations(locRes.data);
-      setProviders(provRes.data);
     } catch (error) {
       console.error('Failed to fetch invoices', error);
-    } finally {
-      setLoading(false);
     }
+
+    // Fetch locations
+    try {
+      const locRes = await api.get('/locations/');
+      setLocations(locRes.data);
+    } catch (error) {
+      console.error('Failed to fetch locations', error);
+    }
+
+    // Fetch providers
+    try {
+      const provRes = await api.get('/providers/');
+      setProviders(provRes.data);
+    } catch (error) {
+      console.error('Failed to fetch providers', error);
+    }
+    
+    setLoading(false);
   };
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Building2, Moon, Sun, Plus, Shield, Zap, Droplets, Flame, Loader2, X, Tag } from 'lucide-react';
+import { MapPin, Building2, Moon, Sun, Plus, Shield, Zap, Droplets, Flame, Loader2, X, Tag, Trash2 } from 'lucide-react';
 import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -33,23 +33,25 @@ const Config: React.FC = () => {
   const [newProviderName, setNewProviderName] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [locRes, provRes, catRes] = await Promise.all([
+        api.get('/locations/'),
+        api.get('/providers/'),
+        api.get('/categories/')
+      ]);
+      setLocations(locRes.data);
+      setProviders(provRes.data);
+      setCategories(catRes.data);
+    } catch (error) {
+      console.error('Failed to fetch config data', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [locRes, provRes, catRes] = await Promise.all([
-          api.get('/locations/'),
-          api.get('/providers/'),
-          api.get('/categories/')
-        ]);
-        setLocations(locRes.data);
-        setProviders(provRes.data);
-        setCategories(catRes.data);
-      } catch (error) {
-        console.error('Failed to fetch config data', error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, []);
 
@@ -89,8 +91,8 @@ const Config: React.FC = () => {
     try {
       await api.delete(`/locations/${id}`);
       setLocations(locations.filter(l => l.id !== id));
-    } catch (error) {
-      alert('Failed to delete location');
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Failed to delete location');
     }
   };
 
@@ -105,6 +107,16 @@ const Config: React.FC = () => {
       setCategories([...categories, response.data]);
     } catch (error) {
       alert('Failed to add category');
+    }
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    if (!window.confirm('Delete this category? All associated providers must be deleted first.')) return;
+    try {
+      await api.delete(`/categories/${id}`);
+      setCategories(categories.filter(c => c.id !== id));
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Failed to delete category');
     }
   };
 
@@ -124,6 +136,16 @@ const Config: React.FC = () => {
       setSelectedCategoryId('');
     } catch (error) {
       alert('Failed to register provider');
+    }
+  };
+
+  const handleDeleteProvider = async (id: number) => {
+    if (!window.confirm('Delete this provider?')) return;
+    try {
+      await api.delete(`/providers/${id}`);
+      setProviders(providers.filter(p => p.id !== id));
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Failed to delete provider');
     }
   };
 
@@ -185,9 +207,15 @@ const Config: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {categories.map((cat) => (
-                <div key={cat.id} className="p-4 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl flex flex-col items-center justify-center text-center">
+                <div key={cat.id} className="relative p-4 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl flex flex-col items-center justify-center text-center group hover:border-purple-500/50 transition-all">
                   <span className="font-headline font-bold text-on-surface">{cat.name}</span>
                   <span className="text-[10px] font-black uppercase text-on-surface-variant opacity-40 mt-1">{cat.unit}</span>
+                  <button 
+                    onClick={() => handleDeleteCategory(cat.id)}
+                    className="absolute top-2 right-2 p-1.5 text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               ))}
             </div>
@@ -220,9 +248,9 @@ const Config: React.FC = () => {
                   </div>
                   <button 
                     onClick={() => handleDeleteLocation(loc.id)}
-                    className="text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-all font-black text-[10px] uppercase tracking-widest"
+                    className="p-2 text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-all"
                   >
-                    Remove
+                    <Trash2 size={18} />
                   </button>
                 </div>
               ))}
@@ -245,7 +273,13 @@ const Config: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {providers.map((prov) => (
-                <div key={prov.id} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl hover:shadow-md transition-all group">
+                <div key={prov.id} className="relative flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl hover:shadow-md transition-all group hover:border-amber-500/50">
+                  <button 
+                    onClick={() => handleDeleteProvider(prov.id)}
+                    className="absolute top-2 right-2 p-1.5 text-on-surface-variant hover:text-error opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                   <div className="w-12 h-12 rounded-2xl bg-surface-container flex items-center justify-center text-on-surface-variant mb-4 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/20 group-hover:text-amber-600 transition-colors">
                     {prov.name.toLowerCase().includes('hidro') ? <Zap size={24} /> : 
                      prov.name.toLowerCase().includes('engie') ? <Flame size={24} /> : 

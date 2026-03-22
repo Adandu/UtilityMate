@@ -42,6 +42,12 @@ def delete_location(location_id: int, db: Session = Depends(get_db), current_use
     ).first()
     if not db_location:
         raise HTTPException(status_code=404, detail="Location not found")
+    
+    # Guardrail: Check for associated invoices
+    invoices_count = db.query(database_models.Invoice).filter(database_models.Invoice.location_id == location_id).count()
+    if invoices_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete location: it has associated invoices. Please delete the invoices first.")
+        
     db.delete(db_location)
     db.commit()
     return {"message": "Location deleted"}

@@ -57,3 +57,18 @@ def seed_providers(db: Session = Depends(get_db), current_user: database_models.
     
     db.commit()
     return {"message": "Providers seeded"}
+
+@router.delete("/{provider_id}")
+def delete_provider(provider_id: int, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
+    db_provider = db.query(database_models.Provider).filter(database_models.Provider.id == provider_id).first()
+    if not db_provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+        
+    # Guardrail: Check for associated invoices
+    invoices_count = db.query(database_models.Invoice).filter(database_models.Invoice.provider_id == provider_id).count()
+    if invoices_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete provider: it has associated invoices. Please delete the invoices first.")
+        
+    db.delete(db_provider)
+    db.commit()
+    return {"message": "Provider deleted"}
