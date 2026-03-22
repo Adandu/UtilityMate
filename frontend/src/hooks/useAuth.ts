@@ -6,6 +6,7 @@ export interface User {
   email: string;
   is_active: boolean;
   theme_pref: string;
+  dashboard_config?: string;
 }
 
 export const useAuth = () => {

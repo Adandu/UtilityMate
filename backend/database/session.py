@@ -44,6 +44,12 @@ def verify_and_migrate_db():
                 logger.info(f"Migration: Adding user_id column to {table}")
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE"))
         
+        # 1.1 Migration: Add dashboard_config to users
+        columns = [c["name"] for c in inspector.get_columns("users")]
+        if "dashboard_config" not in columns:
+            logger.info("Migration: Adding dashboard_config column to users")
+            conn.execute(text("ALTER TABLE users ADD COLUMN dashboard_config VARCHAR"))
+        
         # 2. Migration: Rename billing_date to invoice_date in invoices
         if "invoices" in inspector.get_table_names():
             columns = [c["name"] for c in inspector.get_columns("invoices")]

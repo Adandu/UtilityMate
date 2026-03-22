@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Filter, ChevronRight, Loader2, Database } from 'lucide-react';
+import { Search, Download, Filter, ChevronRight, Loader2, Database, ArrowUp, ArrowDown } from 'lucide-react';
 import api from '../utils/api';
+import { useSortableData } from '../hooks/useSortableData';
 
 interface InvoiceData {
   id: number;
@@ -39,6 +40,13 @@ const RawData: React.FC = () => {
     row.provider?.category?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const { items: sortedData, requestSort, sortConfig } = useSortableData(filteredData, { key: 'invoice_date', direction: 'descending' });
+
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) return null;
+    return sortConfig.direction === 'ascending' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
+  };
+
   if (loading) return (
     <div className="ml-64 flex items-center justify-center min-h-screen bg-surface">
       <Loader2 className="animate-spin text-emerald-500" size={48} />
@@ -50,7 +58,7 @@ const RawData: React.FC = () => {
       alert('Cannot export: ' + error);
       return;
     }
-    if (filteredData.length === 0) {
+    if (sortedData.length === 0) {
       alert('No data available to export.');
       return;
     }
@@ -59,7 +67,7 @@ const RawData: React.FC = () => {
       const headers = ['Invoice Date', 'Location', 'Category', 'Provider', 'Consumption', 'Amount', 'Currency'];
       const csvContent = [
         headers.join(','),
-        ...filteredData.map(row => [
+        ...sortedData.map(row => [
           row.invoice_date,
           `"${row.location?.name || 'N/A'}"`,
           `"${row.provider?.category?.name || 'N/A'}"`,
@@ -86,9 +94,9 @@ const RawData: React.FC = () => {
 
   return (
     <div className="ml-64 p-8 min-h-screen bg-surface transition-colors duration-300 animate-in fade-in duration-500">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10 text-on-surface">
         <div>
-          <h2 className="font-headline text-3xl font-extrabold text-on-surface">Data Warehouse</h2>
+          <h2 className="font-headline text-3xl font-extrabold">Data Warehouse</h2>
           <p className="text-on-surface-variant font-medium opacity-70">Low-level analytical view of all processed utility records.</p>
         </div>
 
@@ -108,7 +116,7 @@ const RawData: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-surface-container-low rounded-3xl border border-outline-variant shadow-sm overflow-hidden">
+      <div className="bg-surface-container-low rounded-3xl border border-outline-variant shadow-sm overflow-hidden text-on-surface">
         <div className="p-6 border-b border-outline-variant flex flex-col md:flex-row gap-4 justify-between bg-surface-container-lowest/50">
           <div className="flex-1 relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant opacity-50" size={18} />
@@ -130,17 +138,29 @@ const RawData: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-on-surface-variant text-[10px] font-black uppercase tracking-[0.2em] border-b border-outline-variant bg-surface-container-low">
-                <th className="px-6 py-4">Invoice Date</th>
-                <th className="px-6 py-4">Context</th>
-                <th className="px-6 py-4 text-center">Category</th>
-                <th className="px-6 py-4">Source</th>
-                <th className="px-6 py-4 text-right">Consumption</th>
-                <th className="px-6 py-4 text-right">Settlement</th>
+                <th className="px-6 py-4 cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('invoice_date')}>
+                  <div className="flex items-center gap-1">Invoice Date {getSortIcon('invoice_date')}</div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('location.name')}>
+                  <div className="flex items-center gap-1">Context {getSortIcon('location.name')}</div>
+                </th>
+                <th className="px-6 py-4 text-center cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('provider.category.name')}>
+                  <div className="flex items-center gap-1 justify-center">Category {getSortIcon('provider.category.name')}</div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('provider.name')}>
+                  <div className="flex items-center gap-1">Source {getSortIcon('provider.name')}</div>
+                </th>
+                <th className="px-6 py-4 text-right cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('consumption_value')}>
+                  <div className="flex items-center gap-1 justify-end">Consumption {getSortIcon('consumption_value')}</div>
+                </th>
+                <th className="px-6 py-4 text-right cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('amount')}>
+                  <div className="flex items-center gap-1 justify-end">Settlement {getSortIcon('amount')}</div>
+                </th>
                 <th className="px-6 py-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
-              {filteredData.length === 0 ? (
+              {sortedData.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-20 text-center">
                     <div className="flex flex-col items-center opacity-30">
@@ -150,7 +170,7 @@ const RawData: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ) : filteredData.map((row) => (
+              ) : sortedData.map((row) => (
                 <tr key={row.id} className="hover:bg-surface-container-high/30 transition-colors group">
                   <td className="px-6 py-5 font-mono text-[11px] text-on-surface-variant">{row.invoice_date}</td>
                   <td className="px-6 py-5">

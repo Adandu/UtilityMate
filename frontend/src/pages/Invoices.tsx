@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, Trash2, Clock, Loader2, MoreVertical, X, Edit, CheckCircle, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 import api from '../utils/api';
+import { useSortableData } from '../hooks/useSortableData';
 
 interface Invoice {
   id: number;
@@ -78,6 +79,13 @@ const Invoices: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const { items: sortedInvoices, requestSort, sortConfig } = useSortableData(invoices, { key: 'invoice_date', direction: 'descending' });
+
+  const getSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) return null;
+    return sortConfig.direction === 'ascending' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
+  };
+
   const handleDelete = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this invoice?')) return;
     try {
@@ -110,7 +118,6 @@ const Invoices: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setUploadResults(response.data);
-      // Refresh list if any succeeded
       if (response.data.some((r: any) => r.status === 'success')) {
         await fetchInvoices();
       }
@@ -170,9 +177,9 @@ const Invoices: React.FC = () => {
 
   return (
     <div className="ml-64 p-8 min-h-screen bg-surface transition-colors duration-300 animate-in fade-in duration-500">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10 text-on-surface">
         <div>
-          <h2 className="font-headline text-3xl font-extrabold text-on-surface">Invoice Ledger</h2>
+          <h2 className="font-headline text-3xl font-extrabold">Invoice Ledger</h2>
           <p className="text-on-surface-variant font-medium opacity-70">Bulk management and automated provider detection.</p>
         </div>
         
@@ -189,8 +196,8 @@ const Invoices: React.FC = () => {
       {showUpload && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-[2rem] border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
-              <h3 className="font-headline text-xl font-black text-on-surface">Invoice Ingestion</h3>
+            <div className="p-8 border-b border-outline-variant flex justify-between items-center bg-surface-container-low text-on-surface">
+              <h3 className="font-headline text-xl font-black">Invoice Ingestion</h3>
               <button onClick={() => setShowUpload(false)} className="text-on-surface-variant hover:text-on-surface transition-colors">
                 <X size={24} />
               </button>
@@ -293,10 +300,10 @@ const Invoices: React.FC = () => {
       {showEdit && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[2rem] border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+            <div className="p-8 border-b border-outline-variant flex justify-between items-center bg-surface-container-low text-on-surface">
               <div className="flex items-center gap-3">
                 <Edit className="text-blue-500" size={24} />
-                <h3 className="font-headline text-xl font-black text-on-surface">Modify Invoice</h3>
+                <h3 className="font-headline text-xl font-black">Modify Invoice</h3>
               </div>
               <button onClick={() => setShowEdit(false)} className="text-on-surface-variant hover:text-on-surface transition-colors">
                 <X size={24} />
@@ -387,20 +394,28 @@ const Invoices: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-surface-container-low rounded-3xl border border-outline-variant shadow-sm overflow-hidden">
+      <div className="bg-surface-container-low rounded-3xl border border-outline-variant shadow-sm overflow-hidden text-on-surface">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-on-surface-variant text-[10px] font-black uppercase tracking-[0.2em] border-b border-outline-variant">
-                <th className="px-8 py-5">Service Provider</th>
-                <th className="px-8 py-5">Asset Location</th>
-                <th className="px-8 py-5 text-center">Invoice Date</th>
-                <th className="px-8 py-5 text-right">Settlement Amount</th>
+                <th className="px-8 py-5 cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('provider.name')}>
+                  <div className="flex items-center gap-1">Service Provider {getSortIcon('provider.name')}</div>
+                </th>
+                <th className="px-8 py-5 cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('location.name')}>
+                  <div className="flex items-center gap-1">Asset Location {getSortIcon('location.name')}</div>
+                </th>
+                <th className="px-8 py-5 text-center cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('invoice_date')}>
+                  <div className="flex items-center gap-1 justify-center">Invoice Date {getSortIcon('invoice_date')}</div>
+                </th>
+                <th className="px-8 py-5 text-right cursor-pointer hover:text-on-surface transition-colors" onClick={() => requestSort('amount')}>
+                  <div className="flex items-center gap-1 justify-end">Settlement Amount {getSortIcon('amount')}</div>
+                </th>
                 <th className="px-8 py-5 text-right pr-12">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
-              {invoices.length === 0 ? (
+              {sortedInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-8 py-20 text-center">
                     <div className="flex flex-col items-center opacity-30">
@@ -410,7 +425,7 @@ const Invoices: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ) : invoices.map((invoice) => (
+              ) : sortedInvoices.map((invoice) => (
                 <tr key={invoice.id} className="hover:bg-surface-container-high/30 transition-colors group">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">

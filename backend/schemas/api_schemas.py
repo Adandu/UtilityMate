@@ -127,6 +127,7 @@ class UserBase(BaseModel):
 
 class UserUpdate(UserBase):
     current_password: Optional[str] = None
+    dashboard_config: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -135,6 +136,7 @@ class User(UserBase):
     id: int
     is_active: bool
     theme_pref: str
+    dashboard_config: Optional[str] = None
     class Config:
         from_attributes = True
 

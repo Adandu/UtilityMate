@@ -12,6 +12,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
     theme_pref = Column(String, default="light")
+    dashboard_config = Column(String, nullable=True) # JSON string of widgets
     
     locations = relationship("Location", back_populates="owner", cascade="all, delete-orphan")
     invoices = relationship("Invoice", back_populates="owner", cascade="all, delete-orphan")

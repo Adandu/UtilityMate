@@ -78,6 +78,9 @@ async def update_user_me(
 
     if theme_pref:
         current_user.theme_pref = theme_pref
+    
+    if user_update.dashboard_config is not None:
+        current_user.dashboard_config = user_update.dashboard_config
         
     db.commit()
     db.refresh(current_user)
