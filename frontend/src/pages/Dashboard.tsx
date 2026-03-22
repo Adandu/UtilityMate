@@ -101,29 +101,53 @@ const Dashboard: React.FC = () => {
       return true;
     });
 
-    if (filteredInvoices.length === 0) return <div className="h-full flex items-center justify-center opacity-40 font-bold uppercase tracking-widest text-xs">No data for this criteria</div>;
-
     // Time-based aggregation for trends
     if (['consumption', 'price', 'price_per_unit'].includes(widget.type)) {
+      const now = new Date();
+      const monthsToShow: string[] = [];
+      let startDate = new Date();
+
+      if (period === '3m') {
+        startDate.setMonth(now.getMonth() - 2);
+      } else if (period === '6m') {
+        startDate.setMonth(now.getMonth() - 5);
+      } else if (period === '1y') {
+        startDate.setFullYear(now.getFullYear() - 1);
+        startDate.setMonth(now.getMonth() + 1);
+      } else if (period === 'all') {
+        if (invoices.length > 0) {
+          const firstDate = new Date(Math.min(...invoices.map(inv => new Date(inv.invoice_date).getTime())));
+          startDate = firstDate;
+        } else {
+          startDate.setMonth(now.getMonth() - 5); // Default 6m
+        }
+      }
+
+      // Generate all months between startDate and now
+      let current = new Date(startDate);
+      current.setDate(1); // Start at beginning of month
+      while (current <= now) {
+        monthsToShow.push(current.toISOString().substring(0, 7));
+        current.setMonth(current.getMonth() + 1);
+      }
+
       const monthlyAggregation: { [key: string]: any } = {};
+      monthsToShow.forEach(month => {
+        monthlyAggregation[month] = { name: month, electricity: 0, gas: 0, water: 0, electricity_price: 0, gas_price: 0, water_price: 0 };
+      });
+
       filteredInvoices.forEach((inv: any) => {
         const month = inv.invoice_date.substring(0, 7);
-        if (!monthlyAggregation[month]) {
-          monthlyAggregation[month] = { name: month, electricity: 0, gas: 0, water: 0, electricity_price: 0, gas_price: 0, water_price: 0 };
-        }
-        const cat = inv.provider?.category?.name?.toLowerCase();
-        if (cat === 'electricity' || cat === 'gas' || cat === 'water') {
-          monthlyAggregation[month][cat] += inv.consumption_value || 0;
-          monthlyAggregation[month][`${cat}_price`] += inv.amount || 0;
+        if (monthlyAggregation[month]) {
+          const cat = inv.provider?.category?.name?.toLowerCase();
+          if (cat === 'electricity' || cat === 'gas' || cat === 'water') {
+            monthlyAggregation[month][cat] += inv.consumption_value || 0;
+            monthlyAggregation[month][`${cat}_price`] += inv.amount || 0;
+          }
         }
       });
 
-      const sortedAggregation = Object.values(monthlyAggregation)
-        .sort((a: any, b: any) => a.name.localeCompare(b.name));
-
-      const chartData = period === 'all' 
-        ? sortedAggregation 
-        : sortedAggregation.slice(period === '3m' ? -3 : period === '6m' ? -6 : -12);
+      const chartData = Object.values(monthlyAggregation).sort((a: any, b: any) => a.name.localeCompare(b.name));
 
       if (widget.type === 'consumption') {
         return (
@@ -177,13 +201,13 @@ const Dashboard: React.FC = () => {
               <YAxis axisLine={false} tickLine={false} tick={{fill: 'currentColor', fontSize: 10}} />
               <Tooltip 
                 formatter={(value: any, name: any) => {
-                  // Find an invoice with this category to get the unit
                   const sampleInv = invoices.find(inv => inv.provider?.category?.name === name);
                   const unit = sampleInv?.provider?.category?.unit || (String(name).toLowerCase().includes('elec') ? 'kWh' : 'm³');
                   return [`${Number(value).toFixed(2)} RON/${unit}`, name];
                 }}
                 contentStyle={{ backgroundColor: 'var(--color-surface)', borderRadius: '12px', border: '1px solid var(--color-outline-variant)' }} 
-              />              {(widget.category === 'All' || widget.category === 'Electricity') && <Line type="monotone" dataKey="electricity" stroke="#3b82f6" strokeWidth={3} name="Electricity" />}
+              />
+              {(widget.category === 'All' || widget.category === 'Electricity') && <Line type="monotone" dataKey="electricity" stroke="#3b82f6" strokeWidth={3} name="Electricity" />}
               {(widget.category === 'All' || widget.category === 'Gas') && <Line type="monotone" dataKey="gas" stroke="#f59e0b" strokeWidth={3} name="Gas" />}
               {(widget.category === 'All' || widget.category === 'Water') && <Line type="monotone" dataKey="water" stroke="#10b981" strokeWidth={3} name="Water" />}
             </LineChart>
@@ -249,6 +273,8 @@ const Dashboard: React.FC = () => {
     if (widget.type === 'compare_price_location' || widget.type === 'compare_cons_location') {
       const locationStats: {[key: string]: { total: number, count: number }} = {};
       invoices.forEach(inv => {
+        const cat = inv.provider?.category?.name;
+        if (widget.category !== 'All' && cat !== widget.category) return;
         const locName = inv.location?.name || 'Unknown';
         if (!locationStats[locName]) locationStats[locName] = { total: 0, count: 0 };
         locationStats[locName].total += widget.type === 'compare_price_location' ? inv.amount : (inv.consumption_value || 0);
