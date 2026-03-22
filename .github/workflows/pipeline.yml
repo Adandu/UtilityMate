@@ -64,48 +64,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 📝 Generate Categorized Release Notes
-        id: changelog
-        run: |
-          CURRENT_TAG=${GITHUB_REF#refs/tags/}
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 $CURRENT_TAG^ 2>/dev/null || echo "")
-          
-          if [ -z "$PREVIOUS_TAG" ]; then
-            COMMITS=$(git log --oneline)
-          else
-            COMMITS=$(git log ${PREVIOUS_TAG}..${CURRENT_TAG} --oneline)
-          fi
-          
-          FEATURES=""
-          IMPROVEMENTS=""
-          FIXES=""
-          
-          while IFS= read -r line; do
-            DESC=$(echo "$line" | cut -d' ' -f2-)
-            if [[ $DESC =~ ^feat: ]] || [[ $DESC =~ ^feat\( ]]; then
-              FEATURES="${FEATURES}- ${DESC#feat: }\n"
-            elif [[ $DESC =~ ^imp: ]] || [[ $DESC =~ ^imp\( ]] || [[ $DESC =~ ^refactor: ]] || [[ $DESC =~ ^style: ]]; then
-              IMPROVEMENTS="${IMPROVEMENTS}- ${DESC#imp: }\n"
-            elif [[ $DESC =~ ^fix: ]] || [[ $DESC =~ ^fix\( ]]; then
-              FIXES="${FIXES}- ${DESC#fix: }\n"
-            fi
-          done <<< "$COMMITS"
-          
-          BODY=""
-          if [ ! -z "$FEATURES" ]; then BODY="${BODY}### 🚀 New Features\n${FEATURES}\n"; fi
-          if [ ! -z "$IMPROVEMENTS" ]; then BODY="${BODY}### 🛠️ Improvements\n${IMPROVEMENTS}\n"; fi
-          if [ ! -z "$FIXES" ]; then BODY="${BODY}### 🐛 Bug Fixes\n${FIXES}\n"; fi
-          
-          if [ -z "$BODY" ]; then BODY="Automated production release."; fi
-          
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          echo -e "$BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: 📢 Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body: ${{ steps.changelog.outputs.body }}
+          generate_release_notes: true
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

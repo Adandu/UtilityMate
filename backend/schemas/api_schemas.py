@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import date, datetime
 
 # Category Schemas
@@ -79,8 +79,8 @@ class InvoiceCreate(InvoiceBase):
     pass
 
 class InvoiceUpdate(BaseModel):
-    location_id: Optional[int] = None
-    provider_id: Optional[int] = None
+    location_id: Optional[Any] = None
+    provider_id: Optional[Any] = None
     invoice_date: Optional[date] = None
     due_date: Optional[date] = None
     amount: Optional[float] = None
@@ -93,22 +93,26 @@ class InvoiceUpdate(BaseModel):
         if v is None or v == "":
             return None
         try:
-            return int(v)
+            return int(float(v))
         except (ValueError, TypeError):
-            return v
+            return None
 
 class InvoiceBulkUpdate(BaseModel):
-    invoice_ids: List[int]
+    invoice_ids: Any
     update_data: InvoiceUpdate
 
     @field_validator('invoice_ids', mode='before')
     @classmethod
     def coerce_ids(cls, v):
+        if v is None: return []
         if isinstance(v, str):
-            # Handle comma-separated string if it somehow arrives this way
-            return [int(x.strip()) for x in v.split(',') if x.strip().isdigit()]
+            return [int(float(x.strip())) for x in v.split(',') if x.strip().replace('.','').isdigit()]
         if isinstance(v, list):
-            return [int(x) if isinstance(x, (str, float)) else x for x in v]
+            res = []
+            for x in v:
+                try: res.append(int(float(x)))
+                except: pass
+            return res
         return v
 
 class Invoice(InvoiceBase):
