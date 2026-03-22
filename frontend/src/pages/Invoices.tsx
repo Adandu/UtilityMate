@@ -220,7 +220,10 @@ const Invoices: React.FC = () => {
     if (editProvider) updates.provider_id = parseInt(editProvider);
 
     try {
-      await api.patch('/invoices/bulk', updates, { params: { invoice_ids: selectedIds.join(',') } });
+      await api.patch('/invoices/bulk', { 
+        invoice_ids: selectedIds,
+        update_data: updates 
+      });
       await fetchInvoices();
       setShowBulkEdit(false);
       setSelectedIds([]);

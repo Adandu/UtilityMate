@@ -87,6 +87,10 @@ class InvoiceUpdate(BaseModel):
     currency: Optional[str] = None
     consumption_value: Optional[float] = None
 
+class InvoiceBulkUpdate(BaseModel):
+    invoice_ids: List[int]
+    update_data: InvoiceUpdate
+
 class Invoice(InvoiceBase):
     id: int
     user_id: int
