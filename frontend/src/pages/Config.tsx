@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Building2, Moon, Sun, Plus, Shield, Zap, Droplets, Flame, Loader2, X, Tag, Trash2 } from 'lucide-react';
+import { MapPin, Building2, Moon, Sun, Plus, Shield, Zap, Droplets, Flame, Loader2, X, Tag, Trash2, Home } from 'lucide-react';
 import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -7,6 +7,7 @@ interface Location {
   id: number;
   name: string;
   address?: string;
+  household_id?: number | null;
 }
 
 interface Provider {
@@ -21,12 +22,20 @@ interface Category {
   unit: string;
 }
 
+interface Household {
+  id: number;
+  name: string;
+  description?: string;
+  members?: { id: number; role: string }[];
+}
+
 const Config: React.FC = () => {
   const { user, setUser } = useAuth();
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [locations, setLocations] = useState<Location[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [households, setHouseholds] = useState<Household[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [showAddProvider, setShowAddProvider] = useState(false);
@@ -58,6 +67,13 @@ const Config: React.FC = () => {
       setCategories(catRes.data);
     } catch (error) {
       console.error('Failed to fetch categories', error);
+    }
+
+    try {
+      const householdRes = await api.get('/households/');
+      setHouseholds(householdRes.data);
+    } catch (error) {
+      console.error('Failed to fetch households', error);
     }
 
     setLoading(false);
@@ -256,7 +272,14 @@ const Config: React.FC = () => {
                     <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600">
                       <MapPin size={20} />
                     </div>
-                    <span className="font-headline font-bold text-lg">{loc.name}</span>
+                    <div>
+                      <span className="font-headline font-bold text-lg">{loc.name}</span>
+                      {loc.household_id && (
+                        <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-50">
+                          {households.find((household) => household.id === loc.household_id)?.name || 'Linked household'}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <button 
                     onClick={() => handleDeleteLocation(loc.id)}
@@ -267,6 +290,29 @@ const Config: React.FC = () => {
                 </div>
               ))}
             </div>
+          </section>
+
+          {/* Households */}
+          <section className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant shadow-sm">
+            <div className="flex items-center gap-3 text-sky-600 mb-8">
+              <Home size={24} />
+              <h3 className="font-headline text-xl font-extrabold text-on-surface">Households</h3>
+            </div>
+            {households.length === 0 ? (
+              <p className="text-sm text-on-surface-variant opacity-60">No households yet. Create one from Operations and it will appear here.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {households.map((household) => (
+                  <div key={household.id} className="p-5 bg-white dark:bg-slate-900 border border-outline-variant rounded-2xl">
+                    <p className="font-headline font-bold text-lg">{household.name}</p>
+                    <p className="text-sm text-on-surface-variant opacity-70">{household.description || 'Shared utility workspace'}</p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-widest opacity-40">
+                      {(household.members?.length || 0)} member records
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Providers */}

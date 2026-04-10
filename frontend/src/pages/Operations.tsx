@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Home, Wallet, Webhook, Download, Gauge, Loader2, Plus, CheckCircle2 } from 'lucide-react';
+import { Bell, Home, Wallet, Webhook, Download, Gauge, Loader2, Plus, CheckCircle2, Building2, AlertTriangle } from 'lucide-react';
 import api from '../utils/api';
 
 interface Category { id: number; name: string; unit: string; }
 interface Location { id: number; name: string; }
+interface Provider { id: number; name: string; category_id: number; }
 interface BudgetStatus {
   budget: { id: number; category_id: number; monthly_limit: number; warning_threshold: number; category?: Category; location?: Location | null; };
   spent: number;
@@ -25,6 +26,8 @@ const Operations: React.FC = () => {
   const [indexes, setIndexes] = useState<ConsumptionIndex[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [pageErrors, setPageErrors] = useState<string[]>([]);
 
   const [newBudgetCategory, setNewBudgetCategory] = useState('');
   const [newBudgetLocation, setNewBudgetLocation] = useState('');
@@ -37,26 +40,45 @@ const Operations: React.FC = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    try {
-      const [budgetRes, alertRes, householdRes, eventRes, indexRes, categoryRes, locationRes] = await Promise.all([
-        api.get('/budgets/status'),
-        api.get('/alerts?unread_only=true'),
-        api.get('/households/'),
-        api.get('/automation/events'),
-        api.get('/consumption/'),
-        api.get('/categories/'),
-        api.get('/locations/'),
-      ]);
-      setBudgets(budgetRes.data);
-      setAlerts(alertRes.data);
-      setHouseholds(householdRes.data);
-      setEvents(eventRes.data);
-      setIndexes(indexRes.data);
-      setCategories(categoryRes.data);
-      setLocations(locationRes.data);
-    } finally {
-      setLoading(false);
-    }
+    const results = await Promise.allSettled([
+      api.get('/budgets/status'),
+      api.get('/alerts?unread_only=true'),
+      api.get('/households/'),
+      api.get('/automation/events'),
+      api.get('/consumption/'),
+      api.get('/categories/'),
+      api.get('/locations/'),
+      api.get('/providers/'),
+    ]);
+
+    const errors: string[] = [];
+
+    if (results[0].status === 'fulfilled') setBudgets(results[0].value.data);
+    else errors.push('Budgets could not be loaded.');
+
+    if (results[1].status === 'fulfilled') setAlerts(results[1].value.data);
+    else errors.push('Alerts could not be loaded.');
+
+    if (results[2].status === 'fulfilled') setHouseholds(results[2].value.data);
+    else errors.push('Households could not be loaded.');
+
+    if (results[3].status === 'fulfilled') setEvents(results[3].value.data);
+    else errors.push('Automation events could not be loaded.');
+
+    if (results[4].status === 'fulfilled') setIndexes(results[4].value.data);
+    else errors.push('Meter readings could not be loaded.');
+
+    if (results[5].status === 'fulfilled') setCategories(results[5].value.data);
+    else errors.push('Categories could not be loaded.');
+
+    if (results[6].status === 'fulfilled') setLocations(results[6].value.data);
+    else errors.push('Locations could not be loaded.');
+
+    if (results[7].status === 'fulfilled') setProviders(results[7].value.data);
+    else errors.push('Providers could not be loaded.');
+
+    setPageErrors(errors);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -139,6 +161,16 @@ const Operations: React.FC = () => {
         </button>
       </header>
 
+      {pageErrors.length > 0 && (
+        <div className="mb-8 rounded-3xl border border-amber-300/40 bg-amber-50 p-5 text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+          <div className="mb-2 flex items-center gap-2 font-black">
+            <AlertTriangle size={18} />
+            Partial data loaded
+          </div>
+          <p className="text-sm opacity-80">{pageErrors.join(' ')}</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
         <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6">
           <div className="mb-5 flex items-center gap-3"><Wallet className="text-emerald-600" /><h3 className="font-headline text-xl font-black">Budgets</h3></div>
@@ -202,6 +234,19 @@ const Operations: React.FC = () => {
                 <p className="font-black">{household.name}</p>
                 <p className="text-sm opacity-70">{household.description || 'Shared household workspace for locations, budgets, and accountability.'}</p>
                 <p className="mt-2 text-xs font-bold uppercase opacity-50">{household.members.length} member records</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6">
+          <div className="mb-5 flex items-center gap-3"><Building2 className="text-amber-600" /><h3 className="font-headline text-xl font-black">Provider Catalog</h3></div>
+          <div className="space-y-3">
+            {providers.length === 0 && <p className="text-sm opacity-60">No providers available.</p>}
+            {providers.slice(0, 10).map((provider) => (
+              <div key={provider.id} className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
+                <p className="font-black">{provider.name}</p>
+                <p className="text-sm opacity-60">{categories.find((category) => category.id === provider.category_id)?.name || 'Unassigned category'}</p>
               </div>
             ))}
           </div>

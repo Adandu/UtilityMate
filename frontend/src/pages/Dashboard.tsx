@@ -44,6 +44,13 @@ interface Invoice {
   amount: number;
 }
 
+const tooltipStyle = {
+  backgroundColor: 'var(--color-surface)',
+  border: '1px solid var(--color-outline-variant)',
+  borderRadius: '16px',
+  color: 'var(--color-on-surface)',
+};
+
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<ReportBundle | null>(null);
@@ -120,7 +127,7 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
-                <Tooltip />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} />
                 <Area type="monotone" dataKey="amount" stroke="#10b981" fill="url(#spendArea)" strokeWidth={3} />
               </AreaChart>
             </ResponsiveContainer>
@@ -135,7 +142,7 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
                 <XAxis dataKey="label" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
-                <Tooltip />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} />
                 <Bar dataKey="amount" fill="#3b82f6" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
