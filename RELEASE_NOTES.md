@@ -1,19 +1,19 @@
-# UtilityMate v1.4.14
+# UtilityMate v1.4.15
 
 ## New Features
 
-- Added a dashboard location selector so utility trends can be reviewed per property or across all locations.
-- Added period filters for the dashboard with Last 3 Months, Last 6 Months, Last 1 Year, Custom Period, and All Time options.
-- Added expandable utility-category analytics sections with cost, consumption, unit-cost, forecast, and cross-location comparison charts.
+- Added an automatic PDF invoice repair pass on startup so existing imported invoices can be corrected after parser improvements.
+- Added targeted Hidroelectrica consumption extraction for billed energy totals instead of whichever `kWh` token appears first in the PDF.
+- Added safer PDF path resolution for startup data repair in container deployments.
 
 ## Improvements
 
-- Rebuilt the dashboard around statistical trend analysis instead of payment-management widgets.
-- Added a dedicated dashboard analytics API that pre-aggregates monthly category and location rollups for faster graph rendering.
-- Improved forecast visibility by overlaying a historical baseline from previous years directly on the trend charts.
+- Improved invoice data integrity by reparsing stored PDF invoices for supported providers during startup.
+- Improved Hidroelectrica parsing to prioritize the invoice summary and metering sections before table-row fallbacks.
+- Improved repair safety so only positive, trustworthy parsed values overwrite stored invoice amounts or consumption.
 
 ## Bug Fixes
 
-- Fixed the dashboard mismatch where payment-focused widgets were taking space away from consumption and cost analysis.
-- Fixed the inability to compare locations by utility category within the dashboard.
-- Fixed the lack of dashboard period controls for narrowing or widening historical analysis.
+- Fixed incorrect dashboard cost-per-unit values caused by misparsed Hidroelectrica consumption on existing invoices.
+- Fixed older energy invoices that stored `8 kWh`, `1 kWh`, or `0 kWh` helper values instead of the billed consumption.
+- Fixed startup repair logic to avoid writing invalid negative fallback consumption values.

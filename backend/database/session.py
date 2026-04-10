@@ -1,9 +1,11 @@
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import joinedload, sessionmaker
 import os
 from dotenv import load_dotenv
 from ..models.database_models import Base
 from ..utils.logging_config import logger
+from ..models import database_models
+from ..utils.parser import InvoiceParser
 
 load_dotenv()
 
@@ -23,6 +25,83 @@ def get_db():
     except Exception:
         db.rollback()
         raise
+    finally:
+        db.close()
+
+
+def resolve_invoice_pdf_path(pdf_path: str) -> str:
+    candidate_paths = [
+        pdf_path,
+        os.path.join("/app", pdf_path),
+    ]
+    for candidate in candidate_paths:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return pdf_path
+
+
+def repair_pdf_invoice_data():
+    repaired_count = 0
+    db = SessionLocal()
+    try:
+        invoices = db.query(database_models.Invoice).options(
+            joinedload(database_models.Invoice.provider),
+            joinedload(database_models.Invoice.location),
+        ).filter(
+            database_models.Invoice.source_type == "pdf",
+            database_models.Invoice.pdf_path != None,
+        ).all()
+
+        for invoice in invoices:
+            if not invoice.provider or not invoice.location:
+                continue
+
+            provider_name = invoice.provider.name or ""
+            if not any(name in provider_name.lower() for name in ("hidroelectrica", "engie")):
+                continue
+
+            pdf_path = resolve_invoice_pdf_path(invoice.pdf_path)
+            if not os.path.exists(pdf_path):
+                continue
+
+            pdf_text = InvoiceParser.get_pdf_text(pdf_path)
+            if not pdf_text:
+                continue
+
+            parsed_data = InvoiceParser.parse_pdf(pdf_text, provider_name, invoice.location.name or "")
+            changed = False
+
+            parsed_invoice_date = parsed_data.get("invoice_date")
+            if parsed_invoice_date and parsed_invoice_date != invoice.invoice_date:
+                invoice.invoice_date = parsed_invoice_date
+                changed = True
+
+            parsed_due_date = parsed_data.get("due_date")
+            if parsed_due_date and parsed_due_date != invoice.due_date:
+                invoice.due_date = parsed_due_date
+                changed = True
+
+            parsed_amount = parsed_data.get("amount")
+            if parsed_amount is not None and parsed_amount > 0 and abs(parsed_amount - (invoice.amount or 0.0)) > 0.01:
+                invoice.amount = parsed_amount
+                changed = True
+
+            parsed_consumption = parsed_data.get("consumption_value")
+            if parsed_consumption is not None and parsed_consumption > 0 and abs(parsed_consumption - (invoice.consumption_value or 0.0)) > 0.01:
+                invoice.consumption_value = parsed_consumption
+                changed = True
+
+            if changed:
+                repaired_count += 1
+
+        if repaired_count:
+            db.commit()
+            logger.info("Repaired parsed invoice data for %s PDF-backed invoices.", repaired_count)
+        else:
+            db.rollback()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("PDF invoice repair pass failed: %s", exc)
     finally:
         db.close()
 
@@ -107,3 +186,4 @@ def verify_and_migrate_db():
                 conn.execute(text("ALTER TABLE locations ADD COLUMN household_id INTEGER REFERENCES households(id) ON DELETE SET NULL"))
     
     logger.info("Database schema verification and migration complete.")
+    repair_pdf_invoice_data()

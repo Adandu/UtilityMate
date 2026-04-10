@@ -5,6 +5,14 @@ from datetime import datetime
 
 class InvoiceParser:
     @staticmethod
+    def _parse_number(value: str) -> float:
+        cleaned = value.strip()
+        if "," in cleaned and "." in cleaned:
+            cleaned = cleaned.replace(".", "")
+        cleaned = cleaned.replace(",", ".")
+        return float(cleaned)
+
+    @staticmethod
     def get_pdf_text(file_path: str) -> str:
         text = ""
         try:
@@ -80,15 +88,54 @@ class InvoiceParser:
             amount_match = re.search(r"total\s+factur[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
             
         if amount_match:
-            amount_str = amount_match.group(1).strip()
-            if "," in amount_str and "." in amount_str:
-                amount_str = amount_str.replace(".", "")
-            amount_str = amount_str.replace(",", ".")
             try:
-                result["amount"] = float(amount_str)
+                result["amount"] = InvoiceParser._parse_number(amount_match.group(1))
             except ValueError:
                 pass
-            
+
+        summary_consumption_match = re.search(
+            r"consum\s+energie\s+activ[ăa]\s+în\s+perioada\s+de\s+facturare\s+([\d\.,]+)\s*kwh",
+            text,
+            re.IGNORECASE,
+        )
+        if summary_consumption_match:
+            try:
+                value = InvoiceParser._parse_number(summary_consumption_match.group(1))
+                if value > 0:
+                    result["consumption_value"] = value
+                    return
+            except ValueError:
+                pass
+
+        metering_match = re.search(
+            r"cantitate\s+de\s+facturat.*?ea\s+kwh\s+[\d\.,]+\s+\d+\s+\d+\s+([\d\.,]+)",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if metering_match:
+            try:
+                value = InvoiceParser._parse_number(metering_match.group(1))
+                if value > 0:
+                    result["consumption_value"] = value
+                    return
+            except ValueError:
+                pass
+
+        current_charge_matches = re.findall(
+            r"energie\s+activ[ăa]\s+factur[ăa]\s+curent[ăa]\s+\d+\s+(-?[\d\.,]+)\s*kwh",
+            text,
+            re.IGNORECASE,
+        )
+        if current_charge_matches:
+            try:
+                values = [InvoiceParser._parse_number(match) for match in current_charge_matches]
+                positive_total = sum(value for value in values if value > 0)
+                if positive_total > 0:
+                    result["consumption_value"] = positive_total
+                    return
+            except ValueError:
+                pass
+
         consumption_match = re.search(r"(\d+)\s+kwh", text, re.IGNORECASE)
         if consumption_match:
             result["consumption_value"] = float(consumption_match.group(1))
@@ -109,12 +156,8 @@ class InvoiceParser:
             amount_match = re.search(r"total\s+factur[aă]\s+curent[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
             
         if amount_match:
-            amount_str = amount_match.group(1).strip()
-            if "," in amount_str and "." in amount_str:
-                amount_str = amount_str.replace(".", "")
-            amount_str = amount_str.replace(",", ".")
             try:
-                result["amount"] = float(amount_str)
+                result["amount"] = InvoiceParser._parse_number(amount_match.group(1))
             except ValueError:
                 pass
 
@@ -195,11 +238,7 @@ class InvoiceParser:
             
         amount_match = re.search(r"total[:\s]+([\d\.,]+)", text, re.IGNORECASE)
         if amount_match:
-            amount_str = amount_match.group(1)
-            if "," in amount_str and "." in amount_str:
-                amount_str = amount_str.replace(".", "")
-            amount_str = amount_str.replace(",", ".")
             try:
-                result["amount"] = float(amount_str)
+                result["amount"] = InvoiceParser._parse_number(amount_match.group(1))
             except (ValueError, TypeError):
                 pass
