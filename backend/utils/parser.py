@@ -74,10 +74,10 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
     "septembrie 2025": {
         "name": "blocmanagernet_2025_09",
         "segments": [
-            _metered_segment("Apa rece", "Water", "m3"),
-            _metered_segment("Apa calda", "Water", "m3"),
-            _metered_segment("Apa parti comune", "Water", "m3"),
-            _metered_segment("Apa meteorica", "Water", "m3"),
+            _metered_segment("Apa rece", "Cold Water", "m3"),
+            _metered_segment("Apa calda", "Hot Water", "m3"),
+            _metered_segment("Apa parti comune", "Shared Water", "m3"),
+            _metered_segment("Apa meteorica", "Storm Water", "m3"),
             _charge_segment("Gaze naturale", category_name="Gas", line_kind="utility", include_in_category=True),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
@@ -97,9 +97,9 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
     "octombrie 2025": {
         "name": "blocmanagernet_2025_10",
         "segments": [
-            _metered_segment("Apa rece", "Water", "m3"),
-            _metered_segment("Apa calda", "Water", "m3"),
-            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Apa rece", "Cold Water", "m3"),
+            _metered_segment("Apa calda", "Hot Water", "m3"),
+            _metered_segment("Apa parti comune", "Shared Water", "m3"),
             _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
             _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
@@ -120,9 +120,9 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
     "noiembrie 2025": {
         "name": "blocmanagernet_2025_11",
         "segments": [
-            _metered_segment("Apa rece", "Water", "m3"),
-            _metered_segment("Apa calda", "Water", "m3"),
-            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Apa rece", "Cold Water", "m3"),
+            _metered_segment("Apa calda", "Hot Water", "m3"),
+            _metered_segment("Apa parti comune", "Shared Water", "m3"),
             _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
             _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
@@ -144,9 +144,9 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
     "decembrie 2025": {
         "name": "blocmanagernet_2025_12",
         "segments": [
-            _metered_segment("Apa rece", "Water", "m3"),
-            _metered_segment("Apa calda", "Water", "m3"),
-            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Apa rece", "Cold Water", "m3"),
+            _metered_segment("Apa calda", "Hot Water", "m3"),
+            _metered_segment("Apa parti comune", "Shared Water", "m3"),
             _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
             _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
@@ -168,9 +168,9 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
     "ianuarie 2026": {
         "name": "blocmanagernet_2026_01",
         "segments": [
-            _metered_segment("Apa rece", "Water", "m3"),
-            _metered_segment("Apa calda", "Water", "m3"),
-            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Apa rece", "Cold Water", "m3"),
+            _metered_segment("Apa calda", "Hot Water", "m3"),
+            _metered_segment("Apa parti comune", "Shared Water", "m3"),
             _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
             _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
@@ -191,9 +191,9 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
     "februarie 2026": {
         "name": "blocmanagernet_2026_02",
         "segments": [
-            _metered_segment("Apa rece", "Water", "m3"),
-            _metered_segment("Apa calda", "Water", "m3"),
-            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Apa rece", "Cold Water", "m3"),
+            _metered_segment("Apa calda", "Hot Water", "m3"),
+            _metered_segment("Apa parti comune", "Shared Water", "m3"),
             _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
             _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
@@ -601,7 +601,7 @@ class InvoiceParser:
         water_consumption = sum(
             line.get("consumption_value") or 0.0
             for line in apartment.get("line_items", [])
-            if line.get("category_name") == "Water" and line.get("include_in_unit_cost")
+            if line.get("unit") == "m3" and line.get("include_in_unit_cost")
         )
         result["consumption_value"] = water_consumption
 

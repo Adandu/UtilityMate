@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -13,7 +13,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { BarChart3, ChevronDown, Filter, Loader2, MapPinned, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import { BarChart3, ChevronDown, Download, Filter, Loader2, MapPinned, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import api from '../utils/api';
 
 interface LocationOption {
@@ -115,6 +117,8 @@ const Dashboard: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('last_6_months');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const dashboardExportRef = useRef<HTMLDivElement | null>(null);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -155,6 +159,62 @@ const Dashboard: React.FC = () => {
     if (!report || selectedLocation === 'all') return 'All Locations';
     return report.available_locations.find((location) => String(location.id) === selectedLocation)?.name || 'Selected Location';
   }, [report, selectedLocation]);
+
+  const selectedPeriodLabel = useMemo(() => (
+    periodOptions.find((option) => option.value === selectedPeriod)?.label || 'Custom Period'
+  ), [selectedPeriod]);
+
+  const exportDashboardPdf = async () => {
+    if (!dashboardExportRef.current || !report) return;
+    setExportingPdf(true);
+    const detailsElements = Array.from(dashboardExportRef.current.querySelectorAll('details'));
+    const originalOpenStates = detailsElements.map((element) => element.open);
+    detailsElements.forEach((element) => {
+      element.open = true;
+    });
+
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      const canvas = await html2canvas(dashboardExportRef.current, {
+        scale: 2,
+        backgroundColor: '#f5f7fb',
+        useCORS: true,
+      });
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      const contentWidth = pageWidth - margin * 2;
+      const contentHeight = (canvas.height * contentWidth) / canvas.width;
+      let remainingHeight = contentHeight;
+      let position = margin;
+
+      pdf.setFontSize(14);
+      pdf.text(`UtilityMate Dashboard Export`, margin, 8);
+      pdf.setFontSize(9);
+      pdf.text(`Location: ${selectedLocationName} | Period: ${selectedPeriodLabel}`, margin, 13);
+      const imageData = canvas.toDataURL('image/png');
+
+      pdf.addImage(imageData, 'PNG', margin, 18, contentWidth, contentHeight);
+      remainingHeight -= (pageHeight - 18 - margin);
+
+      while (remainingHeight > 0) {
+        pdf.addPage();
+        position = remainingHeight - contentHeight + margin;
+        pdf.addImage(imageData, 'PNG', margin, position, contentWidth, contentHeight);
+        remainingHeight -= (pageHeight - margin * 2);
+      }
+
+      const locationSlug = selectedLocationName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const periodSlug = selectedPeriodLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      pdf.save(`utilitymate-dashboard-${locationSlug}-${periodSlug}.pdf`);
+    } finally {
+      detailsElements.forEach((element, index) => {
+        element.open = originalOpenStates[index];
+      });
+      setExportingPdf(false);
+    }
+  };
 
   if (loading || !report) {
     return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
@@ -204,8 +264,15 @@ const Dashboard: React.FC = () => {
             </>
           )}
         </div>
+        <div className="flex justify-end">
+          <button onClick={exportDashboardPdf} disabled={exportingPdf} className="flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white disabled:opacity-60 dark:bg-white dark:text-slate-900">
+            {exportingPdf ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+            {exportingPdf ? 'Exporting PDF...' : 'Export Dashboard PDF'}
+          </button>
+        </div>
       </header>
 
+      <div ref={dashboardExportRef}>
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => {
           const Icon = card.icon;
@@ -405,6 +472,7 @@ const Dashboard: React.FC = () => {
           </details>
         ))}
       </section>
+      </div>
     </div>
   );
 };
