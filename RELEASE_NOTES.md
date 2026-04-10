@@ -1,19 +1,19 @@
-# UtilityMate v1.4.11
+# UtilityMate v1.4.12
 
 ## New Features
 
-- Added bulk invoice status updates from the invoice review desk.
-- Added direct PDF viewing from invoice rows so imported bills can be reviewed in place.
-- Added household deletion controls in the Operations Center.
+- Added invoice deletion actions to the invoice review desk.
+- Added bulk invoice deletion for multi-select workflows.
+- Added confirmation prompts for destructive invoice removal actions.
 
 ## Improvements
 
-- Backfilled review confidence for legacy invoices so older imports no longer stay stuck at `0%`.
-- Improved Operations behavior so alerts degrade quietly and the rest of the page remains usable.
-- Improved invoice workflow ergonomics with checkbox selection and a dedicated bulk action bar.
+- Kept invoice cleanup aligned with existing backend deletion logic so the stored PDF is removed alongside the database record.
+- Improved invoice table actions by grouping review, PDF viewing, and deletion into one place.
+- Preserved bulk-selection workflow after adding destructive actions.
 
 ## Bug Fixes
 
-- Fixed the Operations Center alert-loading failure so alert generation/query issues no longer break the whole page.
-- Fixed empty Operations dropdowns and missing household displays caused by all-or-nothing page loading.
-- Fixed household cleanup so deleting a household detaches linked locations and budgets safely.
+- Fixed the missing delete capability in the current invoice UI after the workflow redesign.
+- Fixed the inability to remove multiple invoices at once from the review desk.
+- Fixed the UX gap where invoice cleanup existed in the backend but was not reachable from the frontend.

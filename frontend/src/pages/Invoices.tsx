@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Edit3, Eye, FileWarning, Loader2, Square, CheckSquare, Upload, X } from 'lucide-react';
+import { CheckCircle2, Edit3, Eye, FileWarning, Loader2, Square, CheckSquare, Trash2, Upload, X } from 'lucide-react';
 import api from '../utils/api';
 
 interface Invoice {
@@ -130,6 +130,21 @@ const Invoices: React.FC = () => {
     await fetchData();
   };
 
+  const deleteInvoice = async (invoiceId: number) => {
+    if (!window.confirm('Delete this invoice and its stored PDF?')) return;
+    await api.delete(`/invoices/${invoiceId}`);
+    setSelectedIds((current) => current.filter((id) => id !== invoiceId));
+    await fetchData();
+  };
+
+  const bulkDeleteInvoices = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.length} selected invoice${selectedIds.length === 1 ? '' : 's'} and their stored PDFs?`)) return;
+    await api.delete('/invoices/bulk', { data: selectedIds });
+    setSelectedIds([]);
+    await fetchData();
+  };
+
   if (loading) {
     return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
@@ -158,6 +173,7 @@ const Invoices: React.FC = () => {
               <option value="overdue">Overdue</option>
             </select>
             <button onClick={applyBulkStatus} className="rounded-xl bg-blue-600 px-4 py-3 font-bold text-white">Apply Status</button>
+            <button onClick={bulkDeleteInvoices} className="rounded-xl bg-red-600 px-4 py-3 font-bold text-white">Delete Selected</button>
             <button onClick={() => setSelectedIds([])} className="rounded-xl border border-outline-variant px-4 py-3 font-bold">Clear</button>
           </div>
         </div>
@@ -217,6 +233,9 @@ const Invoices: React.FC = () => {
                       </button>
                       <button onClick={() => openEdit(invoice)} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black uppercase text-white dark:bg-white dark:text-slate-900">
                         <Edit3 size={14} />
+                      </button>
+                      <button onClick={() => deleteInvoice(invoice.id)} className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white">
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </td>
