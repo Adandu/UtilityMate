@@ -105,6 +105,91 @@ def repair_pdf_invoice_data():
     finally:
         db.close()
 
+
+def _get_or_create_category(db, user_id: int, name: str, unit: str):
+    category = db.query(database_models.Category).filter(
+        database_models.Category.name == name,
+        database_models.Category.unit == unit,
+        database_models.Category.user_id == user_id,
+    ).first()
+    if category:
+        return category
+
+    system_category = db.query(database_models.Category).filter(
+        database_models.Category.name == name,
+        database_models.Category.unit == unit,
+        database_models.Category.user_id == None,
+    ).first()
+    if system_category:
+        return system_category
+
+    category = database_models.Category(
+        user_id=user_id,
+        name=name,
+        unit=unit,
+    )
+    db.add(category)
+    db.flush()
+    return category
+
+
+def repair_association_statement_water_categories():
+    repaired_count = 0
+    db = SessionLocal()
+    try:
+        lines = db.query(database_models.AssociationStatementLine).options(
+            joinedload(database_models.AssociationStatementLine.category),
+        ).filter(
+            database_models.AssociationStatementLine.line_kind == "utility",
+            database_models.AssociationStatementLine.unit == "m3",
+        ).all()
+
+        water_mapping = {
+            "apa rece": "Cold Water",
+            "apa calda": "Hot Water",
+            "apa parti comune": "Shared Water",
+            "apa meteorica": "Storm Water",
+        }
+
+        for line in lines:
+            raw_label = (line.raw_label or "").strip().lower()
+            target_name = water_mapping.get(raw_label)
+            if not target_name:
+                continue
+
+            changed = False
+            if line.normalized_label != target_name:
+                line.normalized_label = target_name
+                changed = True
+
+            if not line.include_in_category_analytics:
+                line.include_in_category_analytics = True
+                changed = True
+
+            if not line.include_in_unit_cost:
+                line.include_in_unit_cost = True
+                changed = True
+
+            current_category_name = line.category.name if line.category else None
+            if current_category_name != target_name:
+                target_category = _get_or_create_category(db, line.user_id, target_name, "m3")
+                line.category_id = target_category.id
+                changed = True
+
+            if changed:
+                repaired_count += 1
+
+        if repaired_count:
+            db.commit()
+            logger.info("Repaired water categories for %s association statement lines.", repaired_count)
+        else:
+            db.rollback()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Association statement water repair pass failed: %s", exc)
+    finally:
+        db.close()
+
 def verify_and_migrate_db():
     """
     Verifies the database schema and applies simple migrations if necessary.

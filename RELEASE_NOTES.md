@@ -1,13 +1,13 @@
-# UtilityMate v1.4.24
+# UtilityMate v1.4.25
 
 ## New Features
 
-- Added a backend-generated dashboard PDF export endpoint that produces a real downloadable report for the active location and period filters.
+- Added an automatic repair pass for previously imported association-statement water lines so old avizier data is reclassified into the split water categories on startup.
 
 ## Improvements
 
-- Reused the same dashboard analytics payload for both the web view and PDF export so the downloaded report matches the current dashboard filters and summaries.
+- Existing avizier imports now align with the newer `Cold Water`, `Hot Water`, `Shared Water`, and `Storm Water` category model without requiring manual re-upload.
 
 ## Bug Fixes
 
-- Fixed the recurring dashboard export failure caused by browser-side chart capture timing and DOM rendering issues.
+- Fixed the dashboard continuing to show a single generic `Water` category for older imported avizier statements after the parser had already been updated to split water types.

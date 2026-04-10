@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from .routers import auth, categories, providers, locations, invoices, consumption, budgets, alerts, households, automation, analytics, association_statements
-from .database.session import engine, repair_pdf_invoice_data, verify_and_migrate_db
+from .database.session import engine, repair_association_statement_water_categories, repair_pdf_invoice_data, verify_and_migrate_db
 from .utils.logging_config import logger
 from .utils.rate_limiter import limiter
 
@@ -72,8 +72,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 async def schedule_invoice_repair():
-    # Run PDF repair after the API is booting so container health checks do not time out.
+    # Run repair jobs after the API is booting so container health checks do not time out.
     threading.Thread(target=repair_pdf_invoice_data, daemon=True).start()
+    threading.Thread(target=repair_association_statement_water_categories, daemon=True).start()
 
 @app.get("/")
 async def root():

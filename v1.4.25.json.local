@@ -1,0 +1,3 @@
+{
+  "body": "## New Features\n- Added an automatic repair pass for previously imported association-statement water lines so old avizier data is reclassified into the split water categories on startup.\n\n## Improvements\n- Existing avizier imports now align with the newer `Cold Water`, `Hot Water`, `Shared Water`, and `Storm Water` category model without requiring manual re-upload.\n\n## Bug Fixes\n- Fixed the dashboard continuing to show a single generic `Water` category for older imported avizier statements after the parser had already been updated to split water types."
+}
