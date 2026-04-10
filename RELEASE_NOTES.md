@@ -1,19 +1,19 @@
-# UtilityMate v1.4.13
+# UtilityMate v1.4.14
 
 ## New Features
 
-- Added a live progress bar for bulk invoice uploads so large PDF batches show clear in-flight activity.
-- Added post-upload parsing feedback that lists each imported file with provider, date, amount, and review confidence.
-- Added per-file success and failure summaries in the upload modal so bulk imports can be verified immediately.
+- Added a dashboard location selector so utility trends can be reviewed per property or across all locations.
+- Added period filters for the dashboard with Last 3 Months, Last 6 Months, Last 1 Year, Custom Period, and All Time options.
+- Added expandable utility-category analytics sections with cost, consumption, unit-cost, forecast, and cross-location comparison charts.
 
 ## Improvements
 
-- Kept the upload modal open after bulk import completion so parsing results remain visible instead of disappearing instantly.
-- Expanded the upload API response to include parser confidence and review-state details for each successful invoice.
-- Improved the bulk import call-to-action so the same modal can be reused for follow-up batches after reviewing results.
+- Rebuilt the dashboard around statistical trend analysis instead of payment-management widgets.
+- Added a dedicated dashboard analytics API that pre-aggregates monthly category and location rollups for faster graph rendering.
+- Improved forecast visibility by overlaying a historical baseline from previous years directly on the trend charts.
 
 ## Bug Fixes
 
-- Fixed the lack of visual feedback during multi-file invoice uploads.
-- Fixed the missing confirmation path for whether each uploaded invoice parsed correctly.
-- Fixed the workflow gap where upload success or failure details were hidden unless the user manually refreshed the invoice list.
+- Fixed the dashboard mismatch where payment-focused widgets were taking space away from consumption and cost analysis.
+- Fixed the inability to compare locations by utility category within the dashboard.
+- Fixed the lack of dashboard period controls for narrowing or widening historical analysis.

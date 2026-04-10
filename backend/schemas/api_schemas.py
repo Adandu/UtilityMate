@@ -374,3 +374,50 @@ class ReportBundle(BaseModel):
     budget_statuses: List[BudgetStatus]
     alerts: List[Alert]
     forecast: List[ForecastPoint]
+
+
+class DashboardSummary(BaseModel):
+    total_cost: float
+    avg_monthly_cost: float
+    previous_period_cost: float
+    change_ratio: float
+    active_categories: int
+    months_covered: int
+
+
+class DashboardSeriesPoint(BaseModel):
+    label: str
+    cost: float
+    consumption: float
+    unit_cost: Optional[float] = None
+    forecast_cost: Optional[float] = None
+
+
+class LocationComparisonPoint(BaseModel):
+    location_id: int
+    location_name: str
+    cost: float
+    consumption: float
+    unit_cost: Optional[float] = None
+
+
+class DashboardCategorySection(BaseModel):
+    category_id: int
+    category_name: str
+    unit: str
+    total_cost: float
+    total_consumption: float
+    avg_unit_cost: Optional[float] = None
+    monthly_series: List[DashboardSeriesPoint]
+    location_comparison: List[LocationComparisonPoint]
+
+
+class DashboardAnalyticsResponse(BaseModel):
+    summary: DashboardSummary
+    available_locations: List[LocationSimple]
+    selected_location_id: Optional[int] = None
+    period_key: str
+    start_date: date
+    end_date: date
+    overall_cost_series: List[DashboardSeriesPoint]
+    category_sections: List[DashboardCategorySection]
