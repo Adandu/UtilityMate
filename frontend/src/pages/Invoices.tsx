@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Edit3, Eye, FileWarning, Loader2, Square, CheckSquare, Trash2, Upload, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, Edit3, Eye, FileWarning, Loader2, Square, CheckSquare, Trash2, Upload, X } from 'lucide-react';
 import api from '../utils/api';
 
 interface Invoice {
@@ -24,6 +24,19 @@ interface Invoice {
 
 interface Location { id: number; name: string; }
 
+interface UploadResult {
+  filename: string;
+  status: 'success' | 'error';
+  detail?: string;
+  id?: number;
+  provider_name?: string;
+  invoice_date?: string;
+  amount?: number;
+  currency?: string;
+  parse_confidence?: number;
+  needs_review?: boolean;
+}
+
 const Invoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -31,6 +44,9 @@ const Invoices: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [showUpload, setShowUpload] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'processing' | 'complete'>('idle');
+  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [editing, setEditing] = useState<Invoice | null>(null);
   const [editStatus, setEditStatus] = useState('received');
   const [editDueDate, setEditDueDate] = useState('');
@@ -40,6 +56,12 @@ const Invoices: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkStatus, setBulkStatus] = useState('reviewed');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadSummary = useMemo(() => ({
+    success: uploadResults.filter((result) => result.status === 'success').length,
+    error: uploadResults.filter((result) => result.status === 'error').length,
+    needsReview: uploadResults.filter((result) => result.status === 'success' && result.needs_review).length,
+  }), [uploadResults]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -69,15 +91,40 @@ const Invoices: React.FC = () => {
     formData.append('location_id', selectedLocation);
     Array.from(files).forEach((file) => formData.append('files', file));
     setUploading(true);
+    setUploadProgress(0);
+    setUploadPhase('uploading');
+    setUploadResults([]);
     try {
-      await api.post('/invoices/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-      setShowUpload(false);
-      setSelectedLocation('');
+      const response = await api.post<UploadResult[]>('/invoices/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (event) => {
+          if (!event.total) return;
+          const progress = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(progress);
+          setUploadPhase(progress >= 100 ? 'processing' : 'uploading');
+        },
+      });
+      setUploadProgress(100);
+      setUploadPhase('complete');
+      setUploadResults(response.data);
       if (fileInputRef.current) fileInputRef.current.value = '';
       await fetchData();
+    } catch {
+      setUploadPhase('complete');
+      setUploadResults([{ filename: 'Bulk upload', status: 'error', detail: 'Upload failed before the server could finish processing the files.' }]);
     } finally {
       setUploading(false);
     }
+  };
+
+  const closeUploadModal = () => {
+    if (uploading) return;
+    setShowUpload(false);
+    setSelectedLocation('');
+    setUploadProgress(0);
+    setUploadPhase('idle');
+    setUploadResults([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const openEdit = (invoice: Invoice) => {
@@ -251,7 +298,7 @@ const Invoices: React.FC = () => {
           <div className="w-full max-w-xl rounded-[2rem] border border-outline-variant bg-white p-8 dark:bg-slate-800">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="font-headline text-xl font-black">Upload Invoices</h3>
-              <button onClick={() => setShowUpload(false)}><X size={22} /></button>
+              <button onClick={closeUploadModal}><X size={22} /></button>
             </div>
             <form onSubmit={handleUpload} className="space-y-4">
               <select required value={selectedLocation} onChange={(e) => setSelectedLocation(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4">
@@ -259,8 +306,74 @@ const Invoices: React.FC = () => {
                 {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
               </select>
               <input ref={fileInputRef} type="file" accept=".pdf" multiple required className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
+              {(uploading || uploadResults.length > 0) && (
+                <div className="rounded-2xl border border-outline-variant bg-slate-50 p-4 dark:bg-slate-900/40">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-900 dark:text-white">
+                        {uploadPhase === 'uploading' && 'Uploading PDFs...'}
+                        {uploadPhase === 'processing' && 'Upload complete. Parsing invoices...'}
+                        {uploadPhase === 'complete' && 'Bulk upload finished'}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-300">
+                        {uploadPhase === 'complete'
+                          ? `${uploadSummary.success} imported, ${uploadSummary.error} failed, ${uploadSummary.needsReview} need review`
+                          : 'Stay on this screen while UtilityMate validates and parses each invoice.'}
+                      </p>
+                    </div>
+                    {uploading && <Loader2 className="animate-spin text-emerald-500" size={18} />}
+                  </div>
+                  <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div className="h-full rounded-full bg-emerald-500 transition-all duration-300" style={{ width: `${Math.max(uploadProgress, uploading ? 8 : 0)}%` }} />
+                  </div>
+                  <p className="mt-2 text-right text-xs font-bold uppercase tracking-[0.15em] text-slate-500 dark:text-slate-300">
+                    {uploadPhase === 'processing' ? 'Processing on server' : `${uploadProgress}%`}
+                  </p>
+                </div>
+              )}
+              {uploadResults.length > 0 && (
+                <div className="space-y-3 rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                  <div className="flex flex-wrap items-center gap-3 text-sm font-bold">
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">{uploadSummary.success} succeeded</span>
+                    <span className="rounded-full bg-red-100 px-3 py-1 text-red-700">{uploadSummary.error} failed</span>
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">{uploadSummary.needsReview} need review</span>
+                  </div>
+                  <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
+                    {uploadResults.map((result, index) => (
+                      <div key={`${result.filename}-${index}`} className="rounded-2xl border border-outline-variant bg-white p-4 dark:bg-slate-900/30">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-black">{result.filename}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-300">{result.detail || (result.status === 'success' ? 'Imported successfully' : 'Import failed')}</p>
+                          </div>
+                          <div className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${result.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {result.status}
+                          </div>
+                        </div>
+                        {result.status === 'success' ? (
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-600 dark:text-slate-200">
+                            {result.provider_name && <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800">{result.provider_name}</span>}
+                            {result.invoice_date && <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800">{result.invoice_date}</span>}
+                            {typeof result.amount === 'number' && <span className="rounded-full bg-slate-100 px-3 py-1 dark:bg-slate-800">{result.amount.toFixed(2)} {result.currency || 'RON'}</span>}
+                            {typeof result.parse_confidence === 'number' && (
+                              <span className={`rounded-full px-3 py-1 ${result.needs_review ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                {Math.round(result.parse_confidence * 100)}% confidence
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-3 flex items-center gap-2 text-xs font-bold text-red-700">
+                            <AlertCircle size={14} />
+                            Fix the file or provider setup and try this PDF again.
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <button disabled={uploading} className="w-full rounded-xl bg-emerald-600 py-4 font-black text-white">
-                {uploading ? 'Uploading...' : 'Import PDFs'}
+                {uploading ? 'Uploading...' : uploadResults.length > 0 ? 'Import More PDFs' : 'Import PDFs'}
               </button>
             </form>
           </div>

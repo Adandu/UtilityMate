@@ -294,7 +294,18 @@ async def upload_invoices(
                     f"{file.filename} was imported with {confidence * 100:.0f}% confidence.",
                 )
                 db.commit()
-            results.append({"filename": file.filename, "status": "success", "id": new_invoice.id})
+            results.append({
+                "filename": file.filename,
+                "status": "success",
+                "id": new_invoice.id,
+                "provider_name": provider.name,
+                "invoice_date": str(new_invoice.invoice_date),
+                "amount": new_invoice.amount,
+                "currency": new_invoice.currency,
+                "parse_confidence": confidence,
+                "needs_review": needs_review,
+                "detail": "Imported successfully" if not needs_review else "Imported and queued for review",
+            })
         except Exception as e:
             logger.error("Error processing %s: %s", file.filename, str(e))
             if file_path and os.path.exists(file_path):
