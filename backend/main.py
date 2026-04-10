@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from .routers import auth, categories, providers, locations, invoices, consumption, budgets, alerts, households, automation, analytics
+from .routers import auth, categories, providers, locations, invoices, consumption, budgets, alerts, households, automation, analytics, association_statements
 from .database.session import engine, repair_pdf_invoice_data, verify_and_migrate_db
 from .utils.logging_config import logger
 from .utils.rate_limiter import limiter
@@ -94,3 +94,4 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(households.router, prefix="/api/households", tags=["households"])
 app.include_router(automation.router, prefix="/api/automation", tags=["automation"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(association_statements.router, prefix="/api/association-statements", tags=["association-statements"])

@@ -1,7 +1,220 @@
 import pdfplumber
 import re
-from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
+
+
+ROMANIAN_MONTHS = {
+    "ianuarie": "01",
+    "februarie": "02",
+    "martie": "03",
+    "aprilie": "04",
+    "mai": "05",
+    "iunie": "06",
+    "iulie": "07",
+    "august": "08",
+    "septembrie": "09",
+    "octombrie": "10",
+    "noiembrie": "11",
+    "decembrie": "12",
+}
+
+
+def _metered_segment(
+    raw_label: str,
+    category_name: str,
+    unit: str,
+    *,
+    include_in_category: bool = True,
+    include_in_unit_cost: bool = True,
+    store_consumption: bool = True,
+):
+    return {
+        "type": "metered",
+        "raw_label": raw_label,
+        "normalized_label": category_name,
+        "category_name": category_name,
+        "unit": unit,
+        "line_kind": "utility",
+        "include_in_overall_analytics": True,
+        "include_in_category_analytics": include_in_category,
+        "include_in_unit_cost": include_in_unit_cost,
+        "store_consumption": store_consumption,
+    }
+
+
+def _charge_segment(
+    raw_label: str,
+    *,
+    category_name: Optional[str] = None,
+    unit: Optional[str] = None,
+    line_kind: str = "fee",
+    include_in_overall: bool = True,
+    include_in_category: bool = False,
+    include_in_unit_cost: bool = False,
+):
+    return {
+        "type": "charge",
+        "raw_label": raw_label,
+        "normalized_label": category_name or raw_label,
+        "category_name": category_name,
+        "unit": unit,
+        "line_kind": line_kind,
+        "include_in_overall_analytics": include_in_overall,
+        "include_in_category_analytics": include_in_category,
+        "include_in_unit_cost": include_in_unit_cost,
+    }
+
+
+def _summary_segment(raw_label: str):
+    return {"type": "summary", "raw_label": raw_label}
+
+
+AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
+    "septembrie 2025": {
+        "name": "blocmanagernet_2025_09",
+        "segments": [
+            _metered_segment("Apa rece", "Water", "m3"),
+            _metered_segment("Apa calda", "Water", "m3"),
+            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Apa meteorica", "Water", "m3"),
+            _charge_segment("Gaze naturale", category_name="Gas", line_kind="utility", include_in_category=True),
+            _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
+            _charge_segment("Salubritate"),
+            _charge_segment("Diverse"),
+            _charge_segment("Cheltuieli administrative"),
+            _charge_segment("Servicii curatenie"),
+            _charge_segment("Corectii"),
+            _summary_segment("Total luna"),
+            _charge_segment("Fond de rulment", line_kind="fund", include_in_overall=False),
+            _charge_segment("Restanta fonduri", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta intretinere", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta penalizare", line_kind="penalty", include_in_overall=False),
+            _charge_segment("Penalizari", line_kind="penalty", include_in_overall=False),
+            _summary_segment("Total de plata"),
+        ],
+    },
+    "octombrie 2025": {
+        "name": "blocmanagernet_2025_10",
+        "segments": [
+            _metered_segment("Apa rece", "Water", "m3"),
+            _metered_segment("Apa calda", "Water", "m3"),
+            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
+            _charge_segment("Salubritate"),
+            _charge_segment("Salarii asociatie"),
+            _charge_segment("Diverse"),
+            _charge_segment("Cheltuieli administrative"),
+            _charge_segment("Servicii curatenie"),
+            _summary_segment("Total luna"),
+            _charge_segment("Fond de rulment", line_kind="fund", include_in_overall=False),
+            _charge_segment("Restanta fonduri", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta intretinere", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta penalizare", line_kind="penalty", include_in_overall=False),
+            _charge_segment("Penalizari", line_kind="penalty", include_in_overall=False),
+            _summary_segment("Total de plata"),
+        ],
+    },
+    "noiembrie 2025": {
+        "name": "blocmanagernet_2025_11",
+        "segments": [
+            _metered_segment("Apa rece", "Water", "m3"),
+            _metered_segment("Apa calda", "Water", "m3"),
+            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
+            _charge_segment("Salubritate"),
+            _charge_segment("Salarii asociatie"),
+            _charge_segment("Diverse"),
+            _charge_segment("Cheltuieli administrative"),
+            _charge_segment("Servicii curatenie"),
+            _charge_segment("Citire repartitoare"),
+            _charge_segment("Mentenanta gaze"),
+            _summary_segment("Total luna"),
+            _charge_segment("Restanta fonduri", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta intretinere", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta penalizare", line_kind="penalty", include_in_overall=False),
+            _charge_segment("Penalizari", line_kind="penalty", include_in_overall=False),
+            _summary_segment("Total de plata"),
+        ],
+    },
+    "decembrie 2025": {
+        "name": "blocmanagernet_2025_12",
+        "segments": [
+            _metered_segment("Apa rece", "Water", "m3"),
+            _metered_segment("Apa calda", "Water", "m3"),
+            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
+            _charge_segment("Salubritate"),
+            _charge_segment("Salarii asociatie"),
+            _charge_segment("Diverse"),
+            _charge_segment("Citire repartitoare"),
+            _charge_segment("Cheltuieli administrative"),
+            _charge_segment("Servicii curatenie"),
+            _charge_segment("Mentenanta gaze"),
+            _summary_segment("Total luna"),
+            _charge_segment("Restanta fonduri", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta intretinere", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta penalizare", line_kind="penalty", include_in_overall=False),
+            _charge_segment("Penalizari", line_kind="penalty", include_in_overall=False),
+            _summary_segment("Total de plata"),
+        ],
+    },
+    "ianuarie 2026": {
+        "name": "blocmanagernet_2026_01",
+        "segments": [
+            _metered_segment("Apa rece", "Water", "m3"),
+            _metered_segment("Apa calda", "Water", "m3"),
+            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
+            _charge_segment("Salubritate"),
+            _charge_segment("Salarii asociatie"),
+            _charge_segment("Diverse"),
+            _charge_segment("Cheltuieli administrative"),
+            _charge_segment("Servicii curatenie"),
+            _charge_segment("Citire repartitoare"),
+            _summary_segment("Total luna"),
+            _charge_segment("Restanta fonduri", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta intretinere", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta penalizare", line_kind="penalty", include_in_overall=False),
+            _charge_segment("Penalizari", line_kind="penalty", include_in_overall=False),
+            _summary_segment("Total de plata"),
+        ],
+    },
+    "februarie 2026": {
+        "name": "blocmanagernet_2026_02",
+        "segments": [
+            _metered_segment("Apa rece", "Water", "m3"),
+            _metered_segment("Apa calda", "Water", "m3"),
+            _metered_segment("Apa parti comune", "Water", "m3"),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
+            _charge_segment("Salubritate"),
+            _charge_segment("Salarii asociatie"),
+            _charge_segment("Diverse"),
+            _charge_segment("Cheltuieli administrative"),
+            _charge_segment("Servicii curatenie"),
+            _charge_segment("Mentenanta gaze"),
+            _charge_segment("Citire repartitoare"),
+            _charge_segment("Citire apometre"),
+            _summary_segment("Total luna"),
+            _charge_segment("Restanta fonduri", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta intretinere", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta penalizare", line_kind="penalty", include_in_overall=False),
+            _charge_segment("Penalizari", line_kind="penalty", include_in_overall=False),
+            _summary_segment("Total de plata"),
+        ],
+    },
+}
+
 
 class InvoiceParser:
     @staticmethod
@@ -18,25 +231,22 @@ class InvoiceParser:
         try:
             with pdfplumber.open(file_path) as pdf:
                 for page in pdf.pages:
-                    text += page.extract_text() + "\n"
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
         except Exception:
             pass
         return text
 
     @staticmethod
     def detect_provider(text: str, available_providers: List[Any]) -> Optional[Any]:
-        """
-        Matches text against available providers.
-        """
         lower_text = text.lower()
-        
-        # Priority 1: Avizier / Administratie
+
         if "asociatia de proprietari" in lower_text or "lista de plată" in lower_text:
             for provider in available_providers:
                 if "administratie" in provider.name.lower() or "asociatie" in provider.name.lower():
                     return provider
 
-        # Priority 2: Direct match
         for provider in available_providers:
             if provider.name.lower() in lower_text:
                 return provider
@@ -44,33 +254,217 @@ class InvoiceParser:
 
     @staticmethod
     def parse_pdf(text: str, provider_name: str, location_name: str = "") -> Dict[str, Any]:
-        """
-        Parses PDF text and extracts key fields.
-        """
         result = {
             "invoice_date": None,
             "due_date": None,
             "amount": 0.0,
             "consumption_value": 0.0,
-            "currency": "RON"
+            "currency": "RON",
         }
-        
+
         if not text:
             return result
-            
+
         lower_text = text.lower()
         lower_provider = provider_name.lower()
-        
+
         if "hidroelectrica" in lower_provider or "hidroelectrica" in lower_text:
             InvoiceParser._parse_hidroelectrica(text, result)
         elif "engie" in lower_provider or "engie" in lower_text:
             InvoiceParser._parse_engie(text, result)
         elif "asociatia" in lower_text or "lista de plată" in lower_text or "administratie" in lower_provider:
-            InvoiceParser._parse_avizier(text, result, location_name)
+            InvoiceParser._parse_avizier_summary(text, result, location_name)
         else:
             InvoiceParser._parse_generic(text, result)
-            
+
         return result
+
+    @staticmethod
+    def parse_association_statement(text: str) -> Dict[str, Any]:
+        if not text:
+            return {
+                "statement_month": None,
+                "display_month": "",
+                "posted_date": None,
+                "due_date": None,
+                "parsing_profile": None,
+                "apartments": [],
+            }
+
+        display_month = InvoiceParser._extract_statement_month(text)
+        statement_month = InvoiceParser._parse_statement_month_to_date(display_month)
+        posted_date = InvoiceParser._parse_romanian_date_from_text(text, r"data\s+afi[şs][aă]rii[:\s]+(\d{1,2})\s+([A-Za-zăâîşțţ]+)\s+(\d{4})")
+        due_date = InvoiceParser._parse_romanian_date_from_text(text, r"data\s+scadent[ăa][:\s]+(\d{1,2})\s+([A-Za-zăâîşțţ]+)\s+(\d{4})")
+
+        row_lines = []
+        for line in text.splitlines():
+            normalized_line = " ".join(line.split())
+            if re.match(r"^\d+\s+\d+\s+\d,\d{3}\s", normalized_line):
+                row_lines.append(normalized_line)
+
+        sample_length = None
+        for row_line in row_lines:
+            trimmed = InvoiceParser._trim_avizier_row_tokens(row_line.split())
+            if trimmed:
+                sample_length = len(trimmed)
+                break
+
+        profile = InvoiceParser._detect_avizier_profile(display_month, sample_length)
+        apartments: List[Dict[str, Any]] = []
+        if not profile:
+            return {
+                "statement_month": statement_month,
+                "display_month": display_month,
+                "posted_date": posted_date,
+                "due_date": due_date,
+                "parsing_profile": None,
+                "apartments": apartments,
+            }
+
+        for row_line in row_lines:
+            row_parts = row_line.split()
+            apartment_number = row_parts[0]
+            trimmed_values = InvoiceParser._trim_avizier_row_tokens(row_parts)
+            if len(trimmed_values) != InvoiceParser._count_profile_values(profile):
+                continue
+            apartments.append(InvoiceParser._parse_avizier_row(apartment_number, trimmed_values, profile))
+
+        return {
+            "statement_month": statement_month,
+            "display_month": display_month,
+            "posted_date": posted_date,
+            "due_date": due_date,
+            "parsing_profile": profile["name"],
+            "apartments": apartments,
+        }
+
+    @staticmethod
+    def _extract_statement_month(text: str) -> str:
+        match = re.search(r"lista\s+de\s+plat[ăa]\s+pe\s+luna\s+([A-Za-zăâîşțţ]+\s+\d{4})", text, re.IGNORECASE)
+        return match.group(1).strip() if match else ""
+
+    @staticmethod
+    def _parse_statement_month_to_date(display_month: str) -> Optional[date]:
+        if not display_month:
+            return None
+        parts = display_month.split()
+        if len(parts) != 2:
+            return None
+        month = ROMANIAN_MONTHS.get(parts[0].lower())
+        if not month:
+            return None
+        return datetime.strptime(f"01.{month}.{parts[1]}", "%d.%m.%Y").date()
+
+    @staticmethod
+    def _parse_romanian_date_from_text(text: str, pattern: str) -> Optional[date]:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            return None
+        day, month_name, year = match.groups()
+        month = ROMANIAN_MONTHS.get(month_name.lower())
+        if not month:
+            return None
+        return datetime.strptime(f"{day.zfill(2)}.{month}.{year}", "%d.%m.%Y").date()
+
+    @staticmethod
+    def _detect_avizier_profile(display_month: str, sample_length: Optional[int]) -> Optional[Dict[str, Any]]:
+        if display_month:
+            profile = AVIZIER_PROFILES.get(display_month.lower())
+            if profile:
+                return profile
+        if sample_length is None:
+            return None
+        for profile in AVIZIER_PROFILES.values():
+            if InvoiceParser._count_profile_values(profile) == sample_length:
+                return profile
+        return None
+
+    @staticmethod
+    def _count_profile_values(profile: Dict[str, Any]) -> int:
+        count = 0
+        for segment in profile["segments"]:
+            if segment["type"] == "metered":
+                count += 2
+            else:
+                count += 1
+        return count
+
+    @staticmethod
+    def _trim_avizier_row_tokens(parts: List[str]) -> List[str]:
+        if len(parts) < 6:
+            return []
+        apartment_number = parts[0]
+        trimmed = parts[3:]
+        if len(trimmed) >= 2 and trimmed[-1] == apartment_number:
+            trimmed = trimmed[:-1]
+        elif len(trimmed) >= 2 and trimmed[-2] == apartment_number:
+            trimmed = trimmed[:-2]
+        return trimmed
+
+    @staticmethod
+    def _parse_avizier_row(apartment_number: str, values: List[str], profile: Dict[str, Any]) -> Dict[str, Any]:
+        line_items = []
+        monthly_total = 0.0
+        total_payable = 0.0
+        cursor = 0
+
+        for segment in profile["segments"]:
+            if segment["type"] == "metered":
+                amount = InvoiceParser._safe_parse(values[cursor])
+                consumption = InvoiceParser._safe_parse(values[cursor + 1])
+                cursor += 2
+                if abs(amount) < 0.001 and abs(consumption) < 0.001:
+                    continue
+                line_items.append({
+                    "raw_label": segment["raw_label"],
+                    "normalized_label": segment["normalized_label"],
+                    "category_name": segment["category_name"],
+                    "line_kind": segment["line_kind"],
+                    "amount": amount,
+                    "consumption_value": consumption if segment.get("store_consumption", True) else None,
+                    "unit": segment["unit"] if segment.get("store_consumption", True) else None,
+                    "include_in_overall_analytics": segment["include_in_overall_analytics"],
+                    "include_in_category_analytics": segment["include_in_category_analytics"],
+                    "include_in_unit_cost": segment["include_in_unit_cost"],
+                })
+                continue
+
+            value = InvoiceParser._safe_parse(values[cursor])
+            cursor += 1
+            if segment["type"] == "summary":
+                if segment["raw_label"] == "Total luna":
+                    monthly_total = value
+                elif segment["raw_label"] == "Total de plata":
+                    total_payable = value
+                continue
+            if abs(value) < 0.001:
+                continue
+            line_items.append({
+                "raw_label": segment["raw_label"],
+                "normalized_label": segment["normalized_label"],
+                "category_name": segment["category_name"],
+                "line_kind": segment["line_kind"],
+                "amount": value,
+                "consumption_value": None,
+                "unit": segment["unit"],
+                "include_in_overall_analytics": segment["include_in_overall_analytics"],
+                "include_in_category_analytics": segment["include_in_category_analytics"],
+                "include_in_unit_cost": segment["include_in_unit_cost"],
+            })
+
+        return {
+            "apartment_number": apartment_number,
+            "monthly_total": monthly_total,
+            "total_payable": total_payable or monthly_total,
+            "line_items": line_items,
+        }
+
+    @staticmethod
+    def _safe_parse(value: str) -> float:
+        try:
+            return InvoiceParser._parse_number(value)
+        except (TypeError, ValueError):
+            return 0.0
 
     @staticmethod
     def _parse_hidroelectrica(text: str, result: Dict[str, Any]):
@@ -80,13 +474,13 @@ class InvoiceParser:
         due_match = re.search(r"scaden[ţt][aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if due_match:
             result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
-            
+
         amount_match = re.search(r"total\s+de\s+plat[aă](?:.*?)\s+([\d\.,]+)lei", text, re.IGNORECASE)
         if not amount_match:
             amount_match = re.search(r"total\s+de\s+plat[aă](?:[^0-9,]+)?([\d\.,]+)", text, re.IGNORECASE)
         if not amount_match:
             amount_match = re.search(r"total\s+factur[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
-            
+
         if amount_match:
             try:
                 result["amount"] = InvoiceParser._parse_number(amount_match.group(1))
@@ -148,13 +542,13 @@ class InvoiceParser:
         due_match = re.search(r"termen\s+de\s+plat[aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if due_match:
             result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
-            
+
         amount_match = re.search(r"total\s+factur[aă]\s+curent[aă][:\s]+[\d\.,]+\s+[\d\.,]+\s+([\d\.,]+)", text, re.IGNORECASE)
         if not amount_match:
             amount_match = re.search(r"total\s+de\s+plat[aă]\s+cu\s+t\.v\.a\.?\s+([\d\.,]+)", text, re.IGNORECASE)
         if not amount_match:
             amount_match = re.search(r"total\s+factur[aă]\s+curent[aă][:\s]+([\d\.,]+)", text, re.IGNORECASE)
-            
+
         if amount_match:
             try:
                 result["amount"] = InvoiceParser._parse_number(amount_match.group(1))
@@ -187,47 +581,29 @@ class InvoiceParser:
                 pass
 
     @staticmethod
-    def _parse_avizier(text: str, result: Dict[str, Any], location_name: str):
-        # Extract date
-        date_match = re.search(r"data\s+afi[şs][aă]rii[:\s]+(\d{1,2})\s+(\w+)\s+(\d{4})", text, re.IGNORECASE)
-        if date_match:
-            day, month_name, year = date_match.groups()
-            months = {
-                "ianuarie": "01", "februarie": "02", "martie": "03", "aprilie": "04", 
-                "mai": "05", "iunie": "06", "iulie": "07", "august": "08", 
-                "septembrie": "09", "octombrie": "10", "noiembrie": "11", "decembrie": "12"
-            }
-            month = months.get(month_name.lower(), "01")
-            result["invoice_date"] = datetime.strptime(f"{day.zfill(2)}.{month}.{year}", "%d.%m.%Y").date()
+    def _parse_avizier_summary(text: str, result: Dict[str, Any], location_name: str):
+        structured = InvoiceParser.parse_association_statement(text)
+        if structured.get("posted_date"):
+            result["invoice_date"] = structured["posted_date"]
+        elif structured.get("statement_month"):
+            result["invoice_date"] = structured["statement_month"]
+        if structured.get("due_date"):
+            result["due_date"] = structured["due_date"]
 
-        # Try to find the apartment number from location_name (e.g. AP12 -> 12)
         apt_num_match = re.search(r"(\d+)", location_name)
-        if apt_num_match:
-            apt_num = apt_num_match.group(1)
-            # Find line starting with apt_num
-            lines = text.split('\n')
-            for line in lines:
-                # Line format: apt_num pers cota_parte ... total_payment ...
-                # 12 1 1,803 34,71 3,00 39,97 2,00 0,12 1,03 13,53 1,77 27,01 18,50 3,07 2,83 36,06 28,85 0,01 207,46 120,00 0,00 0,00 0,00 0,00 327,46 12 750,00
-                parts = line.strip().split()
-                if parts and parts[0] == apt_num:
-                    # Total is usually near the end, but before the repeated apt num and some other index
-                    # Let's find the first number that looks like a total (high value with decimals)
-                    # For Avizier, we'll look for the second to last numeric-ish value that's not the apt number
-                    try:
-                        # Clean parts to only have numeric-ish values
-                        numeric_parts = [p for p in parts if re.match(r"^-?[\d\.,]+$", p)]
-                        if len(numeric_parts) > 5:
-                            # Usually the total is the one before the apt number repeat
-                            # In "327,46 12 750,00", 327,46 is the total
-                            for i in range(len(numeric_parts)-1, 0, -1):
-                                if numeric_parts[i] == apt_num:
-                                    total_str = numeric_parts[i-1]
-                                    total_str = total_str.replace(".", "").replace(",", ".")
-                                    result["amount"] = float(total_str)
-                                    break
-                    except:
-                        pass
+        if not apt_num_match:
+            return
+        apartment_number = apt_num_match.group(1)
+        apartment = next((item for item in structured.get("apartments", []) if item["apartment_number"] == apartment_number), None)
+        if not apartment:
+            return
+        result["amount"] = apartment.get("total_payable", 0.0)
+        water_consumption = sum(
+            line.get("consumption_value") or 0.0
+            for line in apartment.get("line_items", [])
+            if line.get("category_name") == "Water" and line.get("include_in_unit_cost")
+        )
+        result["consumption_value"] = water_consumption
 
     @staticmethod
     def _parse_generic(text: str, result: Dict[str, Any]):
@@ -245,7 +621,7 @@ class InvoiceParser:
                 result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
             except ValueError:
                 pass
-            
+
         amount_match = re.search(r"total[:\s]+([\d\.,]+)", text, re.IGNORECASE)
         if amount_match:
             try:

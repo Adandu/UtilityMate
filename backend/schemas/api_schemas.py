@@ -454,3 +454,51 @@ class AboutResponse(BaseModel):
     release_notes_markdown: str
     stats: AppStats
     environment: AppEnvironmentInfo
+
+
+class AssociationStatementLine(BaseModel):
+    id: int
+    location_id: int
+    category_id: Optional[int] = None
+    raw_label: str
+    normalized_label: str
+    line_kind: str
+    amount: float
+    consumption_value: Optional[float] = None
+    unit: Optional[str] = None
+    include_in_overall_analytics: bool
+    include_in_category_analytics: bool
+    include_in_unit_cost: bool
+    created_at: datetime
+    location: Optional[LocationSimple] = None
+    category: Optional[Category] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AssociationStatement(BaseModel):
+    id: int
+    statement_month: date
+    display_month: str
+    posted_date: Optional[date] = None
+    due_date: Optional[date] = None
+    source_name: Optional[str] = None
+    pdf_path: Optional[str] = None
+    total_payable: Optional[float] = None
+    parsing_profile: Optional[str] = None
+    created_at: datetime
+    lines: List[AssociationStatementLine] = []
+
+    class Config:
+        from_attributes = True
+
+
+class AssociationStatementUploadResult(BaseModel):
+    filename: str
+    status: str
+    detail: str
+    statement_id: Optional[int] = None
+    display_month: Optional[str] = None
+    imported_locations: List[str] = []
+    imported_lines: int = 0

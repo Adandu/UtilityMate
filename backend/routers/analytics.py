@@ -54,7 +54,7 @@ def enumerate_months(start: date, end: date) -> List[date]:
 
 
 def resolve_period(
-    invoices: List[database_models.Invoice],
+    dates: List[date],
     period_key: str,
     custom_start: Optional[date],
     custom_end: Optional[date],
@@ -76,8 +76,8 @@ def resolve_period(
     if period_key == "last_1_year":
         return shift_months(current_month, -11), today
     if period_key == "all_time":
-        if invoices:
-            return min(inv.invoice_date for inv in invoices), max(inv.invoice_date for inv in invoices)
+        if dates:
+            return min(dates), max(dates)
         return current_month, today
 
     raise HTTPException(status_code=400, detail="Unsupported period key")
@@ -87,15 +87,28 @@ def build_summary(db: Session, current_user: database_models.User):
     invoices = db.query(database_models.Invoice).filter(
         database_models.Invoice.user_id == current_user.id
     ).all()
+    statement_lines = db.query(database_models.AssociationStatementLine).join(
+        database_models.AssociationStatement,
+        database_models.AssociationStatementLine.statement_id == database_models.AssociationStatement.id,
+    ).filter(
+        database_models.AssociationStatementLine.user_id == current_user.id,
+        database_models.AssociationStatementLine.include_in_overall_analytics == True,
+    ).all()
     alerts = db.query(database_models.Alert).filter(
         database_models.Alert.user_id == current_user.id,
         database_models.Alert.is_read == False,
     ).count()
     today = datetime.now(timezone.utc).date()
     overdue = [inv for inv in invoices if inv.status != "paid" and inv.due_date and inv.due_date < today]
-    total = sum(inv.amount for inv in invoices)
+    total = sum(inv.amount for inv in invoices) + sum(line.amount for line in statement_lines)
     unpaid_total = sum(inv.amount for inv in invoices if inv.status != "paid")
-    months = max(1, len({inv.invoice_date.strftime("%Y-%m") for inv in invoices}) if invoices else 1)
+    month_keys = {inv.invoice_date.strftime("%Y-%m") for inv in invoices}
+    month_keys.update(
+        line.statement.statement_month.strftime("%Y-%m")
+        for line in statement_lines
+        if line.statement and line.statement.statement_month
+    )
+    months = max(1, len(month_keys) if month_keys else 1)
     return api_schemas.AnalyticsSummary(
         total_spend=round(total, 2),
         invoice_count=len(invoices),
@@ -172,6 +185,14 @@ def invoice_base_query(db: Session, current_user: database_models.User):
         joinedload(database_models.Invoice.provider).joinedload(database_models.Provider.category),
         joinedload(database_models.Invoice.location),
     ).filter(database_models.Invoice.user_id == current_user.id)
+
+
+def statement_line_query(db: Session, current_user: database_models.User):
+    return db.query(database_models.AssociationStatementLine).options(
+        joinedload(database_models.AssociationStatementLine.statement),
+        joinedload(database_models.AssociationStatementLine.location),
+        joinedload(database_models.AssociationStatementLine.category),
+    ).filter(database_models.AssociationStatementLine.user_id == current_user.id)
 
 
 @router.get("/summary", response_model=api_schemas.AnalyticsSummary)
@@ -265,20 +286,39 @@ def dashboard_analytics(
         raise HTTPException(status_code=404, detail="Location not found")
 
     all_invoices = invoice_base_query(db, current_user).order_by(database_models.Invoice.invoice_date.asc()).all()
+    all_statement_lines = statement_line_query(db, current_user).order_by(database_models.AssociationStatementLine.id.asc()).all()
     selected_invoices = [
         invoice for invoice in all_invoices
         if location_id is None or invoice.location_id == location_id
     ]
-    resolved_start, resolved_end = resolve_period(selected_invoices, period, start_date, end_date)
+    selected_statement_lines = [
+        line for line in all_statement_lines
+        if location_id is None or line.location_id == location_id
+    ]
+    selected_dates = [invoice.invoice_date for invoice in selected_invoices]
+    selected_dates.extend(
+        line.statement.statement_month
+        for line in selected_statement_lines
+        if line.statement and line.statement.statement_month
+    )
+    resolved_start, resolved_end = resolve_period(selected_dates, period, start_date, end_date)
     month_labels = enumerate_months(resolved_start, resolved_end)
 
     filtered_invoices = [
         invoice for invoice in selected_invoices
         if resolved_start <= invoice.invoice_date <= resolved_end
     ]
+    filtered_statement_lines = [
+        line for line in selected_statement_lines
+        if line.statement and resolved_start <= line.statement.statement_month <= resolved_end
+    ]
     comparison_invoices = [
         invoice for invoice in all_invoices
         if resolved_start <= invoice.invoice_date <= resolved_end
+    ]
+    comparison_statement_lines = [
+        line for line in all_statement_lines
+        if line.statement and resolved_start <= line.statement.statement_month <= resolved_end
     ]
 
     overall_monthly: Dict[str, Dict[str, float]] = defaultdict(lambda: {"cost": 0.0, "consumption": 0.0})
@@ -295,7 +335,27 @@ def dashboard_analytics(
             category_monthly[category.id][bucket]["cost"] += invoice.amount
             category_monthly[category.id][bucket]["consumption"] += invoice.consumption_value or 0.0
 
-    overall_forecast_lookup = build_forecast_lookup(selected_invoices)
+    for line in filtered_statement_lines:
+        bucket = line.statement.statement_month.strftime("%Y-%m")
+        if line.include_in_overall_analytics:
+            overall_monthly[bucket]["cost"] += line.amount
+            if line.include_in_unit_cost:
+                overall_monthly[bucket]["consumption"] += line.consumption_value or 0.0
+        if line.include_in_category_analytics and line.category:
+            category = line.category
+            category_meta[category.id] = (category.name, category.unit)
+            category_monthly[category.id][bucket]["cost"] += line.amount
+            if line.include_in_unit_cost:
+                category_monthly[category.id][bucket]["consumption"] += line.consumption_value or 0.0
+
+    overall_history_invoices = list(selected_invoices)
+    for line in selected_statement_lines:
+        if line.include_in_overall_analytics and line.statement:
+            overall_history_invoices.append(type("SyntheticInvoice", (), {
+                "invoice_date": line.statement.statement_month,
+                "amount": line.amount,
+            })())
+    overall_forecast_lookup = build_forecast_lookup(overall_history_invoices)
     overall_cost_series = build_monthly_series(overall_monthly, month_labels, overall_forecast_lookup)
 
     comparison_rollups: Dict[int, Dict[int, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
@@ -305,6 +365,13 @@ def dashboard_analytics(
             comparison_rollups[category_id][invoice.location_id]["cost"] += invoice.amount
             comparison_rollups[category_id][invoice.location_id]["consumption"] += invoice.consumption_value or 0.0
 
+    for line in comparison_statement_lines:
+        if line.include_in_category_analytics and line.category:
+            category_id = line.category.id
+            comparison_rollups[category_id][line.location_id]["cost"] += line.amount
+            if line.include_in_unit_cost:
+                comparison_rollups[category_id][line.location_id]["consumption"] += line.consumption_value or 0.0
+
     category_sections: List[api_schemas.DashboardCategorySection] = []
     for category_id, monthly in sorted(category_monthly.items(), key=lambda item: category_meta[item[0]][0].lower()):
         name, unit = category_meta[category_id]
@@ -312,7 +379,16 @@ def dashboard_analytics(
             invoice for invoice in selected_invoices
             if invoice.provider and invoice.provider.category and invoice.provider.category.id == category_id
         ]
-        forecast_lookup = build_forecast_lookup(category_invoices)
+        category_history_points = list(category_invoices)
+        category_history_points.extend(
+            type("SyntheticInvoice", (), {
+                "invoice_date": line.statement.statement_month,
+                "amount": line.amount,
+            })()
+            for line in selected_statement_lines
+            if line.include_in_category_analytics and line.category and line.category.id == category_id and line.statement
+        )
+        forecast_lookup = build_forecast_lookup(category_history_points)
         monthly_series = build_monthly_series(monthly, month_labels, forecast_lookup)
         total_cost = sum(point.cost for point in monthly_series)
         total_consumption = sum(point.consumption for point in monthly_series)
@@ -344,8 +420,10 @@ def dashboard_analytics(
             location_comparison=location_comparison,
         ))
 
-    total_cost = sum(invoice.amount for invoice in filtered_invoices)
-    previous_period_cost = compute_previous_period_cost(selected_invoices, resolved_start, resolved_end)
+    total_cost = sum(invoice.amount for invoice in filtered_invoices) + sum(
+        line.amount for line in filtered_statement_lines if line.include_in_overall_analytics
+    )
+    previous_period_cost = compute_previous_period_cost(overall_history_invoices, resolved_start, resolved_end)
     if previous_period_cost > 0:
         change_ratio = round((total_cost - previous_period_cost) / previous_period_cost, 4)
     elif total_cost > 0:

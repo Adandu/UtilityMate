@@ -47,6 +47,7 @@ class Location(Base):
     owner = relationship("User", back_populates="locations")
     invoices = relationship("Invoice", back_populates="location", cascade="all, delete-orphan")
     indexes = relationship("ConsumptionIndex", back_populates="location", cascade="all, delete-orphan")
+    association_statement_lines = relationship("AssociationStatementLine", back_populates="location", cascade="all, delete-orphan")
 
 class Category(Base):
     __tablename__ = "categories"
@@ -57,6 +58,7 @@ class Category(Base):
     
     providers = relationship("Provider", back_populates="category", cascade="all, delete-orphan")
     indexes = relationship("ConsumptionIndex", back_populates="category", cascade="all, delete-orphan")
+    association_statement_lines = relationship("AssociationStatementLine", back_populates="category")
 
 class Provider(Base):
     __tablename__ = "providers"
@@ -95,6 +97,47 @@ class Invoice(Base):
     owner = relationship("User", back_populates="invoices")
     location = relationship("Location", back_populates="invoices")
     provider = relationship("Provider", back_populates="invoices")
+
+
+class AssociationStatement(Base):
+    __tablename__ = "association_statements"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    statement_month = Column(Date, nullable=False, index=True)
+    display_month = Column(String, nullable=False)
+    posted_date = Column(Date, nullable=True)
+    due_date = Column(Date, nullable=True)
+    source_name = Column(String, nullable=True)
+    pdf_path = Column(String, nullable=True)
+    total_payable = Column(Float, nullable=True)
+    parsing_profile = Column(String, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    owner = relationship("User")
+    lines = relationship("AssociationStatementLine", back_populates="statement", cascade="all, delete-orphan")
+
+
+class AssociationStatementLine(Base):
+    __tablename__ = "association_statement_lines"
+    id = Column(Integer, primary_key=True, index=True)
+    statement_id = Column(Integer, ForeignKey("association_statements.id", ondelete="CASCADE"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    location_id = Column(Integer, ForeignKey("locations.id", ondelete="CASCADE"), index=True, nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id"), index=True, nullable=True)
+    raw_label = Column(String, nullable=False)
+    normalized_label = Column(String, nullable=False)
+    line_kind = Column(String, nullable=False, default="utility")
+    amount = Column(Float, nullable=False, default=0.0)
+    consumption_value = Column(Float, nullable=True)
+    unit = Column(String, nullable=True)
+    include_in_overall_analytics = Column(Boolean, default=True)
+    include_in_category_analytics = Column(Boolean, default=False)
+    include_in_unit_cost = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    statement = relationship("AssociationStatement", back_populates="lines")
+    location = relationship("Location", back_populates="association_statement_lines")
+    category = relationship("Category", back_populates="association_statement_lines")
 
 class ConsumptionIndex(Base):
     __tablename__ = "consumption_indexes"

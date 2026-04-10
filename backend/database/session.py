@@ -184,5 +184,55 @@ def verify_and_migrate_db():
             if "household_id" not in columns:
                 logger.info("Migration: Adding household_id to locations")
                 conn.execute(text("ALTER TABLE locations ADD COLUMN household_id INTEGER REFERENCES households(id) ON DELETE SET NULL"))
+
+        if "association_statements" not in tables:
+            logger.info("Migration: Creating association_statements table")
+            conn.execute(text("""
+                CREATE TABLE association_statements (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    statement_month DATE NOT NULL,
+                    display_month VARCHAR NOT NULL,
+                    posted_date DATE,
+                    due_date DATE,
+                    source_name VARCHAR,
+                    pdf_path VARCHAR,
+                    total_payable FLOAT,
+                    parsing_profile VARCHAR,
+                    created_at DATETIME
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statements_id ON association_statements (id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statements_user_id ON association_statements (user_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statements_statement_month ON association_statements (statement_month)"))
+
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if "association_statement_lines" not in tables:
+            logger.info("Migration: Creating association_statement_lines table")
+            conn.execute(text("""
+                CREATE TABLE association_statement_lines (
+                    id INTEGER PRIMARY KEY,
+                    statement_id INTEGER NOT NULL REFERENCES association_statements(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+                    category_id INTEGER REFERENCES categories(id),
+                    raw_label VARCHAR NOT NULL,
+                    normalized_label VARCHAR NOT NULL,
+                    line_kind VARCHAR NOT NULL DEFAULT 'utility',
+                    amount FLOAT NOT NULL DEFAULT 0.0,
+                    consumption_value FLOAT,
+                    unit VARCHAR,
+                    include_in_overall_analytics BOOLEAN DEFAULT 1,
+                    include_in_category_analytics BOOLEAN DEFAULT 0,
+                    include_in_unit_cost BOOLEAN DEFAULT 0,
+                    created_at DATETIME
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statement_lines_id ON association_statement_lines (id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statement_lines_statement_id ON association_statement_lines (statement_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statement_lines_user_id ON association_statement_lines (user_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statement_lines_location_id ON association_statement_lines (location_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statement_lines_category_id ON association_statement_lines (category_id)"))
     
     logger.info("Database schema verification and migration complete.")
