@@ -14,23 +14,22 @@ from ..utils import auth_utils
 from ..utils.domain_logic import build_forecast, compute_budget_statuses, generate_invoice_alerts
 
 router = APIRouter()
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def read_version() -> str:
-    candidates = ["../VERSION", "VERSION"]
-    for candidate in candidates:
-        if os.path.exists(candidate):
-            with open(candidate, "r", encoding="utf-8") as version_file:
-                return version_file.read().strip()
+    candidate = os.path.join(BASE_DIR, "VERSION")
+    if os.path.exists(candidate):
+        with open(candidate, "r", encoding="utf-8") as version_file:
+            return version_file.read().strip()
     return os.getenv("APP_VERSION", "unknown")
 
 
 def read_release_notes() -> str:
-    candidates = ["../RELEASE_NOTES.md", "RELEASE_NOTES.md"]
-    for candidate in candidates:
-        if os.path.exists(candidate):
-            with open(candidate, "r", encoding="utf-8") as notes_file:
-                return notes_file.read().strip()
+    candidate = os.path.join(BASE_DIR, "RELEASE_NOTES.md")
+    if os.path.exists(candidate):
+        with open(candidate, "r", encoding="utf-8") as notes_file:
+            return notes_file.read().strip()
     return "Release notes are not available."
 
 

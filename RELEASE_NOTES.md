@@ -1,19 +1,16 @@
-# UtilityMate v1.4.18
+# UtilityMate v1.4.19
 
 ## New Features
 
-- Added an About page with the running version, latest changelog, safe environment details, and instance statistics.
-- Added invoice pagination with configurable page sizes so the invoice list can browse beyond the latest 100 records.
-- Added invoice filters for location, provider, and status, plus a new per-invoice consumption column in the main list.
+- Added a more reliable About experience that now surfaces live version and release information from the deployed app files.
 
 ## Improvements
 
-- Replaced the hardcoded sidebar version text with a cleaner product label and moved version visibility into the new About page.
-- Improved dashboard tooltips so cost, consumption, and unit-cost charts always show the correct units in the hover overlay.
-- Standardized dashboard chart labels to consistent names such as `Cost`, `Consumption`, `Unit Cost`, and `Historical Baseline`.
+- Improved backend project-file discovery so Docker deployments resolve `VERSION` and `RELEASE_NOTES.md` from the application root instead of the process working directory.
+- Improved the Raw Data view to work with the new paginated invoice API while still loading a wider export-friendly dataset.
 
 ## Bug Fixes
 
-- Fixed manual meter readings being undeletable from the Operations Center by exposing the existing delete flow in the UI.
-- Fixed invoice browsing being capped to the most recent 100 entries with no way to move through older data.
-- Fixed inconsistent dashboard tooltip naming such as `unit_cost`, `cost`, and `Cost / Unit` appearing side by side.
+- Fixed the About page showing `unknown` for Current Version and API Version in container deployments.
+- Fixed the About page showing `Latest Release Notes are not available` even when release notes existed in the app directory.
+- Fixed the Raw Data page crash `e.filter is not a function` caused by treating the paginated invoice response as a plain array.

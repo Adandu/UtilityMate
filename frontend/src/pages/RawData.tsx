@@ -15,13 +15,20 @@ interface InvoiceData {
   parse_confidence: number;
 }
 
+interface InvoiceListResponse {
+  items: InvoiceData[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
 const RawData: React.FC = () => {
   const [data, setData] = useState<InvoiceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    api.get('/invoices/').then((response) => setData(response.data)).finally(() => setLoading(false));
+    api.get<InvoiceListResponse>('/invoices/', { params: { limit: 500 } }).then((response) => setData(response.data.items)).finally(() => setLoading(false));
   }, []);
 
   const filteredData = data.filter((row) =>

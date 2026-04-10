@@ -10,15 +10,24 @@ from .database.session import engine, repair_pdf_invoice_data, verify_and_migrat
 from .utils.logging_config import logger
 from .utils.rate_limiter import limiter
 
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def read_project_file(filename: str) -> str | None:
+    candidate = os.path.join(BASE_DIR, filename)
+    if os.path.exists(candidate):
+        with open(candidate, "r", encoding="utf-8") as project_file:
+            return project_file.read().strip()
+    return None
+
+
 # Load version
 VERSION = os.getenv("APP_VERSION", "1.1.7")
 try:
-    if os.path.exists("../VERSION"):
-        with open("../VERSION", "r") as f:
-            VERSION = f.read().strip()
-    elif os.path.exists("VERSION"):
-        with open("VERSION", "r") as f:
-            VERSION = f.read().strip()
+    file_version = read_project_file("VERSION")
+    if file_version:
+        VERSION = file_version
 except Exception:
     logger.warning("Could not read VERSION file, using fallback")
 
