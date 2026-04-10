@@ -161,20 +161,30 @@ class InvoiceParser:
             except ValueError:
                 pass
 
-        consumption_match = re.search(r"consum\s+gaze\s+naturale\s+\(kwh\)\s+(\d+)", text, re.IGNORECASE)
-        if not consumption_match:
-            lines = text.split('\n')
-            for i, line in enumerate(lines):
-                if "consum gaze naturale (kwh)" in line.lower():
-                    match = re.search(r"\(kwh\)\s*(\d+)", line, re.IGNORECASE)
-                    if match:
-                        result["consumption_value"] = float(match.group(1))
-                        break
-                    if i + 1 < len(lines):
-                        match = re.search(r"^(\d+)", lines[i+1].strip())
-                        if match:
-                            result["consumption_value"] = float(match.group(1))
-                            break
+        meter_detail_matches = re.findall(
+            r"DGSR-[A-Z0-9-]+\s+(-?[\d\.,]+)\s+[\d\.,]+\s+[\d\.,]+",
+            text,
+            re.IGNORECASE,
+        )
+        if meter_detail_matches:
+            try:
+                values = [InvoiceParser._parse_number(match) for match in meter_detail_matches]
+                positive_total = sum(value for value in values if value > 0)
+                if positive_total > 0:
+                    result["consumption_value"] = positive_total
+                    return
+            except ValueError:
+                pass
+
+        consumption_match = re.search(r"consum\s+gaze\s+naturale\s+\(kwh\)\s+([\d\.,]+)", text, re.IGNORECASE)
+        if consumption_match:
+            try:
+                value = InvoiceParser._parse_number(consumption_match.group(1))
+                if value > 0:
+                    result["consumption_value"] = value
+                    return
+            except ValueError:
+                pass
 
     @staticmethod
     def _parse_avizier(text: str, result: Dict[str, Any], location_name: str):
