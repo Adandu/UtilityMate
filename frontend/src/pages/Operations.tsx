@@ -57,7 +57,7 @@ const Operations: React.FC = () => {
     else errors.push('Budgets could not be loaded.');
 
     if (results[1].status === 'fulfilled') setAlerts(results[1].value.data);
-    else errors.push('Alerts could not be loaded.');
+    else setAlerts([]);
 
     if (results[2].status === 'fulfilled') setHouseholds(results[2].value.data);
     else errors.push('Households could not be loaded.');

@@ -43,6 +43,36 @@ def detect_review_state(parsed_data: dict):
     return confidence, needs_review
 
 
+def infer_review_state(invoice: database_models.Invoice):
+    parsed_data = {
+        "invoice_date": invoice.invoice_date,
+        "amount": invoice.amount,
+        "consumption_value": invoice.consumption_value,
+    }
+    confidence, needs_review = detect_review_state(parsed_data)
+    if invoice.status in {"reviewed", "paid"}:
+        needs_review = False
+        confidence = max(confidence, 0.9)
+    return confidence, needs_review
+
+
+def backfill_invoice_review_state(db: Session, invoices: List[database_models.Invoice]):
+    updated = False
+    for invoice in invoices:
+        if invoice.parse_confidence in (None, 0, 0.0):
+            confidence, needs_review = infer_review_state(invoice)
+            invoice.parse_confidence = confidence
+            if invoice.review_notes and invoice.review_notes.strip():
+                invoice.needs_review = False
+            elif invoice.status in {"reviewed", "paid"}:
+                invoice.needs_review = False
+            else:
+                invoice.needs_review = needs_review
+            updated = True
+    if updated:
+        db.commit()
+
+
 def validate_invoice_relationships(
     db: Session,
     current_user: database_models.User,
@@ -90,7 +120,9 @@ def read_invoices(
         query = query.filter(database_models.Invoice.needs_review == needs_review)
     if status:
         query = query.filter(database_models.Invoice.status == status)
-    return query.order_by(database_models.Invoice.invoice_date.desc()).offset(skip).limit(limit).all()
+    invoices = query.order_by(database_models.Invoice.invoice_date.desc()).offset(skip).limit(limit).all()
+    backfill_invoice_review_state(db, invoices)
+    return invoices
 
 
 @router.get("/review-queue", response_model=List[api_schemas.Invoice])
@@ -98,9 +130,11 @@ def review_queue(
     db: Session = Depends(get_db),
     current_user: database_models.User = Depends(auth_utils.get_current_user),
 ):
-    return invoice_query(db, current_user).filter(
+    invoices = invoice_query(db, current_user).filter(
         database_models.Invoice.needs_review == True
     ).order_by(database_models.Invoice.created_at.desc()).all()
+    backfill_invoice_review_state(db, invoices)
+    return invoices
 
 
 @router.get("/export")

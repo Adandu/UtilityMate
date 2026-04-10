@@ -1,4 +1,4 @@
-# UtilityMate v1.4.10
+# UtilityMate v1.4.11
 
 ## New Features
 
@@ -8,8 +8,8 @@
 
 ## Improvements
 
-- Improved the Operations Center to load each data section independently instead of failing all dropdowns and lists when one endpoint errors.
-- Improved Configuration by surfacing households there as well, so shared workspaces are visible outside Operations.
+- Backfilled review confidence for legacy invoices so older imports no longer stay stuck at `0%`.
+- Improved Operations behavior so alerts degrade quietly and the rest of the page remains usable.
 - Improved invoice workflow ergonomics with checkbox selection and a dedicated bulk action bar.
 
 ## Bug Fixes
