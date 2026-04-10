@@ -166,6 +166,13 @@ class Invoice(InvoiceBase):
         from_attributes = True
 
 
+class InvoiceListResponse(BaseModel):
+    items: List[Invoice]
+    total: int
+    skip: int
+    limit: int
+
+
 class ConsumptionIndexBase(BaseModel):
     location_id: int
     category_id: int
@@ -421,3 +428,29 @@ class DashboardAnalyticsResponse(BaseModel):
     end_date: date
     overall_cost_series: List[DashboardSeriesPoint]
     category_sections: List[DashboardCategorySection]
+
+
+class AppStats(BaseModel):
+    invoices: int
+    locations: int
+    providers: int
+    categories: int
+    households: int
+    manual_meter_readings: int
+    unread_alerts: int
+
+
+class AppEnvironmentInfo(BaseModel):
+    api_version: str
+    database_dialect: str
+    upload_dir: str
+    app_env: str
+    allowed_origins: List[str]
+    server_time_utc: datetime
+
+
+class AboutResponse(BaseModel):
+    version: str
+    release_notes_markdown: str
+    stats: AppStats
+    environment: AppEnvironmentInfo

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Home, Wallet, Webhook, Download, Gauge, Loader2, Plus, CheckCircle2, Building2, AlertTriangle } from 'lucide-react';
+import { Bell, Home, Wallet, Webhook, Download, Gauge, Loader2, Plus, CheckCircle2, Building2, AlertTriangle, Trash2 } from 'lucide-react';
 import api from '../utils/api';
 
 interface Category { id: number; name: string; unit: string; }
@@ -137,6 +137,12 @@ const Operations: React.FC = () => {
   const deleteHousehold = async (householdId: number) => {
     if (!window.confirm('Delete this household? Linked locations and budgets will be detached.')) return;
     await api.delete(`/households/${householdId}`);
+    fetchData();
+  };
+
+  const deleteMeterReading = async (indexId: number) => {
+    if (!window.confirm('Delete this manual meter reading?')) return;
+    await api.delete(`/consumption/${indexId}`);
     fetchData();
   };
 
@@ -283,9 +289,18 @@ const Operations: React.FC = () => {
           <div className="space-y-3">
             {indexes.slice(0, 6).map((index) => (
               <div key={index.id} className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
-                <p className="font-black">{locations.find((l) => l.id === index.location_id)?.name || 'Location'} • {categories.find((c) => c.id === index.category_id)?.name || 'Category'}</p>
-                <p className="text-sm opacity-70">{index.value} on {index.reading_date} • {index.source_type}</p>
-                {index.notes && <p className="text-xs opacity-50">{index.notes}</p>}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black">{locations.find((l) => l.id === index.location_id)?.name || 'Location'} • {categories.find((c) => c.id === index.category_id)?.name || 'Category'}</p>
+                    <p className="text-sm opacity-70">{index.value} on {index.reading_date} • {index.source_type}</p>
+                    {index.notes && <p className="text-xs opacity-50">{index.notes}</p>}
+                  </div>
+                  {index.source_type === 'manual' && (
+                    <button onClick={() => deleteMeterReading(index.id)} className="rounded-xl border border-outline-variant px-3 py-2 text-xs font-black uppercase text-red-600">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

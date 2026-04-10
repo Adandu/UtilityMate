@@ -15,7 +15,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
           </div>
           <div>
             <h1 className="font-headline text-lg font-extrabold text-slate-900 dark:text-slate-50">UtilityMate</h1>
-            <p className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold opacity-60">Asset Oversight v1.2.3</p>
+            <p className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold opacity-60">Utility Analytics</p>
           </div>
         </div>
         
@@ -58,6 +58,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
           >
             <span className="material-symbols-outlined">settings</span>
             <span className="font-body text-sm">Configuration</span>
+          </NavLink>
+
+          <NavLink 
+            to="/about" 
+            className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold transition-all duration-150 ${isActive ? 'bg-white dark:bg-slate-950 text-emerald-600 dark:text-emerald-400 shadow-sm scale-95' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100'}`}
+          >
+            <span className="material-symbols-outlined">info</span>
+            <span className="font-body text-sm">About</span>
           </NavLink>
         </nav>
 

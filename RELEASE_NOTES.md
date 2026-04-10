@@ -1,19 +1,19 @@
-# UtilityMate v1.4.17
+# UtilityMate v1.4.18
 
 ## New Features
 
-- Added Engie gas-volume parsing from the detailed meter table so gas consumption is stored in `mc/m3`.
-- Added support for Engie invoices that use thousands separators in the detailed consumption rows.
-- Added parser coverage for both recent and older Engie invoice layouts using the meter-series section.
+- Added an About page with the running version, latest changelog, safe environment details, and instance statistics.
+- Added invoice pagination with configurable page sizes so the invoice list can browse beyond the latest 100 records.
+- Added invoice filters for location, provider, and status, plus a new per-invoice consumption column in the main list.
 
 ## Improvements
 
-- Improved unit consistency so the Gas dashboard now uses the same volume unit that appears on the invoice detail table.
-- Improved Engie extraction by preferring the detailed `DGSR` meter row over the summary `kWh` headline.
-- Improved historical repair accuracy for existing Engie invoices through the startup PDF reparse worker.
+- Replaced the hardcoded sidebar version text with a cleaner product label and moved version visibility into the new About page.
+- Improved dashboard tooltips so cost, consumption, and unit-cost charts always show the correct units in the hover overlay.
+- Standardized dashboard chart labels to consistent names such as `Cost`, `Consumption`, `Unit Cost`, and `Historical Baseline`.
 
 ## Bug Fixes
 
-- Fixed incorrect gas cost-per-unit values caused by storing Engie `kWh` instead of `mc/m3`.
-- Fixed March 16, 2026 and similar Engie invoices where `48 mc` was previously stored as `519`.
-- Fixed older Engie invoices with values like `1.198,689` and `1.077,700` being truncated to `1`.
+- Fixed manual meter readings being undeletable from the Operations Center by exposing the existing delete flow in the UI.
+- Fixed invoice browsing being capped to the most recent 100 entries with no way to move through older data.
+- Fixed inconsistent dashboard tooltip naming such as `unit_cost`, `cost`, and `Cost / Unit` appearing side by side.

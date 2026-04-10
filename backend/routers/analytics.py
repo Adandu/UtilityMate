@@ -1,17 +1,37 @@
 from collections import defaultdict
 from datetime import date, datetime, timezone
+import os
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from ..database.session import get_db
+from ..database.session import SQLALCHEMY_DATABASE_URL, get_db
 from ..models import database_models
 from ..schemas import api_schemas
 from ..utils import auth_utils
 from ..utils.domain_logic import build_forecast, compute_budget_statuses, generate_invoice_alerts
 
 router = APIRouter()
+
+
+def read_version() -> str:
+    candidates = ["../VERSION", "VERSION"]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            with open(candidate, "r", encoding="utf-8") as version_file:
+                return version_file.read().strip()
+    return os.getenv("APP_VERSION", "unknown")
+
+
+def read_release_notes() -> str:
+    candidates = ["../RELEASE_NOTES.md", "RELEASE_NOTES.md"]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            with open(candidate, "r", encoding="utf-8") as notes_file:
+                return notes_file.read().strip()
+    return "Release notes are not available."
 
 
 def month_start(day: date) -> date:
@@ -182,6 +202,50 @@ def analytics_report(
         budget_statuses=budget_statuses,
         alerts=alerts,
         forecast=build_forecast(db, current_user),
+    )
+
+
+@router.get("/about", response_model=api_schemas.AboutResponse)
+def about(
+    db: Session = Depends(get_db),
+    current_user: database_models.User = Depends(auth_utils.get_current_user),
+):
+    allowed_origins = [origin.strip() for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost,http://127.0.0.1,http://localhost:5173",
+    ).split(",") if origin.strip()]
+    stats = api_schemas.AppStats(
+        invoices=db.query(database_models.Invoice).filter(database_models.Invoice.user_id == current_user.id).count(),
+        locations=db.query(database_models.Location).filter(database_models.Location.user_id == current_user.id).count(),
+        providers=db.query(database_models.Provider).filter(
+            or_(database_models.Provider.user_id == None, database_models.Provider.user_id == current_user.id)
+        ).count(),
+        categories=db.query(database_models.Category).filter(
+            or_(database_models.Category.user_id == None, database_models.Category.user_id == current_user.id)
+        ).count(),
+        households=db.query(database_models.Household).filter(database_models.Household.owner_user_id == current_user.id).count(),
+        manual_meter_readings=db.query(database_models.ConsumptionIndex).filter(
+            database_models.ConsumptionIndex.user_id == current_user.id,
+            database_models.ConsumptionIndex.source_type == "manual",
+        ).count(),
+        unread_alerts=db.query(database_models.Alert).filter(
+            database_models.Alert.user_id == current_user.id,
+            database_models.Alert.is_read == False,
+        ).count(),
+    )
+    environment = api_schemas.AppEnvironmentInfo(
+        api_version=read_version(),
+        database_dialect=SQLALCHEMY_DATABASE_URL.split(":", 1)[0],
+        upload_dir=os.getenv("UPLOAD_DIR", "data/invoices"),
+        app_env=os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "production")),
+        allowed_origins=allowed_origins,
+        server_time_utc=datetime.now(timezone.utc),
+    )
+    return api_schemas.AboutResponse(
+        version=environment.api_version,
+        release_notes_markdown=read_release_notes(),
+        stats=stats,
+        environment=environment,
     )
 
 

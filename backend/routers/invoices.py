@@ -106,12 +106,14 @@ def invoice_query(db: Session, current_user: database_models.User):
     ).filter(database_models.Invoice.user_id == current_user.id)
 
 
-@router.get("/", response_model=List[api_schemas.Invoice])
+@router.get("/", response_model=api_schemas.InvoiceListResponse)
 def read_invoices(
     skip: int = 0,
     limit: int = 100,
     needs_review: Optional[bool] = None,
     status: Optional[str] = None,
+    location_id: Optional[int] = None,
+    provider_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: database_models.User = Depends(auth_utils.get_current_user),
 ):
@@ -120,9 +122,19 @@ def read_invoices(
         query = query.filter(database_models.Invoice.needs_review == needs_review)
     if status:
         query = query.filter(database_models.Invoice.status == status)
-    invoices = query.order_by(database_models.Invoice.invoice_date.desc()).offset(skip).limit(limit).all()
+    if location_id is not None:
+        query = query.filter(database_models.Invoice.location_id == location_id)
+    if provider_id is not None:
+        query = query.filter(database_models.Invoice.provider_id == provider_id)
+    total = query.count()
+    invoices = query.order_by(database_models.Invoice.invoice_date.desc(), database_models.Invoice.id.desc()).offset(skip).limit(limit).all()
     backfill_invoice_review_state(db, invoices)
-    return invoices
+    return api_schemas.InvoiceListResponse(
+        items=invoices,
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get("/review-queue", response_model=List[api_schemas.Invoice])

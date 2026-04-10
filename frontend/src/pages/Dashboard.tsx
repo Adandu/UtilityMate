@@ -85,6 +85,28 @@ const periodOptions = [
 
 const formatMoney = (value: number) => `${value.toFixed(2)} RON`;
 const formatUnitCost = (value?: number | null, unit?: string) => (value == null ? 'No data' : `${value.toFixed(2)} RON / ${unit}`);
+const formatTooltipNumber = (value: number) => (Number.isInteger(value) ? value.toFixed(0) : value.toFixed(3));
+
+const asNumber = (value: unknown) => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value);
+  return 0;
+};
+
+const costTooltipFormatter = (value: unknown, name: unknown) => {
+  const numericValue = asNumber(value);
+  return [formatMoney(numericValue), String(name)];
+};
+
+const consumptionTooltipFormatter = (unit: string) => (value: unknown, name: unknown) => {
+  const numericValue = asNumber(value);
+  return [`${formatTooltipNumber(numericValue)} ${unit}`, String(name)];
+};
+
+const unitCostTooltipFormatter = (unit: string) => (value: unknown, name: unknown) => {
+  const numericValue = asNumber(value);
+  return [`${numericValue.toFixed(4)} RON / ${unit}`, String(name)];
+};
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -222,9 +244,9 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                 <XAxis dataKey="label" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
                 <Area type="monotone" dataKey="cost" stroke="#0f766e" fill="url(#overallSpendArea)" strokeWidth={3} name="Cost" />
-                <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={2} dot={false} name="Historical baseline" />
+                <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={2} dot={false} name="Historical Baseline" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -300,8 +322,8 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} />
-                      <Area type="monotone" dataKey="cost" stroke="#2563eb" fill={`url(#costArea-${section.category_id})`} strokeWidth={3} />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
+                      <Area type="monotone" dataKey="cost" stroke="#2563eb" fill={`url(#costArea-${section.category_id})`} strokeWidth={3} name="Cost" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -315,23 +337,23 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} />
-                      <Bar dataKey="consumption" fill="#14b8a6" radius={[10, 10, 0, 0]} />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={consumptionTooltipFormatter(section.unit)} />
+                      <Bar dataKey="consumption" fill="#14b8a6" radius={[10, 10, 0, 0]} name="Consumption" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               <div className="rounded-3xl border border-outline-variant bg-white/70 p-5 dark:bg-slate-900/40">
-                <h5 className="mb-4 font-black">Cost per Unit of Consumption</h5>
+                <h5 className="mb-4 font-black">Unit Cost</h5>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={section.monthly_series}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} />
-                      <Line type="monotone" dataKey="unit_cost" stroke="#7c3aed" strokeWidth={3} connectNulls dot={{ r: 3 }} />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={unitCostTooltipFormatter(section.unit)} />
+                      <Line type="monotone" dataKey="unit_cost" stroke="#7c3aed" strokeWidth={3} connectNulls dot={{ r: 3 }} name="Unit Cost" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -345,9 +367,9 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} />
-                      <Line type="monotone" dataKey="cost" stroke="#0f766e" strokeWidth={3} dot={{ r: 3 }} name="Actual cost" />
-                      <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={3} strokeDasharray="8 6" connectNulls dot={false} name="Previous years baseline" />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
+                      <Line type="monotone" dataKey="cost" stroke="#0f766e" strokeWidth={3} dot={{ r: 3 }} name="Cost" />
+                      <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={3} strokeDasharray="8 6" connectNulls dot={false} name="Historical Baseline" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -361,9 +383,19 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="location_name" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        labelStyle={{ color: 'var(--color-on-surface)' }}
+                        itemStyle={{ color: 'var(--color-on-surface)' }}
+                        formatter={(value, name) => {
+                          if (name === 'Cost') {
+                            return costTooltipFormatter(value, name);
+                          }
+                          return unitCostTooltipFormatter(section.unit)(value, name);
+                        }}
+                      />
                       <Bar dataKey="cost" fill="#0f766e" radius={[10, 10, 0, 0]} name="Cost" />
-                      <Bar dataKey="unit_cost" fill="#7c3aed" radius={[10, 10, 0, 0]} name="Cost / Unit" />
+                      <Bar dataKey="unit_cost" fill="#7c3aed" radius={[10, 10, 0, 0]} name="Unit Cost" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

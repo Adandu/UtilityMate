@@ -6,8 +6,8 @@ interface Invoice {
   id: number;
   provider_id: number;
   location_id: number;
-  provider?: { name: string; category?: { name: string; unit: string } };
-  location?: { name: string };
+  provider?: { id: number; name: string; category?: { name: string; unit: string } };
+  location?: { id: number; name: string };
   invoice_date: string;
   due_date?: string | null;
   amount: number;
@@ -22,7 +22,23 @@ interface Invoice {
   source_name?: string | null;
 }
 
-interface Location { id: number; name: string; }
+interface Location {
+  id: number;
+  name: string;
+}
+
+interface Provider {
+  id: number;
+  name: string;
+  category_id: number;
+}
+
+interface InvoiceListResponse {
+  items: Invoice[];
+  total: number;
+  skip: number;
+  limit: number;
+}
 
 interface UploadResult {
   filename: string;
@@ -37,9 +53,13 @@ interface UploadResult {
   needs_review?: boolean;
 }
 
+const statusOptions = ['received', 'reviewed', 'scheduled', 'paid', 'overdue'];
+const pageSizeOptions = [25, 50, 100, 200];
+
 const Invoices: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
@@ -55,6 +75,12 @@ const Invoices: React.FC = () => {
   const [editNeedsReview, setEditNeedsReview] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkStatus, setBulkStatus] = useState('reviewed');
+  const [filterLocationId, setFilterLocationId] = useState('all');
+  const [filterProviderId, setFilterProviderId] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalInvoices, setTotalInvoices] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadSummary = useMemo(() => ({
@@ -63,15 +89,46 @@ const Invoices: React.FC = () => {
     needsReview: uploadResults.filter((result) => result.status === 'success' && result.needs_review).length,
   }), [uploadResults]);
 
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(totalInvoices / pageSize)), [pageSize, totalInvoices]);
+  const pageInvoiceIds = useMemo(() => invoices.map((invoice) => invoice.id), [invoices]);
+  const selectedOnPageCount = useMemo(() => pageInvoiceIds.filter((invoiceId) => selectedIds.includes(invoiceId)).length, [pageInvoiceIds, selectedIds]);
+  const allOnPageSelected = pageInvoiceIds.length > 0 && selectedOnPageCount === pageInvoiceIds.length;
+  const visibleRangeStart = totalInvoices === 0 ? 0 : (page - 1) * pageSize + 1;
+  const visibleRangeEnd = totalInvoices === 0 ? 0 : Math.min(page * pageSize, totalInvoices);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [invoiceRes, locationRes] = await Promise.all([
-        api.get('/invoices/'),
-        api.get('/locations/'),
+      const params: Record<string, string | number> = {
+        skip: (page - 1) * pageSize,
+        limit: pageSize,
+      };
+      if (filterLocationId !== 'all') {
+        params.location_id = filterLocationId;
+      }
+      if (filterProviderId !== 'all') {
+        params.provider_id = filterProviderId;
+      }
+      if (filterStatus !== 'all') {
+        params.status = filterStatus;
+      }
+
+      const [invoiceRes, locationRes, providerRes] = await Promise.all([
+        api.get<InvoiceListResponse>('/invoices/', { params }),
+        api.get<Location[]>('/locations/'),
+        api.get<Provider[]>('/providers/'),
       ]);
-      setInvoices(invoiceRes.data);
+
+      const maxPage = Math.max(1, Math.ceil(invoiceRes.data.total / pageSize));
+      if (page > maxPage) {
+        setPage(maxPage);
+        return;
+      }
+
+      setInvoices(invoiceRes.data.items);
+      setTotalInvoices(invoiceRes.data.total);
       setLocations(locationRes.data);
+      setProviders(providerRes.data);
     } finally {
       setLoading(false);
     }
@@ -79,7 +136,7 @@ const Invoices: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [page, pageSize, filterLocationId, filterProviderId, filterStatus]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,7 +218,12 @@ const Invoices: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
-    setSelectedIds((current) => current.length === invoices.length ? [] : invoices.map((invoice) => invoice.id));
+    setSelectedIds((current) => {
+      if (allOnPageSelected) {
+        return current.filter((id) => !pageInvoiceIds.includes(id));
+      }
+      return Array.from(new Set([...current, ...pageInvoiceIds]));
+    });
   };
 
   const applyBulkStatus = async () => {
@@ -201,23 +263,54 @@ const Invoices: React.FC = () => {
       <header className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="font-headline text-3xl font-extrabold">Invoice Review Desk</h2>
-          <p className="text-on-surface-variant opacity-70">Manage import confidence, due dates, payment tracking, bulk workflow status, and PDF review without paying invoices in-app.</p>
+          <p className="text-on-surface-variant opacity-70">Browse, filter, and review invoices over time while keeping PDF access and bulk workflow tools close at hand.</p>
         </div>
         <button onClick={() => setShowUpload(true)} className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 font-bold text-white">
           <Upload size={18} /> Upload Invoices
         </button>
       </header>
 
+      <div className="mb-6 grid grid-cols-1 gap-4 rounded-3xl border border-outline-variant bg-surface-container-low p-4 xl:grid-cols-[1fr_1fr_1fr_auto_auto]">
+        <label className="space-y-2">
+          <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Location</span>
+          <select value={filterLocationId} onChange={(e) => { setFilterLocationId(e.target.value); setPage(1); }} className="w-full rounded-xl border border-outline-variant bg-surface-container p-3">
+            <option value="all">All Locations</option>
+            {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+          </select>
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Provider</span>
+          <select value={filterProviderId} onChange={(e) => { setFilterProviderId(e.target.value); setPage(1); }} className="w-full rounded-xl border border-outline-variant bg-surface-container p-3">
+            <option value="all">All Providers</option>
+            {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+          </select>
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Status</span>
+          <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }} className="w-full rounded-xl border border-outline-variant bg-surface-container p-3">
+            <option value="all">All Statuses</option>
+            {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Rows per Page</span>
+          <select value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value, 10)); setPage(1); }} className="w-full rounded-xl border border-outline-variant bg-surface-container p-3">
+            {pageSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </label>
+        <div className="flex items-end">
+          <div className="w-full rounded-2xl border border-outline-variant bg-surface-container p-3 text-sm font-bold">
+            Showing {visibleRangeStart}-{visibleRangeEnd} of {totalInvoices}
+          </div>
+        </div>
+      </div>
+
       {selectedIds.length > 0 && (
         <div className="mb-6 flex flex-col gap-3 rounded-3xl border border-outline-variant bg-surface-container-low p-4 md:flex-row md:items-center md:justify-between">
           <p className="font-black">{selectedIds.length} invoice{selectedIds.length === 1 ? '' : 's'} selected</p>
           <div className="flex flex-col gap-3 md:flex-row md:items-center">
             <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
-              <option value="received">Received</option>
-              <option value="reviewed">Reviewed</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
+              {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
             </select>
             <button onClick={applyBulkStatus} className="rounded-xl bg-blue-600 px-4 py-3 font-bold text-white">Apply Status</button>
             <button onClick={bulkDeleteInvoices} className="rounded-xl bg-red-600 px-4 py-3 font-bold text-white">Delete Selected</button>
@@ -233,13 +326,14 @@ const Invoices: React.FC = () => {
               <tr className="border-b border-outline-variant text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
                 <th className="px-4 py-4">
                   <button onClick={toggleSelectAll} className="rounded-lg p-1">
-                    {selectedIds.length === invoices.length && invoices.length > 0 ? <CheckSquare size={18} className="text-emerald-600" /> : <Square size={18} />}
+                    {allOnPageSelected ? <CheckSquare size={18} className="text-emerald-600" /> : <Square size={18} />}
                   </button>
                 </th>
                 <th className="px-4 py-4">Provider</th>
                 <th className="px-4 py-4">Location</th>
                 <th className="px-4 py-4">Date</th>
                 <th className="px-4 py-4">Amount</th>
+                <th className="px-4 py-4">Consumption</th>
                 <th className="px-4 py-4">Status</th>
                 <th className="px-4 py-4">Review</th>
                 <th className="px-4 py-4">Actions</th>
@@ -260,6 +354,11 @@ const Invoices: React.FC = () => {
                   <td className="px-4 py-4 font-bold">{invoice.location?.name || 'N/A'}</td>
                   <td className="px-4 py-4 text-sm">{invoice.invoice_date}{invoice.due_date ? ` • due ${invoice.due_date}` : ''}</td>
                   <td className="px-4 py-4 font-black">{invoice.amount.toFixed(2)} {invoice.currency}</td>
+                  <td className="px-4 py-4 font-bold">
+                    {typeof invoice.consumption_value === 'number'
+                      ? `${invoice.consumption_value.toFixed(3)} ${invoice.provider?.category?.unit || ''}`.trim()
+                      : '—'}
+                  </td>
                   <td className="px-4 py-4">
                     <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${invoice.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : invoice.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
                       {invoice.status}
@@ -288,8 +387,27 @@ const Invoices: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {invoices.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-sm font-bold opacity-60">
+                    No invoices match the current filters.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3 border-t border-outline-variant pt-4 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm font-medium opacity-70">Page {page} of {totalPages}</p>
+          <div className="flex items-center gap-2">
+            <button disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-xl border border-outline-variant px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40">
+              Previous
+            </button>
+            <button disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="rounded-xl border border-outline-variant px-4 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-40">
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
@@ -389,11 +507,7 @@ const Invoices: React.FC = () => {
             </div>
             <form onSubmit={saveEdit} className="space-y-4">
               <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4">
-                <option value="received">Received</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="paid">Paid</option>
-                <option value="overdue">Overdue</option>
+                {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
               </select>
               <input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
               <input value={editPaymentReference} onChange={(e) => setEditPaymentReference(e.target.value)} placeholder="Payment reference / bank note" className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
