@@ -1,17 +1,13 @@
-# UtilityMate v1.4.22
+# UtilityMate v1.4.23
 
 ## New Features
 
-- Added dashboard PDF export that captures the currently selected location and period view.
-- Added separate avizier-driven dashboard categories for `Cold Water`, `Hot Water`, `Shared Water`, and `Storm Water`.
+- Added explicit dashboard export status feedback so PDF export success or failure is visible in the UI.
 
 ## Improvements
 
-- Improved avizier insight by splitting water streams into distinct categories instead of merging them into one generic water bucket.
-- Improved dashboard exports by automatically expanding category sections before capture so the PDF contains the active chart set.
-- Improved client-side dashboard export reliability by bundling dedicated PDF and canvas capture libraries with the frontend.
+- Improved dashboard PDF generation reliability by switching to the stable named `jsPDF` export and lowering capture scale to reduce browser-side failures.
 
 ## Bug Fixes
 
-- Fixed avizier water analytics being flattened into a single category, which hid month-to-month movement between cold and hot water.
-- Fixed the lack of a filter-aware PDF export path for dashboard graphs and summary cards.
+- Fixed the `Export Dashboard PDF` button appearing to do nothing when the browser-side PDF generation path failed silently.

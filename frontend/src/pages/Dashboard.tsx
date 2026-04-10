@@ -15,7 +15,7 @@ import {
 } from 'recharts';
 import { BarChart3, ChevronDown, Download, Filter, Loader2, MapPinned, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import api from '../utils/api';
 
 interface LocationOption {
@@ -118,6 +118,7 @@ const Dashboard: React.FC = () => {
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const dashboardExportRef = useRef<HTMLDivElement | null>(null);
 
   const fetchDashboard = async () => {
@@ -167,6 +168,7 @@ const Dashboard: React.FC = () => {
   const exportDashboardPdf = async () => {
     if (!dashboardExportRef.current || !report) return;
     setExportingPdf(true);
+    setExportMessage(null);
     const detailsElements = Array.from(dashboardExportRef.current.querySelectorAll('details'));
     const originalOpenStates = detailsElements.map((element) => element.open);
     detailsElements.forEach((element) => {
@@ -176,7 +178,7 @@ const Dashboard: React.FC = () => {
     try {
       await new Promise((resolve) => window.setTimeout(resolve, 250));
       const canvas = await html2canvas(dashboardExportRef.current, {
-        scale: 2,
+        scale: 1.5,
         backgroundColor: '#f5f7fb',
         useCORS: true,
       });
@@ -208,6 +210,10 @@ const Dashboard: React.FC = () => {
       const locationSlug = selectedLocationName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const periodSlug = selectedPeriodLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       pdf.save(`utilitymate-dashboard-${locationSlug}-${periodSlug}.pdf`);
+      setExportMessage('Dashboard PDF export is ready.');
+    } catch (error) {
+      console.error('Dashboard PDF export failed', error);
+      setExportMessage('Dashboard export failed. Please try again after the charts finish rendering.');
     } finally {
       detailsElements.forEach((element, index) => {
         element.open = originalOpenStates[index];
@@ -270,6 +276,11 @@ const Dashboard: React.FC = () => {
             {exportingPdf ? 'Exporting PDF...' : 'Export Dashboard PDF'}
           </button>
         </div>
+        {exportMessage && (
+          <div className="rounded-2xl border border-outline-variant bg-surface-container px-4 py-3 text-sm font-medium">
+            {exportMessage}
+          </div>
+        )}
       </header>
 
       <div ref={dashboardExportRef}>
