@@ -1,15 +1,18 @@
 #!/bin/bash
+set -e
 
-# Ensure data directory exists for SQLite and Invoices
+# Ensure data directory exists for SQLite and invoice uploads,
+# then fix ownership in case a host bind/named volume overrides image permissions.
 mkdir -p /app/data/invoices
+chown -R appuser:appuser /app/data
 
 # Initialize database if needed (runs the init_db script)
 echo "Initializing database..."
-python -m backend.init_db || { echo "Database initialization failed"; exit 1; }
+gosu appuser python -m backend.init_db || { echo "Database initialization failed"; exit 1; }
 
 # Start Backend (FastAPI) in the background
 echo "Starting FastAPI backend..."
-uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+gosu appuser uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
 # Wait for backend to be ready

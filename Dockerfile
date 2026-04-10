@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     nginx \
     libpq-dev \
     gcc \
+    gosu \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -45,9 +46,6 @@ RUN useradd -u 1000 appuser && \
     chown -R appuser:appuser /var/log/nginx && \
     touch /run/nginx.pid && \
     chown appuser:appuser /run/nginx.pid
-
-# Switch to non-root user
-USER appuser
 
 # Expose port 80 (Nginx)
 EXPOSE 80

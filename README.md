@@ -28,10 +28,14 @@ UtilityMate is a modern, dockerized web application designed to manage and monit
    ```bash
    docker-compose up -d --build
    ```
+   By default, Compose now uses a Docker-managed named volume for `/app/data`, which avoids first-run permission issues with SQLite and uploaded invoices.
 
 3. **Access**:
    - Web UI: http://localhost
    - API Docs: http://localhost:8000/docs (if exposed)
+
+### Persistent Storage
+If you prefer a host bind mount instead of the default named volume, make sure the target directory is writable by container UID `1000`, since the application writes both the SQLite database and uploaded PDFs under `/app/data`.
 
 ## Development
 
