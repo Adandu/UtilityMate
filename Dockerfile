@@ -24,6 +24,9 @@ WORKDIR /app
 COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
+# Copy release metadata used by the About page and API root
+COPY VERSION RELEASE_NOTES.md ./
+
 # Copy Backend code
 COPY backend/ ./backend/
 
