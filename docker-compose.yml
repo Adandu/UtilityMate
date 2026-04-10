@@ -10,14 +10,13 @@ services:
     environment:
       - SECRET_KEY=$SECRET_KEY
       - ALLOWED_ORIGINS=http://localhost:80,http://localhost
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
     volumes:
-      - utilitymate_data:/app/data
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
-volumes:
-  utilitymate_data:
