@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -14,8 +14,6 @@ import {
   YAxis,
 } from 'recharts';
 import { BarChart3, ChevronDown, Download, Filter, Loader2, MapPinned, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import api from '../utils/api';
 
 interface LocationOption {
@@ -119,7 +117,6 @@ const Dashboard: React.FC = () => {
   const [customEnd, setCustomEnd] = useState('');
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
-  const dashboardExportRef = useRef<HTMLDivElement | null>(null);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -166,58 +163,40 @@ const Dashboard: React.FC = () => {
   ), [selectedPeriod]);
 
   const exportDashboardPdf = async () => {
-    if (!dashboardExportRef.current || !report) return;
+    if (!report) return;
     setExportingPdf(true);
     setExportMessage(null);
-    const detailsElements = Array.from(dashboardExportRef.current.querySelectorAll('details'));
-    const originalOpenStates = detailsElements.map((element) => element.open);
-    detailsElements.forEach((element) => {
-      element.open = true;
-    });
-
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
-      const canvas = await html2canvas(dashboardExportRef.current, {
-        scale: 1.5,
-        backgroundColor: '#f5f7fb',
-        useCORS: true,
-      });
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      const contentWidth = pageWidth - margin * 2;
-      const contentHeight = (canvas.height * contentWidth) / canvas.width;
-      let remainingHeight = contentHeight;
-      let position = margin;
-
-      pdf.setFontSize(14);
-      pdf.text(`UtilityMate Dashboard Export`, margin, 8);
-      pdf.setFontSize(9);
-      pdf.text(`Location: ${selectedLocationName} | Period: ${selectedPeriodLabel}`, margin, 13);
-      const imageData = canvas.toDataURL('image/png');
-
-      pdf.addImage(imageData, 'PNG', margin, 18, contentWidth, contentHeight);
-      remainingHeight -= (pageHeight - 18 - margin);
-
-      while (remainingHeight > 0) {
-        pdf.addPage();
-        position = remainingHeight - contentHeight + margin;
-        pdf.addImage(imageData, 'PNG', margin, position, contentWidth, contentHeight);
-        remainingHeight -= (pageHeight - margin * 2);
+      const params: Record<string, string> = { period: selectedPeriod };
+      if (selectedLocation !== 'all') {
+        params.location_id = selectedLocation;
+      }
+      if (selectedPeriod === 'custom') {
+        if (customStart) params.start_date = customStart;
+        if (customEnd) params.end_date = customEnd;
       }
 
-      const locationSlug = selectedLocationName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const periodSlug = selectedPeriodLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      pdf.save(`utilitymate-dashboard-${locationSlug}-${periodSlug}.pdf`);
+      const response = await api.get('/analytics/dashboard-export', {
+        params,
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const objectUrl = window.URL.createObjectURL(blob);
+      const contentDisposition = response.headers['content-disposition'] as string | undefined;
+      const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
+      const filename = match?.[1] || `utilitymate-dashboard-${selectedLocationName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${selectedPeriodLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`;
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
       setExportMessage('Dashboard PDF export is ready.');
     } catch (error) {
       console.error('Dashboard PDF export failed', error);
-      setExportMessage('Dashboard export failed. Please try again after the charts finish rendering.');
+      setExportMessage('Dashboard export failed. Please try again in a few seconds.');
     } finally {
-      detailsElements.forEach((element, index) => {
-        element.open = originalOpenStates[index];
-      });
       setExportingPdf(false);
     }
   };
@@ -283,7 +262,6 @@ const Dashboard: React.FC = () => {
         )}
       </header>
 
-      <div ref={dashboardExportRef}>
       <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => {
           const Icon = card.icon;
@@ -483,7 +461,6 @@ const Dashboard: React.FC = () => {
           </details>
         ))}
       </section>
-      </div>
     </div>
   );
 };

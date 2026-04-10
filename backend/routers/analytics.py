@@ -1,9 +1,19 @@
 from collections import defaultdict
 from datetime import date, datetime, timezone
+from io import BytesIO
 import os
 from typing import Dict, Iterable, List, Optional, Tuple
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -195,89 +205,14 @@ def statement_line_query(db: Session, current_user: database_models.User):
     ).filter(database_models.AssociationStatementLine.user_id == current_user.id)
 
 
-@router.get("/summary", response_model=api_schemas.AnalyticsSummary)
-def analytics_summary(
-    db: Session = Depends(get_db),
-    current_user: database_models.User = Depends(auth_utils.get_current_user),
-):
-    compute_budget_statuses(db, current_user)
-    generate_invoice_alerts(db, current_user)
-    db.commit()
-    return build_summary(db, current_user)
-
-
-@router.get("/report", response_model=api_schemas.ReportBundle)
-def analytics_report(
-    db: Session = Depends(get_db),
-    current_user: database_models.User = Depends(auth_utils.get_current_user),
-):
-    budget_statuses = compute_budget_statuses(db, current_user)
-    generate_invoice_alerts(db, current_user)
-    db.commit()
-    alerts = db.query(database_models.Alert).filter(
-        database_models.Alert.user_id == current_user.id
-    ).order_by(database_models.Alert.created_at.desc()).limit(10).all()
-    return api_schemas.ReportBundle(
-        summary=build_summary(db, current_user),
-        budget_statuses=budget_statuses,
-        alerts=alerts,
-        forecast=build_forecast(db, current_user),
-    )
-
-
-@router.get("/about", response_model=api_schemas.AboutResponse)
-def about(
-    db: Session = Depends(get_db),
-    current_user: database_models.User = Depends(auth_utils.get_current_user),
-):
-    allowed_origins = [origin.strip() for origin in os.getenv(
-        "ALLOWED_ORIGINS",
-        "http://localhost,http://127.0.0.1,http://localhost:5173",
-    ).split(",") if origin.strip()]
-    stats = api_schemas.AppStats(
-        invoices=db.query(database_models.Invoice).filter(database_models.Invoice.user_id == current_user.id).count(),
-        locations=db.query(database_models.Location).filter(database_models.Location.user_id == current_user.id).count(),
-        providers=db.query(database_models.Provider).filter(
-            or_(database_models.Provider.user_id == None, database_models.Provider.user_id == current_user.id)
-        ).count(),
-        categories=db.query(database_models.Category).filter(
-            or_(database_models.Category.user_id == None, database_models.Category.user_id == current_user.id)
-        ).count(),
-        households=db.query(database_models.Household).filter(database_models.Household.owner_user_id == current_user.id).count(),
-        manual_meter_readings=db.query(database_models.ConsumptionIndex).filter(
-            database_models.ConsumptionIndex.user_id == current_user.id,
-            database_models.ConsumptionIndex.source_type == "manual",
-        ).count(),
-        unread_alerts=db.query(database_models.Alert).filter(
-            database_models.Alert.user_id == current_user.id,
-            database_models.Alert.is_read == False,
-        ).count(),
-    )
-    environment = api_schemas.AppEnvironmentInfo(
-        api_version=read_version(),
-        database_dialect=SQLALCHEMY_DATABASE_URL.split(":", 1)[0],
-        upload_dir=os.getenv("UPLOAD_DIR", "data/invoices"),
-        app_env=os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "production")),
-        allowed_origins=allowed_origins,
-        server_time_utc=datetime.now(timezone.utc),
-    )
-    return api_schemas.AboutResponse(
-        version=environment.api_version,
-        release_notes_markdown=read_release_notes(),
-        stats=stats,
-        environment=environment,
-    )
-
-
-@router.get("/dashboard", response_model=api_schemas.DashboardAnalyticsResponse)
-def dashboard_analytics(
-    period: str = Query("last_6_months"),
-    location_id: Optional[int] = Query(None),
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
-    db: Session = Depends(get_db),
-    current_user: database_models.User = Depends(auth_utils.get_current_user),
-):
+def build_dashboard_payload(
+    db: Session,
+    current_user: database_models.User,
+    period: str,
+    location_id: Optional[int],
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> api_schemas.DashboardAnalyticsResponse:
     locations = db.query(database_models.Location).filter(
         database_models.Location.user_id == current_user.id
     ).order_by(database_models.Location.name.asc()).all()
@@ -450,3 +385,297 @@ def dashboard_analytics(
         overall_cost_series=overall_cost_series,
         category_sections=category_sections,
     )
+
+
+def render_chart_image(
+    title: str,
+    labels: List[str],
+    series: List[Tuple[str, List[Optional[float]], str]],
+    y_label: str,
+) -> BytesIO:
+    figure, axis = plt.subplots(figsize=(9, 3.4))
+    for name, values, color in series:
+        numeric_values = [float(value) if value is not None else None for value in values]
+        axis.plot(labels, numeric_values, marker="o", linewidth=2, label=name, color=color)
+    axis.set_title(title, fontsize=12, fontweight="bold")
+    axis.set_ylabel(y_label)
+    axis.grid(True, axis="y", alpha=0.2)
+    axis.legend(loc="best")
+    if len(labels) > 6:
+        axis.tick_params(axis="x", rotation=35)
+    figure.tight_layout()
+    output = BytesIO()
+    figure.savefig(output, format="png", dpi=160, bbox_inches="tight")
+    plt.close(figure)
+    output.seek(0)
+    return output
+
+
+def render_bar_chart_image(
+    title: str,
+    labels: List[str],
+    values: List[float],
+    color: str,
+    y_label: str,
+) -> BytesIO:
+    figure, axis = plt.subplots(figsize=(9, 3.4))
+    axis.bar(labels, values, color=color)
+    axis.set_title(title, fontsize=12, fontweight="bold")
+    axis.set_ylabel(y_label)
+    axis.grid(True, axis="y", alpha=0.2)
+    if len(labels) > 4:
+        axis.tick_params(axis="x", rotation=20)
+    figure.tight_layout()
+    output = BytesIO()
+    figure.savefig(output, format="png", dpi=160, bbox_inches="tight")
+    plt.close(figure)
+    output.seek(0)
+    return output
+
+
+def build_dashboard_pdf(
+    dashboard: api_schemas.DashboardAnalyticsResponse,
+    selected_location_name: str,
+    selected_period_label: str,
+) -> BytesIO:
+    buffer = BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=14 * mm,
+        rightMargin=14 * mm,
+        topMargin=14 * mm,
+        bottomMargin=14 * mm,
+    )
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="UtilityMateHeading", parent=styles["Heading1"], fontSize=18, leading=22, textColor=colors.HexColor("#0f172a")))
+    styles.add(ParagraphStyle(name="UtilityMateSubheading", parent=styles["Heading2"], fontSize=12, leading=15, textColor=colors.HexColor("#334155")))
+    styles.add(ParagraphStyle(name="UtilityMateBody", parent=styles["BodyText"], fontSize=9, leading=12, textColor=colors.HexColor("#334155")))
+
+    story = [
+        Paragraph("UtilityMate Dashboard Export", styles["UtilityMateHeading"]),
+        Spacer(1, 4 * mm),
+        Paragraph(
+            f"Location: <b>{selected_location_name}</b><br/>Period: <b>{selected_period_label}</b><br/>Range: <b>{dashboard.start_date}</b> to <b>{dashboard.end_date}</b>",
+            styles["UtilityMateBody"],
+        ),
+        Spacer(1, 5 * mm),
+    ]
+
+    summary_table = Table(
+        [
+            ["Period Spend", "Average / Month", "Previous Period", "Tracked Categories"],
+            [
+                f"{dashboard.summary.total_cost:.2f} RON",
+                f"{dashboard.summary.avg_monthly_cost:.2f} RON",
+                f"{dashboard.summary.previous_period_cost:.2f} RON",
+                str(dashboard.summary.active_categories),
+            ],
+        ],
+        colWidths=[42 * mm, 42 * mm, 42 * mm, 42 * mm],
+    )
+    summary_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.extend([summary_table, Spacer(1, 6 * mm)])
+
+    overall_labels = [point.label for point in dashboard.overall_cost_series]
+    overall_cost_chart = render_chart_image(
+        "Monthly Cost Trend",
+        overall_labels,
+        [
+            ("Cost", [point.cost for point in dashboard.overall_cost_series], "#0f766e"),
+            ("Historical Baseline", [point.forecast_cost for point in dashboard.overall_cost_series], "#f97316"),
+        ],
+        "RON",
+    )
+    story.extend([
+        Paragraph("Overall Trend", styles["UtilityMateSubheading"]),
+        Spacer(1, 2 * mm),
+        Image(overall_cost_chart, width=180 * mm, height=68 * mm),
+        Spacer(1, 6 * mm),
+    ])
+
+    for section in dashboard.category_sections:
+        story.append(Paragraph(section.category_name, styles["UtilityMateSubheading"]))
+        story.append(Paragraph(
+            f"Total Cost: <b>{section.total_cost:.2f} RON</b> | Total Consumption: <b>{section.total_consumption:.3f} {section.unit}</b> | Unit Cost: <b>{section.avg_unit_cost:.4f} RON / {section.unit}</b>" if section.avg_unit_cost is not None else
+            f"Total Cost: <b>{section.total_cost:.2f} RON</b> | Total Consumption: <b>{section.total_consumption:.3f} {section.unit}</b> | Unit Cost: <b>No data</b>",
+            styles["UtilityMateBody"],
+        ))
+        story.append(Spacer(1, 2 * mm))
+
+        labels = [point.label for point in section.monthly_series]
+        story.append(Image(
+            render_chart_image(
+                f"{section.category_name} Cost and Baseline",
+                labels,
+                [
+                    ("Cost", [point.cost for point in section.monthly_series], "#2563eb"),
+                    ("Historical Baseline", [point.forecast_cost for point in section.monthly_series], "#f97316"),
+                ],
+                "RON",
+            ),
+            width=180 * mm,
+            height=68 * mm,
+        ))
+        story.append(Spacer(1, 2 * mm))
+        story.append(Image(
+            render_chart_image(
+                f"{section.category_name} Consumption and Unit Cost",
+                labels,
+                [
+                    ("Consumption", [point.consumption for point in section.monthly_series], "#14b8a6"),
+                    ("Unit Cost", [point.unit_cost for point in section.monthly_series], "#7c3aed"),
+                ],
+                f"{section.unit} / RON",
+            ),
+            width=180 * mm,
+            height=68 * mm,
+        ))
+        story.append(Spacer(1, 2 * mm))
+        story.append(Image(
+            render_bar_chart_image(
+                f"{section.category_name} Location Comparison",
+                [point.location_name for point in section.location_comparison],
+                [point.cost for point in section.location_comparison],
+                "#0f766e",
+                "RON",
+            ),
+            width=180 * mm,
+            height=68 * mm,
+        ))
+        story.append(Spacer(1, 6 * mm))
+
+    document.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+@router.get("/summary", response_model=api_schemas.AnalyticsSummary)
+def analytics_summary(
+    db: Session = Depends(get_db),
+    current_user: database_models.User = Depends(auth_utils.get_current_user),
+):
+    compute_budget_statuses(db, current_user)
+    generate_invoice_alerts(db, current_user)
+    db.commit()
+    return build_summary(db, current_user)
+
+
+@router.get("/report", response_model=api_schemas.ReportBundle)
+def analytics_report(
+    db: Session = Depends(get_db),
+    current_user: database_models.User = Depends(auth_utils.get_current_user),
+):
+    budget_statuses = compute_budget_statuses(db, current_user)
+    generate_invoice_alerts(db, current_user)
+    db.commit()
+    alerts = db.query(database_models.Alert).filter(
+        database_models.Alert.user_id == current_user.id
+    ).order_by(database_models.Alert.created_at.desc()).limit(10).all()
+    return api_schemas.ReportBundle(
+        summary=build_summary(db, current_user),
+        budget_statuses=budget_statuses,
+        alerts=alerts,
+        forecast=build_forecast(db, current_user),
+    )
+
+
+@router.get("/about", response_model=api_schemas.AboutResponse)
+def about(
+    db: Session = Depends(get_db),
+    current_user: database_models.User = Depends(auth_utils.get_current_user),
+):
+    allowed_origins = [origin.strip() for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost,http://127.0.0.1,http://localhost:5173",
+    ).split(",") if origin.strip()]
+    stats = api_schemas.AppStats(
+        invoices=db.query(database_models.Invoice).filter(database_models.Invoice.user_id == current_user.id).count(),
+        locations=db.query(database_models.Location).filter(database_models.Location.user_id == current_user.id).count(),
+        providers=db.query(database_models.Provider).filter(
+            or_(database_models.Provider.user_id == None, database_models.Provider.user_id == current_user.id)
+        ).count(),
+        categories=db.query(database_models.Category).filter(
+            or_(database_models.Category.user_id == None, database_models.Category.user_id == current_user.id)
+        ).count(),
+        households=db.query(database_models.Household).filter(database_models.Household.owner_user_id == current_user.id).count(),
+        manual_meter_readings=db.query(database_models.ConsumptionIndex).filter(
+            database_models.ConsumptionIndex.user_id == current_user.id,
+            database_models.ConsumptionIndex.source_type == "manual",
+        ).count(),
+        unread_alerts=db.query(database_models.Alert).filter(
+            database_models.Alert.user_id == current_user.id,
+            database_models.Alert.is_read == False,
+        ).count(),
+    )
+    environment = api_schemas.AppEnvironmentInfo(
+        api_version=read_version(),
+        database_dialect=SQLALCHEMY_DATABASE_URL.split(":", 1)[0],
+        upload_dir=os.getenv("UPLOAD_DIR", "data/invoices"),
+        app_env=os.getenv("APP_ENV", os.getenv("ENVIRONMENT", "production")),
+        allowed_origins=allowed_origins,
+        server_time_utc=datetime.now(timezone.utc),
+    )
+    return api_schemas.AboutResponse(
+        version=environment.api_version,
+        release_notes_markdown=read_release_notes(),
+        stats=stats,
+        environment=environment,
+    )
+
+
+@router.get("/dashboard", response_model=api_schemas.DashboardAnalyticsResponse)
+def dashboard_analytics(
+    period: str = Query("last_6_months"),
+    location_id: Optional[int] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: database_models.User = Depends(auth_utils.get_current_user),
+):
+    return build_dashboard_payload(db, current_user, period, location_id, start_date, end_date)
+
+
+@router.get("/dashboard-export")
+def dashboard_export(
+    period: str = Query("last_6_months"),
+    location_id: Optional[int] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: database_models.User = Depends(auth_utils.get_current_user),
+):
+    dashboard = build_dashboard_payload(db, current_user, period, location_id, start_date, end_date)
+    selected_location_name = "All Locations"
+    if dashboard.selected_location_id is not None:
+        selected_location_name = next(
+            (
+                location.name
+                for location in dashboard.available_locations
+                if location.id == dashboard.selected_location_id
+            ),
+            "Selected Location",
+        )
+
+    period_labels = {
+        "last_3_months": "Last 3 Months",
+        "last_6_months": "Last 6 Months",
+        "last_1_year": "Last 1 Year",
+        "custom": "Custom Period",
+        "all_time": "All Time",
+    }
+    selected_period_label = period_labels.get(period, "Custom Period")
+    pdf_buffer = build_dashboard_pdf(dashboard, selected_location_name, selected_period_label)
+    filename = f"utilitymate-dashboard-{selected_location_name.lower().replace(' ', '-')}-{selected_period_label.lower().replace(' ', '-')}.pdf"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(pdf_buffer, media_type="application/pdf", headers=headers)

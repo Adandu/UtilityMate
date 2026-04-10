@@ -1,13 +1,13 @@
-# UtilityMate v1.4.23
+# UtilityMate v1.4.24
 
 ## New Features
 
-- Added explicit dashboard export status feedback so PDF export success or failure is visible in the UI.
+- Added a backend-generated dashboard PDF export endpoint that produces a real downloadable report for the active location and period filters.
 
 ## Improvements
 
-- Improved dashboard PDF generation reliability by switching to the stable named `jsPDF` export and lowering capture scale to reduce browser-side failures.
+- Reused the same dashboard analytics payload for both the web view and PDF export so the downloaded report matches the current dashboard filters and summaries.
 
 ## Bug Fixes
 
-- Fixed the `Export Dashboard PDF` button appearing to do nothing when the browser-side PDF generation path failed silently.
+- Fixed the recurring dashboard export failure caused by browser-side chart capture timing and DOM rendering issues.
