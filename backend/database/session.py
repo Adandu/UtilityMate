@@ -186,4 +186,3 @@ def verify_and_migrate_db():
                 conn.execute(text("ALTER TABLE locations ADD COLUMN household_id INTEGER REFERENCES households(id) ON DELETE SET NULL"))
     
     logger.info("Database schema verification and migration complete.")
-    repair_pdf_invoice_data()

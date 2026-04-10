@@ -1,19 +1,19 @@
-# UtilityMate v1.4.15
+# UtilityMate v1.4.16
 
 ## New Features
 
-- Added an automatic PDF invoice repair pass on startup so existing imported invoices can be corrected after parser improvements.
-- Added targeted Hidroelectrica consumption extraction for billed energy totals instead of whichever `kWh` token appears first in the PDF.
-- Added safer PDF path resolution for startup data repair in container deployments.
+- Added background scheduling for invoice PDF repair so startup fixes can run without blocking container readiness.
+- Added a non-blocking startup repair flow for existing imported invoices.
+- Added backend boot-time separation between schema migration and invoice data repair.
 
 ## Improvements
 
-- Improved invoice data integrity by reparsing stored PDF invoices for supported providers during startup.
-- Improved Hidroelectrica parsing to prioritize the invoice summary and metering sections before table-row fallbacks.
-- Improved repair safety so only positive, trustworthy parsed values overwrite stored invoice amounts or consumption.
+- Improved container startup reliability when a bind-mounted instance contains many PDFs to reparse.
+- Improved backend readiness by letting FastAPI start before the invoice repair worker processes historical files.
+- Improved deploy safety for MasterChief by avoiding false startup failures during long repair runs.
 
 ## Bug Fixes
 
-- Fixed incorrect dashboard cost-per-unit values caused by misparsed Hidroelectrica consumption on existing invoices.
-- Fixed older energy invoices that stored `8 kWh`, `1 kWh`, or `0 kWh` helper values instead of the billed consumption.
-- Fixed startup repair logic to avoid writing invalid negative fallback consumption values.
+- Fixed the boot loop where the container reported `Backend failed to start after 15 seconds` while invoice repair was still running.
+- Fixed startup timing so backend health checks no longer fail just because historical PDF repair takes longer than the entrypoint wait window.
+- Fixed the regression introduced by running invoice repair directly in the synchronous startup path.
