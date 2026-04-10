@@ -14,7 +14,14 @@ def read_locations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db
 
 @router.post("/", response_model=api_schemas.Location)
 def create_location(location: api_schemas.LocationCreate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
-    db_location = database_models.Location(**location.dict(), user_id=current_user.id)
+    if location.household_id is not None:
+        household = db.query(database_models.Household).filter(
+            database_models.Household.id == location.household_id,
+            database_models.Household.owner_user_id == current_user.id
+        ).first()
+        if not household:
+            raise HTTPException(status_code=404, detail="Household not found")
+    db_location = database_models.Location(**location.model_dump(), user_id=current_user.id)
     db.add(db_location)
     db.commit()
     db.refresh(db_location)
@@ -28,7 +35,14 @@ def update_location(location_id: int, location: api_schemas.LocationCreate, db: 
     ).first()
     if not db_location:
         raise HTTPException(status_code=404, detail="Location not found")
-    for key, value in location.dict().items():
+    if location.household_id is not None:
+        household = db.query(database_models.Household).filter(
+            database_models.Household.id == location.household_id,
+            database_models.Household.owner_user_id == current_user.id
+        ).first()
+        if not household:
+            raise HTTPException(status_code=404, detail="Household not found")
+    for key, value in location.model_dump().items():
         setattr(db_location, key, value)
     db.commit()
     db.refresh(db_location)

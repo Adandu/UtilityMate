@@ -69,6 +69,9 @@ class InvoiceParser:
         billing_match = re.search(r"(?:data\s+de|data\s+factur(?:[aă]rii|ii)[:\s]+)\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
             result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
+        due_match = re.search(r"scaden[ţt][aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        if due_match:
+            result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
             
         amount_match = re.search(r"total\s+de\s+plat[aă](?:.*?)\s+([\d\.,]+)lei", text, re.IGNORECASE)
         if not amount_match:
@@ -95,6 +98,9 @@ class InvoiceParser:
         billing_match = re.search(r"(?:data\s+emiterii[:\s]+|data\s+facturii[:\s]+)?(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
             result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
+        due_match = re.search(r"termen\s+de\s+plat[aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        if due_match:
+            result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
             
         amount_match = re.search(r"total\s+factur[aă]\s+curent[aă][:\s]+[\d\.,]+\s+[\d\.,]+\s+([\d\.,]+)", text, re.IGNORECASE)
         if not amount_match:
@@ -178,6 +184,12 @@ class InvoiceParser:
         if date_match:
             try:
                 result["invoice_date"] = datetime.strptime(date_match.group(1), "%d.%m.%Y").date()
+            except ValueError:
+                pass
+        due_match = re.search(r"(?:due|scadent[ăa]|termen(?:\s+de\s+plat[ăa])?)[:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        if due_match:
+            try:
+                result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
             except ValueError:
                 pass
             

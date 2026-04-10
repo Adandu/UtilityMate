@@ -37,6 +37,7 @@ def verify_and_migrate_db():
     Base.metadata.create_all(bind=engine)
     
     with engine.begin() as conn:
+        tables = inspector.get_table_names()
         # 1. Migration: Add user_id to categories and providers
         for table in ["categories", "providers"]:
             columns = [c["name"] for c in inspector.get_columns(table)]
@@ -51,7 +52,7 @@ def verify_and_migrate_db():
             conn.execute(text("ALTER TABLE users ADD COLUMN dashboard_config VARCHAR"))
         
         # 2. Migration: Rename billing_date to invoice_date in invoices
-        if "invoices" in inspector.get_table_names():
+        if "invoices" in tables:
             columns = [c["name"] for c in inspector.get_columns("invoices")]
             if "billing_date" in columns and "invoice_date" not in columns:
                 logger.info("Migration: Renaming billing_date to invoice_date in invoices")
@@ -69,5 +70,40 @@ def verify_and_migrate_db():
                 # We won't drop it here as it requires table recreation in SQLite < 3.35.0
                 # But we've removed it from our models, so it will just be ignored
                 pass
+
+        invoice_columns = {
+            "status": "ALTER TABLE invoices ADD COLUMN status VARCHAR DEFAULT 'received'",
+            "paid_at": "ALTER TABLE invoices ADD COLUMN paid_at DATETIME",
+            "payment_reference": "ALTER TABLE invoices ADD COLUMN payment_reference VARCHAR",
+            "parse_confidence": "ALTER TABLE invoices ADD COLUMN parse_confidence FLOAT DEFAULT 0.0",
+            "needs_review": "ALTER TABLE invoices ADD COLUMN needs_review BOOLEAN DEFAULT 0",
+            "review_notes": "ALTER TABLE invoices ADD COLUMN review_notes VARCHAR",
+            "source_type": "ALTER TABLE invoices ADD COLUMN source_type VARCHAR DEFAULT 'pdf'",
+            "source_name": "ALTER TABLE invoices ADD COLUMN source_name VARCHAR",
+            "processing_notes": "ALTER TABLE invoices ADD COLUMN processing_notes VARCHAR",
+        }
+        for column_name, statement in invoice_columns.items():
+            columns = [c["name"] for c in inspector.get_columns("invoices")]
+            if column_name not in columns:
+                logger.info("Migration: Adding %s to invoices", column_name)
+                conn.execute(text(statement))
+
+        consumption_columns = {
+            "source_type": "ALTER TABLE consumption_indexes ADD COLUMN source_type VARCHAR DEFAULT 'manual'",
+            "photo_path": "ALTER TABLE consumption_indexes ADD COLUMN photo_path VARCHAR",
+            "notes": "ALTER TABLE consumption_indexes ADD COLUMN notes VARCHAR",
+        }
+        if "consumption_indexes" in tables:
+            for column_name, statement in consumption_columns.items():
+                columns = [c["name"] for c in inspector.get_columns("consumption_indexes")]
+                if column_name not in columns:
+                    logger.info("Migration: Adding %s to consumption_indexes", column_name)
+                    conn.execute(text(statement))
+
+        if "locations" in tables:
+            columns = [c["name"] for c in inspector.get_columns("locations")]
+            if "household_id" not in columns:
+                logger.info("Migration: Adding household_id to locations")
+                conn.execute(text("ALTER TABLE locations ADD COLUMN household_id INTEGER REFERENCES households(id) ON DELETE SET NULL"))
     
     logger.info("Database schema verification and migration complete.")

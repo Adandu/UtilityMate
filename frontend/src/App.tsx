@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Invoices from './pages/Invoices';
 import RawData from './pages/RawData';
 import Config from './pages/Config';
+import Operations from './pages/Operations';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -42,6 +43,7 @@ const App: React.FC = () => {
             <Route path="/" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/invoices" element={isAuthenticated ? <Invoices /> : <Navigate to="/login" />} />
             <Route path="/data" element={isAuthenticated ? <RawData /> : <Navigate to="/login" />} />
+            <Route path="/operations" element={isAuthenticated ? <Operations /> : <Navigate to="/login" />} />
             <Route path="/config" element={isAuthenticated ? <Config /> : <Navigate to="/login" />} />
           </Routes>
         </main>

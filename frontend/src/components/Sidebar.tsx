@@ -45,6 +45,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
           </NavLink>
 
           <NavLink 
+            to="/operations" 
+            className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold transition-all duration-150 ${isActive ? 'bg-white dark:bg-slate-950 text-emerald-600 dark:text-emerald-400 shadow-sm scale-95' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100'}`}
+          >
+            <span className="material-symbols-outlined">hub</span>
+            <span className="font-body text-sm">Operations</span>
+          </NavLink>
+
+          <NavLink 
             to="/config" 
             className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold transition-all duration-150 ${isActive ? 'bg-white dark:bg-slate-950 text-emerald-600 dark:text-emerald-400 shadow-sm scale-95' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100'}`}
           >
