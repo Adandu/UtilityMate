@@ -71,3 +71,29 @@ def add_household_member(
     db.commit()
     db.refresh(db_member)
     return db_member
+
+
+@router.delete("/{household_id}")
+def delete_household(
+    household_id: int,
+    db: Session = Depends(get_db),
+    current_user: database_models.User = Depends(auth_utils.get_current_user),
+):
+    household = db.query(database_models.Household).filter(
+        database_models.Household.id == household_id,
+        database_models.Household.owner_user_id == current_user.id,
+    ).first()
+    if not household:
+        raise HTTPException(status_code=404, detail="Household not found")
+
+    db.query(database_models.Location).filter(
+        database_models.Location.household_id == household_id
+    ).update({database_models.Location.household_id: None}, synchronize_session=False)
+
+    db.query(database_models.Budget).filter(
+        database_models.Budget.household_id == household_id
+    ).update({database_models.Budget.household_id: None}, synchronize_session=False)
+
+    db.delete(household)
+    db.commit()
+    return {"message": "Household deleted"}

@@ -134,6 +134,12 @@ const Operations: React.FC = () => {
     fetchData();
   };
 
+  const deleteHousehold = async (householdId: number) => {
+    if (!window.confirm('Delete this household? Linked locations and budgets will be detached.')) return;
+    await api.delete(`/households/${householdId}`);
+    fetchData();
+  };
+
   const downloadReport = async () => {
     const response = await api.get('/invoices/export', { responseType: 'blob' });
     const url = URL.createObjectURL(new Blob([response.data]));
@@ -231,9 +237,16 @@ const Operations: React.FC = () => {
             {households.length === 0 && <p className="text-sm opacity-60">No households created yet.</p>}
             {households.map((household) => (
               <div key={household.id} className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
-                <p className="font-black">{household.name}</p>
-                <p className="text-sm opacity-70">{household.description || 'Shared household workspace for locations, budgets, and accountability.'}</p>
-                <p className="mt-2 text-xs font-bold uppercase opacity-50">{household.members.length} member records</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black">{household.name}</p>
+                    <p className="text-sm opacity-70">{household.description || 'Shared household workspace for locations, budgets, and accountability.'}</p>
+                    <p className="mt-2 text-xs font-bold uppercase opacity-50">{household.members.length} member records</p>
+                  </div>
+                  <button onClick={() => deleteHousehold(household.id)} className="rounded-xl border border-outline-variant px-3 py-2 text-xs font-black uppercase text-red-600">
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>

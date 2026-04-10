@@ -7,6 +7,7 @@ from ..models import database_models
 from ..schemas import api_schemas
 from ..utils import auth_utils
 from ..utils.domain_logic import compute_budget_statuses, generate_invoice_alerts
+from ..utils.logging_config import logger
 
 router = APIRouter()
 
@@ -17,13 +18,23 @@ def read_alerts(
     db: Session = Depends(get_db),
     current_user: database_models.User = Depends(auth_utils.get_current_user),
 ):
-    compute_budget_statuses(db, current_user)
-    generate_invoice_alerts(db, current_user)
-    db.commit()
-    query = db.query(database_models.Alert).filter(database_models.Alert.user_id == current_user.id)
-    if unread_only:
-        query = query.filter(database_models.Alert.is_read == False)
-    return query.order_by(database_models.Alert.created_at.desc()).all()
+    try:
+        compute_budget_statuses(db, current_user)
+        generate_invoice_alerts(db, current_user)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Alert generation failed for user %s: %s", current_user.email, str(exc))
+
+    try:
+        query = db.query(database_models.Alert).filter(database_models.Alert.user_id == current_user.id)
+        if unread_only:
+            query = query.filter(database_models.Alert.is_read == False)
+        return query.order_by(database_models.Alert.created_at.desc()).all()
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Alert query failed for user %s: %s", current_user.email, str(exc))
+        return []
 
 
 @router.post("/", response_model=api_schemas.Alert)

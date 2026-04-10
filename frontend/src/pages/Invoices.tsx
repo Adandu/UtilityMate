@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Edit3, FileWarning, Loader2, Upload, X } from 'lucide-react';
+import { CheckCircle2, Edit3, Eye, FileWarning, Loader2, Square, CheckSquare, Upload, X } from 'lucide-react';
 import api from '../utils/api';
 
 interface Invoice {
@@ -37,6 +37,8 @@ const Invoices: React.FC = () => {
   const [editPaymentReference, setEditPaymentReference] = useState('');
   const [editReviewNotes, setEditReviewNotes] = useState('');
   const [editNeedsReview, setEditNeedsReview] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkStatus, setBulkStatus] = useState('reviewed');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchData = async () => {
@@ -72,7 +74,7 @@ const Invoices: React.FC = () => {
       setShowUpload(false);
       setSelectedLocation('');
       if (fileInputRef.current) fileInputRef.current.value = '';
-      fetchData();
+      await fetchData();
     } finally {
       setUploading(false);
     }
@@ -98,7 +100,34 @@ const Invoices: React.FC = () => {
       needs_review: editNeedsReview,
     });
     setEditing(null);
-    fetchData();
+    await fetchData();
+  };
+
+  const viewPdf = async (invoiceId: number) => {
+    const response = await api.get(`/invoices/${invoiceId}/pdf`, { responseType: 'blob' });
+    const blobUrl = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const toggleSelect = (invoiceId: number) => {
+    setSelectedIds((current) => current.includes(invoiceId) ? current.filter((id) => id !== invoiceId) : [...current, invoiceId]);
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((current) => current.length === invoices.length ? [] : invoices.map((invoice) => invoice.id));
+  };
+
+  const applyBulkStatus = async () => {
+    if (selectedIds.length === 0) return;
+    await api.patch('/invoices/bulk', {
+      invoice_ids: selectedIds,
+      update_data: {
+        status: bulkStatus,
+        needs_review: bulkStatus === 'reviewed' || bulkStatus === 'paid' ? false : undefined,
+      },
+    });
+    setSelectedIds([]);
+    await fetchData();
   };
 
   if (loading) {
@@ -110,18 +139,40 @@ const Invoices: React.FC = () => {
       <header className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="font-headline text-3xl font-extrabold">Invoice Review Desk</h2>
-          <p className="text-on-surface-variant opacity-70">Manage import confidence, due dates, payment tracking, and manual review without paying invoices in-app.</p>
+          <p className="text-on-surface-variant opacity-70">Manage import confidence, due dates, payment tracking, bulk workflow status, and PDF review without paying invoices in-app.</p>
         </div>
         <button onClick={() => setShowUpload(true)} className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 font-bold text-white">
           <Upload size={18} /> Upload Invoices
         </button>
       </header>
 
+      {selectedIds.length > 0 && (
+        <div className="mb-6 flex flex-col gap-3 rounded-3xl border border-outline-variant bg-surface-container-low p-4 md:flex-row md:items-center md:justify-between">
+          <p className="font-black">{selectedIds.length} invoice{selectedIds.length === 1 ? '' : 's'} selected</p>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
+              <option value="received">Received</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+            </select>
+            <button onClick={applyBulkStatus} className="rounded-xl bg-blue-600 px-4 py-3 font-bold text-white">Apply Status</button>
+            <button onClick={() => setSelectedIds([])} className="rounded-xl border border-outline-variant px-4 py-3 font-bold">Clear</button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-3xl border border-outline-variant bg-surface-container-low p-4">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-outline-variant text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                <th className="px-4 py-4">
+                  <button onClick={toggleSelectAll} className="rounded-lg p-1">
+                    {selectedIds.length === invoices.length && invoices.length > 0 ? <CheckSquare size={18} className="text-emerald-600" /> : <Square size={18} />}
+                  </button>
+                </th>
                 <th className="px-4 py-4">Provider</th>
                 <th className="px-4 py-4">Location</th>
                 <th className="px-4 py-4">Date</th>
@@ -133,7 +184,12 @@ const Invoices: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-outline-variant/30">
               {invoices.map((invoice) => (
-                <tr key={invoice.id}>
+                <tr key={invoice.id} className={selectedIds.includes(invoice.id) ? 'bg-emerald-50/40 dark:bg-emerald-900/10' : ''}>
+                  <td className="px-4 py-4">
+                    <button onClick={() => toggleSelect(invoice.id)} className="rounded-lg p-1">
+                      {selectedIds.includes(invoice.id) ? <CheckSquare size={18} className="text-emerald-600" /> : <Square size={18} className="opacity-50" />}
+                    </button>
+                  </td>
                   <td className="px-4 py-4">
                     <p className="font-black">{invoice.provider?.name || 'Unknown provider'}</p>
                     <p className="text-xs opacity-50">{invoice.provider?.category?.name || 'Unknown category'}</p>
@@ -155,9 +211,14 @@ const Invoices: React.FC = () => {
                     {invoice.review_notes && <p className="mt-1 max-w-xs text-xs opacity-50">{invoice.review_notes}</p>}
                   </td>
                   <td className="px-4 py-4">
-                    <button onClick={() => openEdit(invoice)} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black uppercase text-white dark:bg-white dark:text-slate-900">
-                      <Edit3 size={14} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => viewPdf(invoice.id)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black uppercase text-white">
+                        <Eye size={14} />
+                      </button>
+                      <button onClick={() => openEdit(invoice)} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black uppercase text-white dark:bg-white dark:text-slate-900">
+                        <Edit3 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
