@@ -24,6 +24,32 @@ MAX_FILE_SIZE = 50 * 1024 * 1024 # 50MB
 def get_file_hash(file_content: bytes):
     return hashlib.sha256(file_content).hexdigest()
 
+
+def validate_invoice_relationships(
+    db: Session,
+    current_user: database_models.User,
+    location_id: Optional[int] = None,
+    provider_id: Optional[int] = None,
+):
+    if location_id is not None:
+        location = db.query(database_models.Location).filter(
+            database_models.Location.id == location_id,
+            database_models.Location.user_id == current_user.id,
+        ).first()
+        if not location:
+            raise HTTPException(status_code=404, detail="Location not found")
+
+    if provider_id is not None:
+        provider = db.query(database_models.Provider).filter(
+            database_models.Provider.id == provider_id,
+            or_(
+                database_models.Provider.user_id == None,
+                database_models.Provider.user_id == current_user.id,
+            ),
+        ).first()
+        if not provider:
+            raise HTTPException(status_code=404, detail="Provider not found")
+
 @router.get("/", response_model=List[api_schemas.Invoice])
 def read_invoices(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
     return db.query(database_models.Invoice).options(
@@ -101,6 +127,7 @@ async def upload_invoices(
             # 5. Detect provider
             pdf_text = parser.InvoiceParser.get_pdf_text(file_path)
             if not pdf_text:
+                os.remove(file_path)
                 results.append({"filename": file.filename, "status": "error", "detail": "Could not extract text from this PDF. Is it a scanned image?"})
                 continue
 
@@ -140,27 +167,6 @@ async def upload_invoices(
 
     return results
 
-@router.patch("/{invoice_id}", response_model=api_schemas.Invoice)
-def update_invoice(invoice_id: int, invoice_update: api_schemas.InvoiceUpdate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
-    invoice = db.query(database_models.Invoice).filter(
-        database_models.Invoice.id == invoice_id,
-        database_models.Invoice.user_id == current_user.id
-    ).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-        
-    update_data = invoice_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(invoice, key, value)
-        
-    db.commit()
-    db.refresh(invoice)
-    
-    return db.query(database_models.Invoice).options(
-        joinedload(database_models.Invoice.provider).joinedload(database_models.Provider.category),
-        joinedload(database_models.Invoice.location)
-    ).filter(database_models.Invoice.id == invoice_id).first()
-
 @router.patch("/bulk")
 def bulk_update_invoices(
     bulk_update: api_schemas.InvoiceBulkUpdate, 
@@ -178,6 +184,13 @@ def bulk_update_invoices(
     
     if not update_data:
         return {"message": "No updates provided"}
+
+    validate_invoice_relationships(
+        db,
+        current_user,
+        location_id=update_data.get("location_id"),
+        provider_id=update_data.get("provider_id"),
+    )
         
     for invoice in invoices:
         for key, value in update_data.items():
@@ -185,6 +198,34 @@ def bulk_update_invoices(
             
     db.commit()
     return {"message": f"Successfully updated {len(invoices)} invoices"}
+
+@router.patch("/{invoice_id}", response_model=api_schemas.Invoice)
+def update_invoice(invoice_id: int, invoice_update: api_schemas.InvoiceUpdate, db: Session = Depends(get_db), current_user: database_models.User = Depends(auth_utils.get_current_user)):
+    invoice = db.query(database_models.Invoice).filter(
+        database_models.Invoice.id == invoice_id,
+        database_models.Invoice.user_id == current_user.id
+    ).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+        
+    update_data = invoice_update.model_dump(exclude_unset=True)
+    validate_invoice_relationships(
+        db,
+        current_user,
+        location_id=update_data.get("location_id"),
+        provider_id=update_data.get("provider_id"),
+    )
+
+    for key, value in update_data.items():
+        setattr(invoice, key, value)
+        
+    db.commit()
+    db.refresh(invoice)
+    
+    return db.query(database_models.Invoice).options(
+        joinedload(database_models.Invoice.provider).joinedload(database_models.Provider.category),
+        joinedload(database_models.Invoice.location)
+    ).filter(database_models.Invoice.id == invoice_id).first()
 
 @router.delete("/bulk")
 def bulk_delete_invoices(
