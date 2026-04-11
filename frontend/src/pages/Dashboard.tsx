@@ -298,20 +298,20 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={report.overall_cost_series}>
-                <defs>
-                  <linearGradient id="overallSpendArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0f766e" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#0f766e" stopOpacity={0.04} />
-                  </linearGradient>
-                </defs>
+                <ComposedChart data={report.overall_cost_series}>
+                  <defs>
+                    <linearGradient id="overallSpendArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.04} />
+                    </linearGradient>
+                  </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                 <XAxis dataKey="label" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
                 <Legend wrapperStyle={legendStyle} />
                 <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
-                <Area type="monotone" dataKey="cost" stroke="#0f766e" fill="url(#overallSpendArea)" strokeWidth={3} name="Cost" />
-                <Line type="monotone" dataKey="last_year_cost" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls name="Last Year" />
+                <Area type="monotone" dataKey="cost" stroke="#7c3aed" fill="url(#overallSpendArea)" strokeWidth={3} name="Cost" />
+                <Line type="monotone" dataKey="last_year_cost" stroke="#0f766e" strokeWidth={2} dot={false} connectNulls name="Last Year" />
                 <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={2} dot={false} name="Average Over the Years" />
               </ComposedChart>
             </ResponsiveContainer>

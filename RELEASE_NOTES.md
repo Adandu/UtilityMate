@@ -1,13 +1,13 @@
-# UtilityMate v1.4.30
+# UtilityMate v1.4.31
 
 ## New Features
 
-- Added an explicit dashboard utility-category display order so the main trend sections now appear in the requested business order instead of plain alphabetical order.
+- Aligned the main `Monthly Cost Trend` graph palette with the `History Comparison` graphs so the same comparison types use the same colors across the dashboard.
 
 ## Improvements
 
-- Dashboard category sections now prioritize `Energy`, `Gas`, `Cold Water`, `Hot Water`, `Shared Water`, and `Heating`, while still placing any extra categories afterward in a stable way.
+- Dashboard color semantics are now more consistent: current value uses purple, last year uses green, and average over the years uses orange in both the overall and per-category history views.
 
 ## Bug Fixes
 
-- Fixed dashboard utility categories appearing in a less useful alphabetical order that made the most important utilities harder to scan quickly.
+- Fixed the top-level monthly trend graph using a different color mapping than the category history charts, which made cross-chart comparison harder to follow.
