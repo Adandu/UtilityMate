@@ -428,6 +428,7 @@ class DashboardAnalyticsResponse(BaseModel):
     start_date: date
     end_date: date
     overall_cost_series: List[DashboardSeriesPoint]
+    avizier_cost_series: List[DashboardSeriesPoint]
     category_sections: List[DashboardCategorySection]
 
 

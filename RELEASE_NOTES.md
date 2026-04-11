@@ -1,13 +1,13 @@
-# UtilityMate v1.4.34
+# UtilityMate v1.4.35
 
 ## New Features
 
-- Added a current-period utility cost breakdown table to the dashboard so you can review each utility’s spend contribution for the active filters.
+- Added the utility cost breakdown table to the dashboard PDF export, and added a new final `Avizier Cost per Month` section to both the dashboard and the export.
 
 ## Improvements
 
-- History chart legends and hover ordering are now standardized as `Cost`, `Last Year`, and `Average Over the Years` for easier comparison.
+- Dashboard and exported reports now make association-statement costs easier to audit month by month alongside the regular utility breakdown.
 
 ## Bug Fixes
 
-- Fixed inconsistent history-series naming and ordering between the dashboard legends and tooltips.
+- Fixed the PDF export missing newer dashboard analysis sections that were already visible on screen.

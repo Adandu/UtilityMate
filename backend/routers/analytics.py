@@ -274,6 +274,7 @@ def build_dashboard_payload(
     ]
 
     overall_monthly: Dict[str, Dict[str, float]] = defaultdict(lambda: {"cost": 0.0, "consumption": 0.0})
+    avizier_monthly: Dict[str, Dict[str, float]] = defaultdict(lambda: {"cost": 0.0, "consumption": 0.0})
     category_monthly: Dict[int, Dict[str, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
     category_meta: Dict[int, Tuple[str, str]] = {}
 
@@ -293,6 +294,7 @@ def build_dashboard_payload(
             overall_monthly[bucket]["cost"] += line.amount
             if line.include_in_unit_cost:
                 overall_monthly[bucket]["consumption"] += line.consumption_value or 0.0
+        avizier_monthly[bucket]["cost"] += line.amount
         if line.include_in_category_analytics and line.category:
             category = line.category
             category_meta[category.id] = (category.name, category.unit)
@@ -313,6 +315,21 @@ def build_dashboard_payload(
         month_labels,
         overall_previous_year_lookup,
         overall_forecast_lookup,
+    )
+    avizier_history_points = [
+        type("SyntheticInvoice", (), {
+            "invoice_date": line.statement.statement_month,
+            "amount": line.amount,
+        })()
+        for line in selected_statement_lines
+        if line.statement
+    ]
+    avizier_previous_year_lookup, avizier_forecast_lookup = build_history_lookups(avizier_history_points)
+    avizier_cost_series = build_monthly_series(
+        avizier_monthly,
+        month_labels,
+        avizier_previous_year_lookup,
+        avizier_forecast_lookup,
     )
 
     comparison_rollups: Dict[int, Dict[int, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
@@ -416,6 +433,7 @@ def build_dashboard_payload(
         start_date=resolved_start,
         end_date=resolved_end,
         overall_cost_series=overall_cost_series,
+        avizier_cost_series=avizier_cost_series,
         category_sections=category_sections,
     )
 
@@ -520,6 +538,33 @@ def build_dashboard_pdf(
     ]))
     story.extend([summary_table, Spacer(1, 6 * mm)])
 
+    category_breakdown_rows = [["Utility", "Cost", "Share"]]
+    total_cost = dashboard.summary.total_cost or 0.0
+    for section in sorted(dashboard.category_sections, key=lambda item: item.total_cost, reverse=True):
+        share = (section.total_cost / total_cost * 100) if total_cost > 0 else 0.0
+        category_breakdown_rows.append([
+            section.category_name,
+            f"{section.total_cost:.2f} RON",
+            f"{share:.1f}%",
+        ])
+    if len(category_breakdown_rows) == 1:
+        category_breakdown_rows.append(["No category data", "0.00 RON", "0.0%"])
+
+    story.append(Paragraph("Cost Breakdown by Utility", styles["UtilityMateSubheading"]))
+    story.append(Spacer(1, 2 * mm))
+    category_breakdown_table = Table(category_breakdown_rows, colWidths=[80 * mm, 45 * mm, 35 * mm])
+    category_breakdown_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.extend([category_breakdown_table, Spacer(1, 6 * mm)])
+
     overall_labels = [point.label for point in dashboard.overall_cost_series]
     overall_cost_chart = render_chart_image(
         "Monthly Cost Trend",
@@ -589,6 +634,43 @@ def build_dashboard_pdf(
             height=68 * mm,
         ))
         story.append(Spacer(1, 6 * mm))
+
+    avizier_labels = [point.label for point in dashboard.avizier_cost_series]
+    avizier_table_rows = [["Month", "Avizier Cost"]]
+    for point in dashboard.avizier_cost_series:
+        avizier_table_rows.append([point.label, f"{point.cost:.2f} RON"])
+    if len(avizier_table_rows) == 1:
+        avizier_table_rows.append(["No avizier data", "0.00 RON"])
+
+    story.append(Paragraph("Avizier Cost per Month", styles["UtilityMateSubheading"]))
+    story.append(Spacer(1, 2 * mm))
+    story.append(Image(
+        render_chart_image(
+            "Avizier Cost per Month",
+            avizier_labels,
+            [
+                ("Cost", [point.cost for point in dashboard.avizier_cost_series], "#7c3aed"),
+                ("Last Year", [point.last_year_cost for point in dashboard.avizier_cost_series], "#0f766e"),
+                ("Average Over the Years", [point.forecast_cost for point in dashboard.avizier_cost_series], "#f97316"),
+            ],
+            "RON",
+        ),
+        width=180 * mm,
+        height=68 * mm,
+    ))
+    story.append(Spacer(1, 2 * mm))
+    avizier_table = Table(avizier_table_rows, colWidths=[80 * mm, 80 * mm])
+    avizier_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.extend([avizier_table, Spacer(1, 6 * mm)])
 
     document.build(story)
     buffer.seek(0)

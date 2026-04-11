@@ -67,6 +67,7 @@ interface DashboardResponse {
   start_date: string;
   end_date: string;
   overall_cost_series: DashboardSeriesPoint[];
+  avizier_cost_series: DashboardSeriesPoint[];
   category_sections: DashboardCategorySection[];
 }
 
@@ -529,6 +530,50 @@ const Dashboard: React.FC = () => {
             </div>
           </details>
         ))}
+      </section>
+
+      <section className="mt-8 rounded-3xl border border-outline-variant bg-surface-container-low p-6">
+        <div className="mb-4">
+          <h3 className="font-headline text-2xl font-black">Avizier Cost per Month</h3>
+          <p className="text-sm opacity-70">Monthly total cost from association statements for the active location and period filter.</p>
+        </div>
+        <div className="mb-6 h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={report.avizier_cost_series}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
+              <XAxis dataKey="label" axisLine={false} tickLine={false} />
+              <YAxis axisLine={false} tickLine={false} />
+              <Legend wrapperStyle={legendStyle} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} itemSorter={historyItemSorter} />
+              <Line type="monotone" dataKey="cost" stroke="#7c3aed" strokeWidth={3} dot={{ r: 3 }} name="Cost" />
+              <Line type="monotone" dataKey="last_year_cost" stroke="#0f766e" strokeWidth={3} connectNulls dot={false} name="Last Year" />
+              <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={3} strokeDasharray="8 6" connectNulls dot={false} name="Average Over the Years" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="overflow-x-auto rounded-2xl border border-outline-variant bg-white/70 dark:bg-slate-900/40">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-surface-container">
+              <tr>
+                <th className="px-4 py-3 font-black">Month</th>
+                <th className="px-4 py-3 font-black">Avizier Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.avizier_cost_series.map((point) => (
+                <tr key={point.label} className="border-t border-outline-variant">
+                  <td className="px-4 py-3 font-semibold">{point.label}</td>
+                  <td className="px-4 py-3">{formatMoney(point.cost)}</td>
+                </tr>
+              ))}
+              {report.avizier_cost_series.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 opacity-70" colSpan={2}>No avizier data is available for the selected period.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
