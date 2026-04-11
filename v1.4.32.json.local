@@ -1,0 +1,3 @@
+{
+  "body": "## New Features\n- Added a dedicated `Previous Avg / Month` dashboard widget so the top summary row now shows both total and average views for the current and previous periods.\n\n## Improvements\n- Renamed the top summary widgets to clearer labels such as `Total Spend`, `Current Avg / Month`, `Previous Period Spend`, and `Utility Categories`.\n\n## Bug Fixes\n- Fixed the dashboard summary row making it hard to tell which cards described the current filter and which cards described the previous comparison period."
+}

@@ -1,13 +1,13 @@
-# UtilityMate v1.4.31
+# UtilityMate v1.4.32
 
 ## New Features
 
-- Aligned the main `Monthly Cost Trend` graph palette with the `History Comparison` graphs so the same comparison types use the same colors across the dashboard.
+- Added a dedicated `Previous Avg / Month` dashboard widget so the top summary row now shows both total and average views for the current and previous periods.
 
 ## Improvements
 
-- Dashboard color semantics are now more consistent: current value uses purple, last year uses green, and average over the years uses orange in both the overall and per-category history views.
+- Renamed the top summary widgets to clearer labels such as `Total Spend`, `Current Avg / Month`, `Previous Period Spend`, and `Utility Categories`.
 
 ## Bug Fixes
 
-- Fixed the top-level monthly trend graph using a different color mapping than the category history charts, which made cross-chart comparison harder to follow.
+- Fixed the dashboard summary row making it hard to tell which cards described the current filter and which cards described the previous comparison period.

@@ -214,11 +214,15 @@ const Dashboard: React.FC = () => {
   }
 
   const TrendIcon = trendDirection.icon;
+  const previousPeriodAverage = report.summary.months_covered > 0
+    ? report.summary.previous_period_cost / report.summary.months_covered
+    : 0;
   const summaryCards = [
-    { label: 'Period Spend', value: formatMoney(report.summary.total_cost), icon: BarChart3, tone: 'text-emerald-600' },
-    { label: 'Average / Month', value: formatMoney(report.summary.avg_monthly_cost), icon: Sparkles, tone: 'text-blue-600' },
-    { label: 'Previous Period', value: formatMoney(report.summary.previous_period_cost), icon: TrendingUp, tone: 'text-amber-600' },
-    { label: 'Tracked Categories', value: String(report.summary.active_categories), icon: MapPinned, tone: 'text-rose-600' },
+    { label: 'Total Spend', value: formatMoney(report.summary.total_cost), icon: BarChart3, tone: 'text-emerald-600' },
+    { label: 'Current Avg / Month', value: formatMoney(report.summary.avg_monthly_cost), icon: Sparkles, tone: 'text-blue-600' },
+    { label: 'Previous Period Spend', value: formatMoney(report.summary.previous_period_cost), icon: TrendingUp, tone: 'text-amber-600' },
+    { label: 'Previous Avg / Month', value: formatMoney(previousPeriodAverage), icon: TrendingDown, tone: 'text-violet-600' },
+    { label: 'Utility Categories', value: String(report.summary.active_categories), icon: MapPinned, tone: 'text-rose-600' },
   ];
 
   return (
@@ -270,7 +274,7 @@ const Dashboard: React.FC = () => {
         )}
       </header>
 
-      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-5">
         {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
