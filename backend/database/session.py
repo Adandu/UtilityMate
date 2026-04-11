@@ -635,5 +635,13 @@ def verify_and_migrate_db():
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statement_lines_user_id ON association_statement_lines (user_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statement_lines_location_id ON association_statement_lines (location_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statement_lines_category_id ON association_statement_lines (category_id)"))
+
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if "rent_month_tenants" in tables:
+            columns = [c["name"] for c in inspector.get_columns("rent_month_tenants")]
+            if "other_adjustment_note" not in columns:
+                logger.info("Migration: Adding other_adjustment_note to rent_month_tenants")
+                conn.execute(text("ALTER TABLE rent_month_tenants ADD COLUMN other_adjustment_note TEXT"))
     
     logger.info("Database schema verification and migration complete.")

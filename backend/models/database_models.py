@@ -258,6 +258,7 @@ class RentMonthTenant(Base):
     pays_utilities = Column(Boolean, default=True)
     rent_amount = Column(Float, default=0.0)
     other_adjustment = Column(Float, default=0.0)
+    other_adjustment_note = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     rent_month = relationship("RentMonth", back_populates="tenant_configs")

@@ -1,13 +1,13 @@
-# UtilityMate v1.6.2
+# UtilityMate v1.6.3
 
 ## New Features
 
-- Added a tenant-facing Rent PDF export so each month can be downloaded as a clean proof-of-payment statement with per-person breakdowns and total amounts due.
+- Added per-tenant adjustment notes in Rent so custom credits and debits can carry their explanation through to the monthly statement and exported PDF.
 
 ## Improvements
 
-- Rent statement exports now fit into a shareable one-page PDF layout with summary totals, source breakdowns, and a clear section for what each person owes.
+- Rent adjustment entry is now cleaner, with simpler wording in the UI and optional notes stored alongside each manual adjustment.
 
 ## Bug Fixes
 
-- Fixed the missing rent export flow so month statements can be generated directly from the Rent section instead of relying on screenshots or manual copy-paste.
+- Fixed Rent statement exports so manual adjustment context is no longer lost when sharing the monthly PDF with tenants.

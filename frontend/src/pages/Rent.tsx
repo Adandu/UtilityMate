@@ -40,6 +40,7 @@ interface RentTenantMonthConfig {
   pays_utilities: boolean;
   rent_amount: number;
   other_adjustment: number;
+  other_adjustment_note?: string | null;
 }
 interface RentRoomUsage { room_id: number; room_name: string; usage_value: number; }
 interface RentPayment {
@@ -61,6 +62,7 @@ interface RentTenantStatement {
   heating_amount: number;
   utilities_amount: number;
   other_adjustment: number;
+  other_adjustment_note?: string | null;
   previous_balance: number;
   payments_in_month: number;
   amount_due: number;
@@ -271,15 +273,16 @@ const Rent: React.FC = () => {
       const response = await api.put<RentMonthStatement>(`/rent/leases/${selectedLeaseId}/month`, {
         month: monthInputToApi(selectedMonth),
         notes: noteDraft,
-        tenant_configs: draftConfigs.map((config) => ({
-          tenant_id: config.tenant_id,
-          room_id: config.room_id,
-          is_active: config.is_active,
-          pays_rent: config.pays_rent,
-          pays_utilities: config.pays_utilities,
-          rent_amount: Number(config.rent_amount || 0),
-          other_adjustment: Number(config.other_adjustment || 0),
-        })),
+          tenant_configs: draftConfigs.map((config) => ({
+            tenant_id: config.tenant_id,
+            room_id: config.room_id,
+            is_active: config.is_active,
+            pays_rent: config.pays_rent,
+            pays_utilities: config.pays_utilities,
+            rent_amount: Number(config.rent_amount || 0),
+            other_adjustment: Number(config.other_adjustment || 0),
+            other_adjustment_note: config.other_adjustment_note || null,
+          })),
         room_usages: draftRoomUsages.map((usage) => ({
           room_id: usage.room_id,
           usage_value: Number(usage.usage_value || 0),
@@ -546,19 +549,31 @@ const Rent: React.FC = () => {
 
                       <div className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
                         <h4 className="mb-4 font-headline text-lg font-black">Other Adjustments</h4>
-                        <p className="mb-4 text-sm opacity-65">Use this like column <span className="font-black">E</span> in your worksheet. Positive values add to that tenant’s total, negative values reduce it.</p>
+                        <p className="mb-4 text-sm opacity-65">Positive values add to that tenant’s total, negative values reduce it. Notes will also be included in the PDF export.</p>
                         <div className="space-y-3">
                           {draftConfigs.map((config) => (
-                            <label key={config.tenant_id} className="flex items-center justify-between gap-4">
-                              <span className="font-bold">{config.tenant_name}</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={config.other_adjustment}
-                                onChange={(e) => updateDraftConfig(config.tenant_id, 'other_adjustment', Number(e.target.value || 0))}
-                                className="w-32 rounded-lg border border-outline-variant bg-surface-container px-3 py-2"
-                              />
-                            </label>
+                            <div key={config.tenant_id} className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_140px]">
+                              <div className="space-y-2">
+                                <span className="font-bold">{config.tenant_name}</span>
+                                <input
+                                  type="text"
+                                  value={config.other_adjustment_note || ''}
+                                  onChange={(e) => updateDraftConfig(config.tenant_id, 'other_adjustment_note', e.target.value)}
+                                  placeholder="Optional adjustment note"
+                                  className="w-full rounded-lg border border-outline-variant bg-surface-container px-3 py-2"
+                                />
+                              </div>
+                              <label className="space-y-2">
+                                <span className="block text-sm font-bold opacity-70">Amount</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={config.other_adjustment}
+                                  onChange={(e) => updateDraftConfig(config.tenant_id, 'other_adjustment', Number(e.target.value || 0))}
+                                  className="w-full rounded-lg border border-outline-variant bg-surface-container px-3 py-2"
+                                />
+                              </label>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -595,7 +610,10 @@ const Rent: React.FC = () => {
                               <td className="px-3 py-2">{formatMoney(row.electricity_amount)}</td>
                               <td className="px-3 py-2">{formatMoney(row.shared_utilities_amount)}</td>
                               <td className="px-3 py-2">{formatMoney(row.heating_amount)}</td>
-                              <td className="px-3 py-2">{formatMoney(row.other_adjustment)}</td>
+                              <td className="px-3 py-2">
+                                <div>{formatMoney(row.other_adjustment)}</div>
+                                {row.other_adjustment_note && <div className="mt-1 text-xs opacity-65">{row.other_adjustment_note}</div>}
+                              </td>
                               <td className="px-3 py-2">{formatMoney(row.previous_balance)}</td>
                               <td className="px-3 py-2">{formatMoney(row.payments_in_month)}</td>
                               <td className="px-3 py-2 font-black">{formatMoney(row.amount_due)}</td>

@@ -153,6 +153,7 @@ def _get_or_build_month(
                 pays_utilities=config.pays_utilities if config else tenant.pays_utilities_default,
                 rent_amount=float(config.rent_amount if config else tenant.default_rent_amount or 0.0),
                 other_adjustment=float(config.other_adjustment if config else 0.0),
+                other_adjustment_note=config.other_adjustment_note if config else None,
             )
         )
 
@@ -342,6 +343,7 @@ def _build_statement(
                 heating_amount=float(heating_amount),
                 utilities_amount=float(utilities_amount),
                 other_adjustment=float(config.other_adjustment),
+                other_adjustment_note=config.other_adjustment_note,
                 current_total=float(current_total),
                 previous_balance=float(previous_balance),
                 payments_in_month=float(payments_in_month),
@@ -500,6 +502,7 @@ def _build_rent_statement_pdf(
             ["Shared Utilities", f"{tenant.shared_utilities_amount:.2f} RON"],
             ["Heating", f"{tenant.heating_amount:.2f} RON"],
             ["Other Adjustments", f"{tenant.other_adjustment:.2f} RON"],
+            ["Adjustment Note", tenant.other_adjustment_note or "-"],
             ["Previous Balance", f"{tenant.previous_balance:.2f} RON"],
             ["Payments This Month", f"-{tenant.payments_in_month:.2f} RON"],
             ["Amount Due", f"{tenant.amount_due:.2f} RON"],
@@ -823,6 +826,7 @@ def upsert_rent_month(
             pays_utilities=config.pays_utilities,
             rent_amount=config.rent_amount,
             other_adjustment=config.other_adjustment,
+            other_adjustment_note=config.other_adjustment_note,
         ))
 
     for usage in payload.room_usages:

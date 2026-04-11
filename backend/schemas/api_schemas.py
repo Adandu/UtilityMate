@@ -602,6 +602,7 @@ class RentMonthTenantConfigInput(BaseModel):
     pays_utilities: bool = True
     rent_amount: float = 0.0
     other_adjustment: float = 0.0
+    other_adjustment_note: Optional[str] = None
 
 
 class RentRoomUsageInput(BaseModel):
@@ -648,6 +649,7 @@ class RentTenantMonthConfig(BaseModel):
     pays_utilities: bool
     rent_amount: float
     other_adjustment: float
+    other_adjustment_note: Optional[str] = None
 
 
 class RentRoomUsage(BaseModel):
@@ -676,6 +678,7 @@ class RentTenantStatement(BaseModel):
     heating_amount: float
     utilities_amount: float
     other_adjustment: float
+    other_adjustment_note: Optional[str] = None
     current_total: float
     previous_balance: float
     payments_in_month: float
