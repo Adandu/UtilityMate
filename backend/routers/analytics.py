@@ -201,6 +201,7 @@ def build_statement_total_rows(
         if key not in grouped:
             grouped[key] = {
                 "invoice_date": line.statement.statement_month,
+                "location_id": line.location_id,
                 "summary_amount": None,
                 "detail_amount": 0.0,
             }
@@ -216,6 +217,7 @@ def build_statement_total_rows(
             amount = row["detail_amount"]
         synthetic_rows.append(type("SyntheticInvoice", (), {
             "invoice_date": row["invoice_date"],
+            "location_id": row["location_id"],
             "amount": amount or 0.0,
         })())
     return synthetic_rows
@@ -304,6 +306,7 @@ def build_dashboard_payload(
         line for line in all_statement_lines
         if line.statement and resolved_start <= line.statement.statement_month <= resolved_end
     ]
+    comparison_statement_totals = build_statement_total_rows(comparison_statement_lines)
 
     overall_monthly: Dict[str, Dict[str, float]] = defaultdict(lambda: {"cost": 0.0, "consumption": 0.0})
     avizier_monthly: Dict[str, Dict[str, float]] = defaultdict(lambda: {"cost": 0.0, "consumption": 0.0})
@@ -352,11 +355,15 @@ def build_dashboard_payload(
     )
 
     comparison_rollups: Dict[int, Dict[int, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
+    avizier_comparison_rollups: Dict[int, float] = defaultdict(float)
     for invoice in comparison_invoices:
         if invoice.provider and invoice.provider.category:
             category_id = invoice.provider.category.id
             comparison_rollups[category_id][invoice.location_id]["cost"] += invoice.amount
             comparison_rollups[category_id][invoice.location_id]["consumption"] += invoice.consumption_value or 0.0
+
+    for item in comparison_statement_totals:
+        avizier_comparison_rollups[item.location_id] += item.amount
 
     for line in comparison_statement_lines:
         if line.include_in_category_analytics and line.category:
@@ -424,6 +431,17 @@ def build_dashboard_payload(
             location_comparison=location_comparison,
         ))
 
+    avizier_location_comparison = [
+        api_schemas.LocationComparisonPoint(
+            location_id=location.id,
+            location_name=location.name,
+            cost=round(avizier_comparison_rollups[location.id], 2),
+            consumption=0.0,
+            unit_cost=None,
+        )
+        for location in locations
+    ]
+
     total_cost = sum(invoice.amount for invoice in filtered_invoices) + sum(item.amount for item in filtered_statement_totals)
     previous_period_cost = compute_previous_period_cost(overall_history_invoices, resolved_start, resolved_end)
     if previous_period_cost > 0:
@@ -451,6 +469,7 @@ def build_dashboard_payload(
         end_date=resolved_end,
         overall_cost_series=overall_cost_series,
         avizier_cost_series=avizier_cost_series,
+        avizier_location_comparison=avizier_location_comparison,
         category_sections=category_sections,
     )
 
@@ -687,7 +706,26 @@ def build_dashboard_pdf(
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
     ]))
-    story.extend([avizier_table, Spacer(1, 6 * mm)])
+    story.extend([avizier_table, Spacer(1, 4 * mm)])
+    story.append(Image(
+        render_bar_chart_image(
+            "Compare Locations for Avizier",
+            [point.location_name for point in dashboard.avizier_location_comparison],
+            [point.cost for point in dashboard.avizier_location_comparison],
+            "#0f766e",
+            "RON",
+        ),
+        width=180 * mm,
+        height=68 * mm,
+    ))
+    story.extend([
+        Spacer(1, 2 * mm),
+        Paragraph(
+            "The avizier comparison uses the current period filter across all locations and compares the apartment statement totals side by side.",
+            styles["UtilityMateBody"],
+        ),
+        Spacer(1, 6 * mm),
+    ])
 
     document.build(story)
     buffer.seek(0)

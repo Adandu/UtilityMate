@@ -1,13 +1,13 @@
-# UtilityMate v1.4.36
+# UtilityMate v1.4.37
 
 ## New Features
 
-- Added avizier apartment total repair support so dashboard totals can be rebuilt from each statement row's printed monthly total.
+- Added a new `Compare Locations for Avizier` chart to the dashboard and PDF export so avizier totals can be benchmarked across locations with the active period filter.
 
 ## Improvements
 
-- Dashboard avizier monthly totals and top-level spend summaries now prefer the statement row total instead of rebuilding that figure from parsed detail lines.
+- The `Avizier Cost per Month` dashboard block is now collapsible and follows the same interaction pattern as the utility category sections.
 
 ## Bug Fixes
 
-- Fixed the `Avizier Cost per Month` graph undercounting statements like `Ap 15` February 2026 when detail-line parsing did not fully match the document layout.
+- Fixed the dashboard response shape so avizier comparison data is provided consistently to both the on-screen dashboard and the export path.

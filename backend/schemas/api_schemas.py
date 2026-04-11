@@ -429,6 +429,7 @@ class DashboardAnalyticsResponse(BaseModel):
     end_date: date
     overall_cost_series: List[DashboardSeriesPoint]
     avizier_cost_series: List[DashboardSeriesPoint]
+    avizier_location_comparison: List[LocationComparisonPoint]
     category_sections: List[DashboardCategorySection]
 
 
