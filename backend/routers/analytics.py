@@ -133,6 +133,7 @@ def build_summary(db: Session, current_user: database_models.User):
 def build_monthly_series(
     monthly_data: Dict[str, Dict[str, float]],
     month_labels: Iterable[date],
+    previous_year_lookup: Dict[Tuple[int, int], float],
     forecast_lookup: Dict[Tuple[int, int], float],
 ) -> List[api_schemas.DashboardSeriesPoint]:
     series: List[api_schemas.DashboardSeriesPoint] = []
@@ -141,37 +142,45 @@ def build_monthly_series(
         cost = monthly_data[key]["cost"]
         consumption = monthly_data[key]["consumption"]
         unit_cost = round(cost / consumption, 4) if consumption > 0 else None
+        previous_year_cost = previous_year_lookup.get((bucket.year, bucket.month))
         history = forecast_lookup.get((bucket.year, bucket.month))
+        last_year_cost = round(previous_year_cost, 2) if previous_year_cost is not None else None
         forecast_cost = round(history, 2) if history is not None else None
         series.append(api_schemas.DashboardSeriesPoint(
             label=key,
             cost=round(cost, 2),
             consumption=round(consumption, 3),
             unit_cost=unit_cost,
+            last_year_cost=last_year_cost,
             forecast_cost=forecast_cost,
         ))
     return series
 
 
-def build_forecast_lookup(invoices: List[database_models.Invoice]) -> Dict[Tuple[int, int], float]:
+def build_history_lookups(
+    invoices: List[database_models.Invoice],
+) -> Tuple[Dict[Tuple[int, int], float], Dict[Tuple[int, int], float]]:
     grouped_costs: Dict[int, Dict[int, List[float]]] = defaultdict(lambda: defaultdict(list))
     for invoice in invoices:
         grouped_costs[invoice.invoice_date.month][invoice.invoice_date.year].append(invoice.amount)
 
+    previous_year_lookup: Dict[Tuple[int, int], float] = {}
     forecast_lookup: Dict[Tuple[int, int], float] = {}
     years = sorted({invoice.invoice_date.year for invoice in invoices})
     months = sorted({invoice.invoice_date.month for invoice in invoices})
     for year in years:
         for month in months:
+            if grouped_costs[month].get(year - 1):
+                previous_year_lookup[(year, month)] = sum(grouped_costs[month][year - 1])
             history_years = [prior for prior in years if prior < year and grouped_costs[month].get(prior)]
             if not history_years:
                 continue
             history_values = [
-                sum(grouped_costs[month][prior]) / len(grouped_costs[month][prior])
+                sum(grouped_costs[month][prior])
                 for prior in history_years
             ]
             forecast_lookup[(year, month)] = sum(history_values) / len(history_values)
-    return forecast_lookup
+    return previous_year_lookup, forecast_lookup
 
 
 def compute_previous_period_cost(
@@ -290,8 +299,13 @@ def build_dashboard_payload(
                 "invoice_date": line.statement.statement_month,
                 "amount": line.amount,
             })())
-    overall_forecast_lookup = build_forecast_lookup(overall_history_invoices)
-    overall_cost_series = build_monthly_series(overall_monthly, month_labels, overall_forecast_lookup)
+    overall_previous_year_lookup, overall_forecast_lookup = build_history_lookups(overall_history_invoices)
+    overall_cost_series = build_monthly_series(
+        overall_monthly,
+        month_labels,
+        overall_previous_year_lookup,
+        overall_forecast_lookup,
+    )
 
     comparison_rollups: Dict[int, Dict[int, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
     for invoice in comparison_invoices:
@@ -323,8 +337,13 @@ def build_dashboard_payload(
             for line in selected_statement_lines
             if line.include_in_category_analytics and line.category and line.category.id == category_id and line.statement
         )
-        forecast_lookup = build_forecast_lookup(category_history_points)
-        monthly_series = build_monthly_series(monthly, month_labels, forecast_lookup)
+        previous_year_lookup, forecast_lookup = build_history_lookups(category_history_points)
+        monthly_series = build_monthly_series(
+            monthly,
+            month_labels,
+            previous_year_lookup,
+            forecast_lookup,
+        )
         total_cost = sum(point.cost for point in monthly_series)
         total_consumption = sum(point.consumption for point in monthly_series)
         avg_unit_cost = round(total_cost / total_consumption, 4) if total_consumption > 0 else None
@@ -493,6 +512,7 @@ def build_dashboard_pdf(
         overall_labels,
         [
             ("Cost", [point.cost for point in dashboard.overall_cost_series], "#0f766e"),
+            ("Last Year", [point.last_year_cost for point in dashboard.overall_cost_series], "#2563eb"),
             ("Historical Baseline", [point.forecast_cost for point in dashboard.overall_cost_series], "#f97316"),
         ],
         "RON",
@@ -516,10 +536,11 @@ def build_dashboard_pdf(
         labels = [point.label for point in section.monthly_series]
         story.append(Image(
             render_chart_image(
-                f"{section.category_name} Cost and Baseline",
+                f"{section.category_name} Cost, Last Year, and Historical Baseline",
                 labels,
                 [
                     ("Cost", [point.cost for point in section.monthly_series], "#2563eb"),
+                    ("Last Year", [point.last_year_cost for point in section.monthly_series], "#0f766e"),
                     ("Historical Baseline", [point.forecast_cost for point in section.monthly_series], "#f97316"),
                 ],
                 "RON",

@@ -35,6 +35,7 @@ interface DashboardSeriesPoint {
   cost: number;
   consumption: number;
   unit_cost?: number | null;
+  last_year_cost?: number | null;
   forecast_cost?: number | null;
 }
 
@@ -302,6 +303,7 @@ const Dashboard: React.FC = () => {
                 <YAxis axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
                 <Area type="monotone" dataKey="cost" stroke="#0f766e" fill="url(#overallSpendArea)" strokeWidth={3} name="Cost" />
+                <Line type="monotone" dataKey="last_year_cost" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls name="Last Year" />
                 <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={2} dot={false} name="Historical Baseline" />
               </ComposedChart>
             </ResponsiveContainer>
@@ -325,7 +327,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] opacity-50">Reading this chart</p>
-              <p className="mt-2 text-sm opacity-75">The orange line shows the historical baseline for the same calendar months from previous years when enough history exists.</p>
+              <p className="mt-2 text-sm opacity-75">The comparison lines show the same month last year and the longer-term historical average from all earlier years.</p>
             </div>
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] opacity-50">Active selection</p>
@@ -339,7 +341,7 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-headline text-2xl font-black">Utility Categories</h3>
-            <p className="text-sm opacity-70">Expand a category to inspect spend, consumption, cost per unit, historical baseline, and cross-location comparison for the selected period.</p>
+            <p className="text-sm opacity-70">Expand a category to inspect spend, consumption, cost per unit, same-month last year, historical average, and cross-location comparison for the selected period.</p>
           </div>
         </div>
 
@@ -416,7 +418,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div className="rounded-3xl border border-outline-variant bg-white/70 p-5 dark:bg-slate-900/40">
-                <h5 className="mb-4 font-black">Historical Baseline Forecast</h5>
+                <h5 className="mb-4 font-black">History Comparison</h5>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={section.monthly_series}>
@@ -424,7 +426,8 @@ const Dashboard: React.FC = () => {
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
-                      <Line type="monotone" dataKey="cost" stroke="#0f766e" strokeWidth={3} dot={{ r: 3 }} name="Cost" />
+                      <Line type="monotone" dataKey="cost" stroke="#7c3aed" strokeWidth={3} dot={{ r: 3 }} name="Current Value" />
+                      <Line type="monotone" dataKey="last_year_cost" stroke="#0f766e" strokeWidth={3} connectNulls dot={false} name="Last Year" />
                       <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={3} strokeDasharray="8 6" connectNulls dot={false} name="Historical Baseline" />
                     </LineChart>
                   </ResponsiveContainer>

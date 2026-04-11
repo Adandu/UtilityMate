@@ -1,13 +1,13 @@
-# UtilityMate v1.4.26
+# UtilityMate v1.4.27
 
 ## New Features
 
-- Tightened ENGIE invoice date extraction so dashboard gas trends use the actual invoice month even when PDFs include extra notification pages ahead of the bill.
+- Added a dedicated `Last Year` comparison line to dashboard history charts so each month can be compared against the same month from the immediately previous year.
 
 ## Improvements
 
-- Existing PDF repair logic can now correct affected ENGIE invoice dates on startup by reparsing the stored files with the more precise date matcher.
+- Historical comparison charts and PDF exports now distinguish between the current value, last year's value, and the broader historical average instead of collapsing all history into a single reference line.
 
 ## Bug Fixes
 
-- Fixed ENGIE invoices such as `2023-12-18 - ENGIE.pdf` being bucketed into the wrong month, which distorted dashboard gas history and baseline calculations.
+- Fixed dashboard historical-average calculations to use prior-year month totals consistently, which makes the comparison lines easier to reason about when there are multiple entries in the same month.

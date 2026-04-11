@@ -397,6 +397,7 @@ class DashboardSeriesPoint(BaseModel):
     cost: float
     consumption: float
     unit_cost: Optional[float] = None
+    last_year_cost: Optional[float] = None
     forecast_cost: Optional[float] = None
 
 

@@ -1,0 +1,3 @@
+{
+  "body": "## New Features\n- Added a dedicated `Last Year` comparison line to dashboard history charts so each month can be compared against the same month from the immediately previous year.\n\n## Improvements\n- Historical comparison charts and PDF exports now distinguish between the current value, last year's value, and the broader historical average instead of collapsing all history into a single reference line.\n\n## Bug Fixes\n- Fixed dashboard historical-average calculations to use prior-year month totals consistently, which makes the comparison lines easier to reason about when there are multiple entries in the same month."
+}
