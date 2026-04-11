@@ -81,6 +81,10 @@ def delete_provider(provider_id: int, db: Session = Depends(get_db), current_use
     invoices_count = db.query(database_models.Invoice).filter(database_models.Invoice.provider_id == provider_id).count()
     if invoices_count > 0:
         raise HTTPException(status_code=400, detail="Cannot delete provider: it has associated invoices. Please delete the invoices first.")
+
+    rent_leases_count = db.query(database_models.RentLease).filter(database_models.RentLease.electricity_provider_id == provider_id).count()
+    if rent_leases_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete provider: it is used by a rent workspace. Please delete the rent workspace first.")
         
     db.delete(db_provider)
     db.commit()

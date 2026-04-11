@@ -61,6 +61,10 @@ def delete_location(location_id: int, db: Session = Depends(get_db), current_use
     invoices_count = db.query(database_models.Invoice).filter(database_models.Invoice.location_id == location_id).count()
     if invoices_count > 0:
         raise HTTPException(status_code=400, detail="Cannot delete location: it has associated invoices. Please delete the invoices first.")
+
+    rent_leases_count = db.query(database_models.RentLease).filter(database_models.RentLease.location_id == location_id).count()
+    if rent_leases_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete location: it is used by a rent workspace. Please delete the rent workspace first.")
         
     db.delete(db_location)
     db.commit()

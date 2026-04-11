@@ -506,3 +506,207 @@ class AssociationStatementUploadResult(BaseModel):
     display_month: Optional[str] = None
     imported_locations: List[str] = []
     imported_lines: int = 0
+
+
+class RentRoomBase(BaseModel):
+    name: str
+    sort_order: int = 0
+
+
+class RentRoomCreate(RentRoomBase):
+    pass
+
+
+class RentRoomUpdate(BaseModel):
+    name: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class RentRoom(RentRoomBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RentTenantBase(BaseModel):
+    name: str
+    default_room_id: Optional[int] = None
+    sort_order: int = 0
+    is_active_default: bool = True
+    pays_rent_default: bool = True
+    pays_utilities_default: bool = True
+    default_rent_amount: float = 0.0
+
+
+class RentTenantCreate(RentTenantBase):
+    pass
+
+
+class RentTenantUpdate(BaseModel):
+    name: Optional[str] = None
+    default_room_id: Optional[int] = None
+    sort_order: Optional[int] = None
+    is_active_default: Optional[bool] = None
+    pays_rent_default: Optional[bool] = None
+    pays_utilities_default: Optional[bool] = None
+    default_rent_amount: Optional[float] = None
+
+
+class RentTenant(RentTenantBase):
+    id: int
+    created_at: datetime
+    default_room: Optional[RentRoom] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RentLeaseBase(BaseModel):
+    location_id: int
+    electricity_provider_id: Optional[int] = None
+    name: str
+    notes: Optional[str] = None
+    is_active: bool = True
+
+
+class RentLeaseCreate(RentLeaseBase):
+    pass
+
+
+class RentLeaseUpdate(BaseModel):
+    location_id: Optional[int] = None
+    electricity_provider_id: Optional[int] = None
+    name: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class RentLeaseSummary(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+    created_at: datetime
+    location: LocationSimple
+
+    class Config:
+        from_attributes = True
+
+
+class RentMonthTenantConfigInput(BaseModel):
+    tenant_id: int
+    room_id: Optional[int] = None
+    is_active: bool = True
+    pays_rent: bool = True
+    pays_utilities: bool = True
+    rent_amount: float = 0.0
+    other_adjustment: float = 0.0
+
+
+class RentRoomUsageInput(BaseModel):
+    room_id: int
+    usage_value: float = 0.0
+
+
+class RentMonthUpsert(BaseModel):
+    month: date
+    notes: Optional[str] = None
+    tenant_configs: List[RentMonthTenantConfigInput]
+    room_usages: List[RentRoomUsageInput] = []
+
+
+class RentPaymentCreate(BaseModel):
+    tenant_id: int
+    month: date
+    payment_date: date
+    amount: float
+    notes: Optional[str] = None
+
+
+class RentPayment(BaseModel):
+    id: int
+    tenant_id: int
+    month: date
+    payment_date: date
+    amount: float
+    notes: Optional[str] = None
+    created_at: datetime
+    tenant: Optional[RentTenant] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RentTenantMonthConfig(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    room_id: Optional[int] = None
+    room_name: Optional[str] = None
+    is_active: bool
+    pays_rent: bool
+    pays_utilities: bool
+    rent_amount: float
+    other_adjustment: float
+
+
+class RentRoomUsage(BaseModel):
+    room_id: int
+    room_name: str
+    usage_value: float
+
+
+class RentSourceSummary(BaseModel):
+    electricity_total: float
+    avizier_total: float
+    heating_total: float
+    non_heating_utilities_total: float
+
+
+class RentTenantStatement(BaseModel):
+    tenant_id: int
+    tenant_name: str
+    room_name: Optional[str] = None
+    is_active: bool
+    pays_rent: bool
+    pays_utilities: bool
+    rent_amount: float
+    electricity_amount: float
+    shared_utilities_amount: float
+    heating_amount: float
+    utilities_amount: float
+    other_adjustment: float
+    current_total: float
+    previous_balance: float
+    payments_in_month: float
+    amount_due: float
+
+
+class RentMonthStatement(BaseModel):
+    month: date
+    notes: Optional[str] = None
+    source_summary: RentSourceSummary
+    utility_payer_count: int
+    heating_allocation_mode: str
+    tenant_configs: List[RentTenantMonthConfig]
+    room_usages: List[RentRoomUsage]
+    payments: List[RentPayment]
+    tenant_statements: List[RentTenantStatement]
+    totals: dict[str, float]
+
+
+class RentLeaseDetail(BaseModel):
+    id: int
+    name: str
+    notes: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    location: LocationSimple
+    electricity_provider: Optional[ProviderSimple] = None
+    tenants: List[RentTenant] = []
+    rooms: List[RentRoom] = []
+    available_statement_months: List[date] = []
+    configured_months: List[date] = []
+
+    class Config:
+        from_attributes = True

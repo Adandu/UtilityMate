@@ -1,0 +1,3 @@
+{
+  "body": "## New Features\n- Added a separate Rent workspace with its own backend tables, API routes, and frontend page for tenant-by-tenant monthly charge allocation.\n\n## Improvements\n- Rent workspaces can combine manual rent amounts with live UtilityMate electricity invoices and avizier totals, while supporting room-based heating allocation and per-tenant payment tracking.\n\n## Bug Fixes\n- Added guardrails so locations and providers cannot be removed while an active rent workspace still depends on them."
+}

@@ -1,13 +1,13 @@
-# UtilityMate v1.5.4
+# UtilityMate v1.6.0
 
 ## New Features
 
-- Rebuilt the avizier month profiles across the September 2025 through February 2026 statement formats so each supported layout now uses a dedicated column map.
+- Added a separate Rent workspace with its own backend tables, API routes, and frontend page for tenant-by-tenant monthly charge allocation.
 
 ## Improvements
 
-- Association statement repair now rebuilds stored avizier line items from their source PDFs, so existing imports are refreshed when the parser improves.
+- Rent workspaces can combine manual rent amounts with live UtilityMate electricity invoices and avizier totals, while supporting room-based heating allocation and per-tenant payment tracking.
 
 ## Bug Fixes
 
-- Fixed the January 2026 avizier profile being one column short, which caused that month to misalign adjacent utility and fee fields.
+- Added guardrails so locations and providers cannot be removed while an active rent workspace still depends on them.

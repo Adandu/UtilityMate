@@ -7,6 +7,7 @@ import RawData from './pages/RawData';
 import Config from './pages/Config';
 import Operations from './pages/Operations';
 import About from './pages/About';
+import Rent from './pages/Rent';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -45,6 +46,7 @@ const App: React.FC = () => {
             <Route path="/invoices" element={isAuthenticated ? <Invoices /> : <Navigate to="/login" />} />
             <Route path="/data" element={isAuthenticated ? <RawData /> : <Navigate to="/login" />} />
             <Route path="/operations" element={isAuthenticated ? <Operations /> : <Navigate to="/login" />} />
+            <Route path="/rent" element={isAuthenticated ? <Rent /> : <Navigate to="/login" />} />
             <Route path="/config" element={isAuthenticated ? <Config /> : <Navigate to="/login" />} />
             <Route path="/about" element={isAuthenticated ? <About /> : <Navigate to="/login" />} />
           </Routes>
