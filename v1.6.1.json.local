@@ -1,0 +1,3 @@
+{
+  "body": "## New Features\n- Added a dedicated per-tenant Other Adjustments table in Rent, mirroring the spreadsheet-style manual debit and credit workflow with support for negative values.\n\n## Improvements\n- Rent now aligns avizier charges with the statement posting month, so February aviziers flow into March rent calculations the same way they do in the workbook.\n\n## Bug Fixes\n- Fixed rent month source mapping so avizier totals are no longer attached to the statement display month when the payment logic should use the posted month instead."
+}

@@ -1,13 +1,13 @@
-# UtilityMate v1.6.0
+# UtilityMate v1.6.1
 
 ## New Features
 
-- Added a separate Rent workspace with its own backend tables, API routes, and frontend page for tenant-by-tenant monthly charge allocation.
+- Added a dedicated per-tenant Other Adjustments table in Rent, mirroring the spreadsheet-style manual debit and credit workflow with support for negative values.
 
 ## Improvements
 
-- Rent workspaces can combine manual rent amounts with live UtilityMate electricity invoices and avizier totals, while supporting room-based heating allocation and per-tenant payment tracking.
+- Rent now aligns avizier charges with the statement posting month, so February aviziers flow into March rent calculations the same way they do in the workbook.
 
 ## Bug Fixes
 
-- Added guardrails so locations and providers cannot be removed while an active rent workspace still depends on them.
+- Fixed rent month source mapping so avizier totals are no longer attached to the statement display month when the payment logic should use the posted month instead.

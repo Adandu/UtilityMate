@@ -474,7 +474,6 @@ const Rent: React.FC = () => {
                             <th className="px-3 py-2">Pays Rent</th>
                             <th className="px-3 py-2">Pays Utilities</th>
                             <th className="px-3 py-2">Rent</th>
-                            <th className="px-3 py-2">Other</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -491,7 +490,6 @@ const Rent: React.FC = () => {
                               <td className="px-3 py-2"><input type="checkbox" checked={config.pays_rent} onChange={(e) => updateDraftConfig(config.tenant_id, 'pays_rent', e.target.checked)} /></td>
                               <td className="px-3 py-2"><input type="checkbox" checked={config.pays_utilities} onChange={(e) => updateDraftConfig(config.tenant_id, 'pays_utilities', e.target.checked)} /></td>
                               <td className="px-3 py-2"><input type="number" step="0.01" value={config.rent_amount} onChange={(e) => updateDraftConfig(config.tenant_id, 'rent_amount', Number(e.target.value || 0))} className="w-28 rounded-lg border border-outline-variant bg-surface-container px-2 py-2" /></td>
-                              <td className="px-3 py-2"><input type="number" step="0.01" value={config.other_adjustment} onChange={(e) => updateDraftConfig(config.tenant_id, 'other_adjustment', Number(e.target.value || 0))} className="w-28 rounded-lg border border-outline-variant bg-surface-container px-2 py-2" /></td>
                             </tr>
                           ))}
                         </tbody>
@@ -513,6 +511,25 @@ const Rent: React.FC = () => {
                       </div>
 
                       <div className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
+                        <h4 className="mb-4 font-headline text-lg font-black">Other Adjustments</h4>
+                        <p className="mb-4 text-sm opacity-65">Use this like column <span className="font-black">E</span> in your worksheet. Positive values add to that tenant’s total, negative values reduce it.</p>
+                        <div className="space-y-3">
+                          {draftConfigs.map((config) => (
+                            <label key={config.tenant_id} className="flex items-center justify-between gap-4">
+                              <span className="font-bold">{config.tenant_name}</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={config.other_adjustment}
+                                onChange={(e) => updateDraftConfig(config.tenant_id, 'other_adjustment', Number(e.target.value || 0))}
+                                className="w-32 rounded-lg border border-outline-variant bg-surface-container px-3 py-2"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40 xl:col-span-2">
                         <h4 className="mb-4 font-headline text-lg font-black">Month Notes</h4>
                         <textarea value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Optional notes for move-ins, credits, unusual bills, or custom split decisions." className="h-40 w-full rounded-xl border border-outline-variant bg-surface-container p-3" />
                       </div>

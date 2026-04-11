@@ -18,6 +18,15 @@ def _month_start(value: date) -> date:
     return date(value.year, value.month, 1)
 
 
+def _next_month(value: date) -> date:
+    return date(value.year + (1 if value.month == 12 else 0), 1 if value.month == 12 else value.month + 1, 1)
+
+
+def _statement_effective_month(statement: database_models.AssociationStatement) -> Optional[date]:
+    anchor = statement.posted_date or statement.statement_month
+    return _month_start(anchor) if anchor else None
+
+
 def _get_owned_lease(db: Session, user_id: int, lease_id: int):
     lease = db.query(database_models.RentLease).options(
         joinedload(database_models.RentLease.location),
@@ -60,15 +69,15 @@ def _validate_provider(db: Session, user_id: int, provider_id: Optional[int]):
 
 
 def _serialize_lease_detail(db: Session, lease: database_models.RentLease, user_id: int):
-    statement_months = set(
-        row[0]
-        for row in db.query(database_models.AssociationStatement.statement_month)
+    statement_months = {
+        _statement_effective_month(statement)
+        for statement in db.query(database_models.AssociationStatement)
         .join(database_models.AssociationStatementLine, database_models.AssociationStatementLine.statement_id == database_models.AssociationStatement.id)
         .filter(database_models.AssociationStatementLine.location_id == lease.location_id)
         .distinct()
         .all()
-        if row[0]
-    )
+    }
+    statement_months.discard(None)
 
     invoice_months_query = db.query(database_models.Invoice.invoice_date).filter(
         database_models.Invoice.location_id == lease.location_id
@@ -156,7 +165,7 @@ def _calculate_source_summary(db: Session, lease: database_models.RentLease, mon
     electricity_query = db.query(database_models.Invoice).filter(
         database_models.Invoice.location_id == lease.location_id,
         database_models.Invoice.invoice_date >= month_value,
-        database_models.Invoice.invoice_date < date(month_value.year + (1 if month_value.month == 12 else 0), 1 if month_value.month == 12 else month_value.month + 1, 1),
+        database_models.Invoice.invoice_date < _next_month(month_value),
     )
     if lease.electricity_provider_id:
         electricity_query = electricity_query.filter(database_models.Invoice.provider_id == lease.electricity_provider_id)
@@ -169,12 +178,17 @@ def _calculate_source_summary(db: Session, lease: database_models.RentLease, mon
 
     electricity_total = sum(float(invoice.amount or 0.0) for invoice in electricity_query.all())
 
-    statement_lines = db.query(database_models.AssociationStatementLine).join(
+    raw_statement_lines = db.query(database_models.AssociationStatementLine, database_models.AssociationStatement).join(
         database_models.AssociationStatement, database_models.AssociationStatement.id == database_models.AssociationStatementLine.statement_id
     ).filter(
-        database_models.AssociationStatement.statement_month == month_value,
         database_models.AssociationStatementLine.location_id == lease.location_id,
     ).all()
+
+    statement_lines = [
+        line
+        for line, statement in raw_statement_lines
+        if _statement_effective_month(statement) == month_value
+    ]
 
     avizier_total = sum(
         float(line.amount or 0.0)
