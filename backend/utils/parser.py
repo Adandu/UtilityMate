@@ -72,6 +72,39 @@ def _summary_segment(raw_label: str):
     return {"type": "summary", "raw_label": raw_label}
 
 
+def _dual_charge_segment(
+    left_raw_label: str,
+    left_category_name: str,
+    right_raw_label: str,
+    right_category_name: str,
+):
+    return {
+        "type": "dual_charge",
+        "items": [
+            {
+                "raw_label": left_raw_label,
+                "normalized_label": left_category_name,
+                "category_name": left_category_name,
+                "unit": None,
+                "line_kind": "utility",
+                "include_in_overall_analytics": True,
+                "include_in_category_analytics": True,
+                "include_in_unit_cost": False,
+            },
+            {
+                "raw_label": right_raw_label,
+                "normalized_label": right_category_name,
+                "category_name": right_category_name,
+                "unit": None,
+                "line_kind": "utility",
+                "include_in_overall_analytics": True,
+                "include_in_category_analytics": True,
+                "include_in_unit_cost": False,
+            },
+        ],
+    }
+
+
 AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
     "septembrie 2025": {
         "name": "blocmanagernet_2025_09",
@@ -102,12 +135,13 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _dual_charge_segment("Gaze naturale", "Gas", "Caldura", "Heating"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
             _charge_segment("Diverse"),
+            _charge_segment("Alte cheltuieli 1", include_in_category=False),
+            _charge_segment("Alte cheltuieli 2", include_in_category=False),
             _charge_segment("Cheltuieli administrative"),
             _charge_segment("Servicii curatenie"),
             _summary_segment("Total luna"),
@@ -125,12 +159,13 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _dual_charge_segment("Gaze naturale", "Gas", "Caldura", "Heating"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
             _charge_segment("Diverse"),
+            _charge_segment("Alte cheltuieli 1", include_in_category=False),
+            _charge_segment("Alte cheltuieli 2", include_in_category=False),
             _charge_segment("Cheltuieli administrative"),
             _charge_segment("Servicii curatenie"),
             _charge_segment("Citire repartitoare"),
@@ -149,12 +184,13 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _dual_charge_segment("Gaze naturale", "Gas", "Caldura", "Heating"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
             _charge_segment("Diverse"),
+            _charge_segment("Alte cheltuieli 1", include_in_category=False),
+            _charge_segment("Alte cheltuieli 2", include_in_category=False),
             _charge_segment("Citire repartitoare"),
             _charge_segment("Cheltuieli administrative"),
             _charge_segment("Servicii curatenie"),
@@ -173,12 +209,13 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _dual_charge_segment("Gaze naturale", "Gas", "Caldura", "Heating"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
             _charge_segment("Diverse"),
+            _charge_segment("Alte cheltuieli 1", include_in_category=False),
+            _charge_segment("Alte cheltuieli 2", include_in_category=False),
             _charge_segment("Cheltuieli administrative"),
             _charge_segment("Servicii curatenie"),
             _charge_segment("Citire repartitoare"),
@@ -196,12 +233,13 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _dual_charge_segment("Gaze naturale", "Gas", "Caldura", "Heating"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
             _charge_segment("Diverse"),
+            _charge_segment("Alte cheltuieli 1", include_in_category=False),
+            _charge_segment("Alte cheltuieli 2", include_in_category=False),
             _charge_segment("Cheltuieli administrative"),
             _charge_segment("Servicii curatenie"),
             _charge_segment("Mentenanta gaze"),
@@ -387,6 +425,8 @@ class InvoiceParser:
         for segment in profile["segments"]:
             if segment["type"] == "metered":
                 count += 2
+            elif segment["type"] == "dual_charge":
+                count += len(segment["items"])
             else:
                 count += 1
         return count
@@ -432,6 +472,26 @@ class InvoiceParser:
                     "include_in_category_analytics": segment["include_in_category_analytics"],
                     "include_in_unit_cost": segment["include_in_unit_cost"],
                 })
+                continue
+
+            if segment["type"] == "dual_charge":
+                for item in segment["items"]:
+                    value = InvoiceParser._safe_parse(values[cursor])
+                    cursor += 1
+                    if abs(value) < 0.001:
+                        continue
+                    line_items.append({
+                        "raw_label": item["raw_label"],
+                        "normalized_label": item["normalized_label"],
+                        "category_name": item["category_name"],
+                        "line_kind": item["line_kind"],
+                        "amount": value,
+                        "consumption_value": None,
+                        "unit": item["unit"],
+                        "include_in_overall_analytics": item["include_in_overall_analytics"],
+                        "include_in_category_analytics": item["include_in_category_analytics"],
+                        "include_in_unit_cost": item["include_in_unit_cost"],
+                    })
                 continue
 
             value = InvoiceParser._safe_parse(values[cursor])
