@@ -1,13 +1,13 @@
-# UtilityMate v1.4.25
+# UtilityMate v1.4.26
 
 ## New Features
 
-- Added an automatic repair pass for previously imported association-statement water lines so old avizier data is reclassified into the split water categories on startup.
+- Tightened ENGIE invoice date extraction so dashboard gas trends use the actual invoice month even when PDFs include extra notification pages ahead of the bill.
 
 ## Improvements
 
-- Existing avizier imports now align with the newer `Cold Water`, `Hot Water`, `Shared Water`, and `Storm Water` category model without requiring manual re-upload.
+- Existing PDF repair logic can now correct affected ENGIE invoice dates on startup by reparsing the stored files with the more precise date matcher.
 
 ## Bug Fixes
 
-- Fixed the dashboard continuing to show a single generic `Water` category for older imported avizier statements after the parser had already been updated to split water types.
+- Fixed ENGIE invoices such as `2023-12-18 - ENGIE.pdf` being bucketed into the wrong month, which distorted dashboard gas history and baseline calculations.

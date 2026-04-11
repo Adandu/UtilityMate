@@ -536,10 +536,20 @@ class InvoiceParser:
 
     @staticmethod
     def _parse_engie(text: str, result: Dict[str, Any]):
-        billing_match = re.search(r"(?:data\s+emiterii[:\s]+|data\s+facturii[:\s]+)?(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        billing_match = re.search(
+            r"seria\s+eng\s+nr\.\s*\d+.*?data\s+facturii:\s*(\d{2}\.\d{2}\.\d{4})",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if not billing_match:
+            billing_match = re.search(r"data\s+facturii:\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        if not billing_match:
+            billing_match = re.search(r"data\s+emiterii:\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
             result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
-        due_match = re.search(r"termen\s+de\s+plat[aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        due_match = re.search(r"data\s+scadent[ăa]\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        if not due_match:
+            due_match = re.search(r"termen\s+de\s+plat[aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if due_match:
             result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
 
