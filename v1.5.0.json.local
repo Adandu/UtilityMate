@@ -1,0 +1,3 @@
+{
+  "body": "## New Features\n- Refactored the dashboard into three main utility groups: `Energy` (Hidroelectrica invoices), `Gas` (Engie invoices), and `Avizier`, with nested avizier utility subsections such as `Energy`, `Gas`, `Cold Water`, and `Hot Water`.\n\n## Improvements\n- Cost breakdowns, supplier charts, avizier charts, and summary widgets now keep supplier invoice data separate from avizier costs so unit pricing remains faithful to the original invoices.\n\n## Bug Fixes\n- Fixed mixed `Energy` and `Gas` dashboard calculations where avizier costs could inflate supplier unit-cost metrics by adding cost without corresponding invoice consumption."
+}
