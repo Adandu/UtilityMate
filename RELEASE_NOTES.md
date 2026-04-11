@@ -1,13 +1,13 @@
-# UtilityMate v1.4.37
+# UtilityMate v1.4.38
 
 ## New Features
 
-- Added a new `Compare Locations for Avizier` chart to the dashboard and PDF export so avizier totals can be benchmarked across locations with the active period filter.
+- Added an `Average / Month` column to the `Cost Breakdown by Utility` table in both the dashboard and the PDF export.
 
 ## Improvements
 
-- The `Avizier Cost per Month` dashboard block is now collapsible and follows the same interaction pattern as the utility category sections.
+- The utility breakdown table now gives a quicker period-normalized read of each category without needing to calculate monthly averages mentally.
 
 ## Bug Fixes
 
-- Fixed the dashboard response shape so avizier comparison data is provided consistently to both the on-screen dashboard and the export path.
+- Fixed the dashboard and export tables drifting out of sync by keeping the same utility breakdown columns in both places.

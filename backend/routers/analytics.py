@@ -574,21 +574,23 @@ def build_dashboard_pdf(
     ]))
     story.extend([summary_table, Spacer(1, 6 * mm)])
 
-    category_breakdown_rows = [["Utility", "Cost", "Share"]]
+    category_breakdown_rows = [["Utility", "Cost", "Average / Month", "Share"]]
     total_cost = dashboard.summary.total_cost or 0.0
+    months_covered = max(1, dashboard.summary.months_covered)
     for section in sorted(dashboard.category_sections, key=lambda item: item.total_cost, reverse=True):
         share = (section.total_cost / total_cost * 100) if total_cost > 0 else 0.0
         category_breakdown_rows.append([
             section.category_name,
             f"{section.total_cost:.2f} RON",
+            f"{(section.total_cost / months_covered):.2f} RON",
             f"{share:.1f}%",
         ])
     if len(category_breakdown_rows) == 1:
-        category_breakdown_rows.append(["No category data", "0.00 RON", "0.0%"])
+        category_breakdown_rows.append(["No category data", "0.00 RON", "0.00 RON", "0.0%"])
 
     story.append(Paragraph("Cost Breakdown by Utility", styles["UtilityMateSubheading"]))
     story.append(Spacer(1, 2 * mm))
-    category_breakdown_table = Table(category_breakdown_rows, colWidths=[80 * mm, 45 * mm, 35 * mm])
+    category_breakdown_table = Table(category_breakdown_rows, colWidths=[65 * mm, 35 * mm, 40 * mm, 20 * mm])
     category_breakdown_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),

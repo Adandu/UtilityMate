@@ -316,23 +316,26 @@ const Dashboard: React.FC = () => {
               <tr>
                 <th className="px-4 py-3 font-black">Utility</th>
                 <th className="px-4 py-3 font-black">Cost</th>
+                <th className="px-4 py-3 font-black">Average / Month</th>
                 <th className="px-4 py-3 font-black">Share</th>
               </tr>
             </thead>
             <tbody>
               {categoryBreakdown.map((section) => {
                 const share = report.summary.total_cost > 0 ? (section.total_cost / report.summary.total_cost) * 100 : 0;
+                const averagePerMonth = report.summary.months_covered > 0 ? section.total_cost / report.summary.months_covered : 0;
                 return (
                   <tr key={section.category_id} className="border-t border-outline-variant">
                     <td className="px-4 py-3 font-semibold">{section.category_name}</td>
                     <td className="px-4 py-3">{formatMoney(section.total_cost)}</td>
+                    <td className="px-4 py-3">{formatMoney(averagePerMonth)}</td>
                     <td className="px-4 py-3">{share.toFixed(1)}%</td>
                   </tr>
                 );
               })}
               {categoryBreakdown.length === 0 && (
                 <tr>
-                  <td className="px-4 py-4 opacity-70" colSpan={3}>No category cost data is available for the selected period.</td>
+                  <td className="px-4 py-4 opacity-70" colSpan={4}>No category cost data is available for the selected period.</td>
                 </tr>
               )}
             </tbody>
