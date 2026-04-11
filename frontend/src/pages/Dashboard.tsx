@@ -8,6 +8,7 @@ import {
   ComposedChart,
   Line,
   LineChart,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -74,6 +75,12 @@ const tooltipStyle = {
   border: '1px solid var(--color-outline-variant)',
   borderRadius: '16px',
   color: 'var(--color-on-surface)',
+};
+
+const legendStyle = {
+  color: 'var(--color-on-surface)',
+  fontSize: 12,
+  fontWeight: 700,
 };
 
 const periodOptions = [
@@ -301,6 +308,7 @@ const Dashboard: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                 <XAxis dataKey="label" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
+                <Legend wrapperStyle={legendStyle} />
                 <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
                 <Area type="monotone" dataKey="cost" stroke="#0f766e" fill="url(#overallSpendArea)" strokeWidth={3} name="Cost" />
                 <Line type="monotone" dataKey="last_year_cost" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls name="Last Year" />
@@ -380,6 +388,7 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
+                      <Legend wrapperStyle={legendStyle} />
                       <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
                       <Area type="monotone" dataKey="cost" stroke="#2563eb" fill={`url(#costArea-${section.category_id})`} strokeWidth={3} name="Cost" />
                     </AreaChart>
@@ -395,6 +404,7 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
+                      <Legend wrapperStyle={legendStyle} />
                       <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={consumptionTooltipFormatter(section.unit)} />
                       <Bar dataKey="consumption" fill="#14b8a6" radius={[10, 10, 0, 0]} name="Consumption" />
                     </BarChart>
@@ -410,6 +420,7 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
+                      <Legend wrapperStyle={legendStyle} />
                       <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={unitCostTooltipFormatter(section.unit)} />
                       <Line type="monotone" dataKey="unit_cost" stroke="#7c3aed" strokeWidth={3} connectNulls dot={{ r: 3 }} name="Unit Cost" />
                     </LineChart>
@@ -425,6 +436,7 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
+                      <Legend wrapperStyle={legendStyle} />
                       <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
                       <Line type="monotone" dataKey="cost" stroke="#7c3aed" strokeWidth={3} dot={{ r: 3 }} name="Current Value" />
                       <Line type="monotone" dataKey="last_year_cost" stroke="#0f766e" strokeWidth={3} connectNulls dot={false} name="Last Year" />
@@ -442,6 +454,7 @@ const Dashboard: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
                       <XAxis dataKey="location_name" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
+                      <Legend wrapperStyle={legendStyle} />
                       <Tooltip
                         contentStyle={tooltipStyle}
                         labelStyle={{ color: 'var(--color-on-surface)' }}

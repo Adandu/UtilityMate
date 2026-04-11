@@ -1,13 +1,13 @@
-# UtilityMate v1.4.27
+# UtilityMate v1.4.28
 
 ## New Features
 
-- Added a dedicated `Last Year` comparison line to dashboard history charts so each month can be compared against the same month from the immediately previous year.
+- Added visible colored legends to the dashboard graphs so each chart shows its series names and colors without relying on hover.
 
 ## Improvements
 
-- Historical comparison charts and PDF exports now distinguish between the current value, last year's value, and the broader historical average instead of collapsing all history into a single reference line.
+- Dashboard chart legends now stay consistent with the line and bar colors used for cost, consumption, unit cost, last year, and historical baseline series.
 
 ## Bug Fixes
 
-- Fixed dashboard historical-average calculations to use prior-year month totals consistently, which makes the comparison lines easier to reason about when there are multiple entries in the same month.
+- Fixed the dashboard graphs being harder to interpret at a glance because series colors were visible only in the plotted lines and not labeled directly on the chart.
