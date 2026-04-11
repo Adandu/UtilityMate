@@ -168,6 +168,23 @@ async def upload_association_statements(
                 if not location:
                     continue
                 imported_locations.append(location.name)
+                apartment_total = apartment.get("monthly_total") or apartment.get("total_payable") or 0.0
+                db.add(database_models.AssociationStatementLine(
+                    statement_id=statement.id,
+                    user_id=current_user.id,
+                    location_id=location.id,
+                    category_id=None,
+                    raw_label="Total luna",
+                    normalized_label="Avizier Total",
+                    line_kind="statement_total",
+                    amount=apartment_total,
+                    consumption_value=None,
+                    unit=None,
+                    include_in_overall_analytics=False,
+                    include_in_category_analytics=False,
+                    include_in_unit_cost=False,
+                ))
+                imported_lines += 1
                 for line_item in apartment.get("line_items", []):
                     category = None
                     if line_item.get("category_name"):

@@ -110,21 +110,20 @@ def build_summary(db: Session, current_user: database_models.User):
         database_models.AssociationStatementLine.statement_id == database_models.AssociationStatement.id,
     ).filter(
         database_models.AssociationStatementLine.user_id == current_user.id,
-        database_models.AssociationStatementLine.include_in_overall_analytics == True,
     ).all()
+    statement_totals = build_statement_total_rows(statement_lines)
     alerts = db.query(database_models.Alert).filter(
         database_models.Alert.user_id == current_user.id,
         database_models.Alert.is_read == False,
     ).count()
     today = datetime.now(timezone.utc).date()
     overdue = [inv for inv in invoices if inv.status != "paid" and inv.due_date and inv.due_date < today]
-    total = sum(inv.amount for inv in invoices) + sum(line.amount for line in statement_lines)
+    total = sum(inv.amount for inv in invoices) + sum(item.amount for item in statement_totals)
     unpaid_total = sum(inv.amount for inv in invoices if inv.status != "paid")
     month_keys = {inv.invoice_date.strftime("%Y-%m") for inv in invoices}
     month_keys.update(
-        line.statement.statement_month.strftime("%Y-%m")
-        for line in statement_lines
-        if line.statement and line.statement.statement_month
+        item.invoice_date.strftime("%Y-%m")
+        for item in statement_totals
     )
     months = max(1, len(month_keys) if month_keys else 1)
     return api_schemas.AnalyticsSummary(
@@ -189,6 +188,37 @@ def build_history_lookups(
             ]
             forecast_lookup[(year, month)] = sum(history_values) / len(history_values)
     return previous_year_lookup, forecast_lookup
+
+
+def build_statement_total_rows(
+    lines: List[database_models.AssociationStatementLine],
+) -> List[database_models.Invoice]:
+    grouped: Dict[Tuple[int, int], Dict[str, Optional[float] | date]] = {}
+    for line in lines:
+        if not line.statement or not line.statement.statement_month:
+            continue
+        key = (line.statement_id, line.location_id)
+        if key not in grouped:
+            grouped[key] = {
+                "invoice_date": line.statement.statement_month,
+                "summary_amount": None,
+                "detail_amount": 0.0,
+            }
+        if line.line_kind == "statement_total":
+            grouped[key]["summary_amount"] = line.amount
+        elif line.include_in_overall_analytics:
+            grouped[key]["detail_amount"] = float(grouped[key]["detail_amount"] or 0.0) + line.amount
+
+    synthetic_rows: List[database_models.Invoice] = []
+    for row in grouped.values():
+        amount = row["summary_amount"]
+        if amount is None:
+            amount = row["detail_amount"]
+        synthetic_rows.append(type("SyntheticInvoice", (), {
+            "invoice_date": row["invoice_date"],
+            "amount": amount or 0.0,
+        })())
+    return synthetic_rows
 
 
 def compute_previous_period_cost(
@@ -264,6 +294,8 @@ def build_dashboard_payload(
         line for line in selected_statement_lines
         if line.statement and resolved_start <= line.statement.statement_month <= resolved_end
     ]
+    selected_statement_totals = build_statement_total_rows(selected_statement_lines)
+    filtered_statement_totals = build_statement_total_rows(filtered_statement_lines)
     comparison_invoices = [
         invoice for invoice in all_invoices
         if resolved_start <= invoice.invoice_date <= resolved_end
@@ -288,13 +320,13 @@ def build_dashboard_payload(
             category_monthly[category.id][bucket]["cost"] += invoice.amount
             category_monthly[category.id][bucket]["consumption"] += invoice.consumption_value or 0.0
 
+    for item in filtered_statement_totals:
+        bucket = item.invoice_date.strftime("%Y-%m")
+        overall_monthly[bucket]["cost"] += item.amount
+        avizier_monthly[bucket]["cost"] += item.amount
+
     for line in filtered_statement_lines:
         bucket = line.statement.statement_month.strftime("%Y-%m")
-        if line.include_in_overall_analytics:
-            overall_monthly[bucket]["cost"] += line.amount
-            if line.include_in_unit_cost:
-                overall_monthly[bucket]["consumption"] += line.consumption_value or 0.0
-        avizier_monthly[bucket]["cost"] += line.amount
         if line.include_in_category_analytics and line.category:
             category = line.category
             category_meta[category.id] = (category.name, category.unit)
@@ -303,12 +335,7 @@ def build_dashboard_payload(
                 category_monthly[category.id][bucket]["consumption"] += line.consumption_value or 0.0
 
     overall_history_invoices = list(selected_invoices)
-    for line in selected_statement_lines:
-        if line.include_in_overall_analytics and line.statement:
-            overall_history_invoices.append(type("SyntheticInvoice", (), {
-                "invoice_date": line.statement.statement_month,
-                "amount": line.amount,
-            })())
+    overall_history_invoices.extend(selected_statement_totals)
     overall_previous_year_lookup, overall_forecast_lookup = build_history_lookups(overall_history_invoices)
     overall_cost_series = build_monthly_series(
         overall_monthly,
@@ -316,15 +343,7 @@ def build_dashboard_payload(
         overall_previous_year_lookup,
         overall_forecast_lookup,
     )
-    avizier_history_points = [
-        type("SyntheticInvoice", (), {
-            "invoice_date": line.statement.statement_month,
-            "amount": line.amount,
-        })()
-        for line in selected_statement_lines
-        if line.statement
-    ]
-    avizier_previous_year_lookup, avizier_forecast_lookup = build_history_lookups(avizier_history_points)
+    avizier_previous_year_lookup, avizier_forecast_lookup = build_history_lookups(selected_statement_totals)
     avizier_cost_series = build_monthly_series(
         avizier_monthly,
         month_labels,
@@ -405,9 +424,7 @@ def build_dashboard_payload(
             location_comparison=location_comparison,
         ))
 
-    total_cost = sum(invoice.amount for invoice in filtered_invoices) + sum(
-        line.amount for line in filtered_statement_lines if line.include_in_overall_analytics
-    )
+    total_cost = sum(invoice.amount for invoice in filtered_invoices) + sum(item.amount for item in filtered_statement_totals)
     previous_period_cost = compute_previous_period_cost(overall_history_invoices, resolved_start, resolved_end)
     if previous_period_cost > 0:
         change_ratio = round((total_cost - previous_period_cost) / previous_period_cost, 4)

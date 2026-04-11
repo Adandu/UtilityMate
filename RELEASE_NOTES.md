@@ -1,13 +1,13 @@
-# UtilityMate v1.4.35
+# UtilityMate v1.4.36
 
 ## New Features
 
-- Added the utility cost breakdown table to the dashboard PDF export, and added a new final `Avizier Cost per Month` section to both the dashboard and the export.
+- Added avizier apartment total repair support so dashboard totals can be rebuilt from each statement row's printed monthly total.
 
 ## Improvements
 
-- Dashboard and exported reports now make association-statement costs easier to audit month by month alongside the regular utility breakdown.
+- Dashboard avizier monthly totals and top-level spend summaries now prefer the statement row total instead of rebuilding that figure from parsed detail lines.
 
 ## Bug Fixes
 
-- Fixed the PDF export missing newer dashboard analysis sections that were already visible on screen.
+- Fixed the `Avizier Cost per Month` graph undercounting statements like `Ap 15` February 2026 when detail-line parsing did not fully match the document layout.

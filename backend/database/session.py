@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import joinedload, sessionmaker
 import os
+import re
 from dotenv import load_dotenv
 from ..models.database_models import Base
 from ..utils.logging_config import logger
@@ -133,6 +134,13 @@ def _get_or_create_category(db, user_id: int, name: str, unit: str):
     return category
 
 
+def _normalize_location_token(name: str):
+    if not name:
+        return None
+    match = re.search(r"(\d+)", name)
+    return match.group(1) if match else None
+
+
 def repair_association_statement_water_categories():
     repaired_count = 0
     db = SessionLocal()
@@ -187,6 +195,117 @@ def repair_association_statement_water_categories():
     except Exception as exc:
         db.rollback()
         logger.warning("Association statement water repair pass failed: %s", exc)
+    finally:
+        db.close()
+
+
+def repair_association_statement_totals():
+    repaired_count = 0
+    db = SessionLocal()
+    try:
+        statements = db.query(database_models.AssociationStatement).options(
+            joinedload(database_models.AssociationStatement.lines),
+        ).all()
+        location_cache = {}
+
+        for statement in statements:
+            if statement.user_id not in location_cache:
+                locations = db.query(database_models.Location).filter(
+                    database_models.Location.user_id == statement.user_id,
+                ).all()
+                location_cache[statement.user_id] = {
+                    token: location
+                    for location in locations
+                    for token in [_normalize_location_token(location.name)]
+                    if token
+                }
+
+            pdf_path = resolve_invoice_pdf_path(statement.pdf_path)
+            if not pdf_path or not os.path.exists(pdf_path):
+                continue
+
+            pdf_text = InvoiceParser.get_pdf_text(pdf_path)
+            if not pdf_text:
+                continue
+
+            structured = InvoiceParser.parse_association_statement(pdf_text)
+            apartments = structured.get("apartments", [])
+            if not apartments:
+                continue
+
+            expected_totals = {}
+            location_by_token = location_cache[statement.user_id]
+            for apartment in apartments:
+                location = location_by_token.get(apartment.get("apartment_number"))
+                if not location:
+                    continue
+                expected_totals[location.id] = apartment.get("monthly_total") or apartment.get("total_payable") or 0.0
+
+            existing_summary_lines = {}
+            for line in statement.lines:
+                if line.line_kind == "statement_total" and line.normalized_label == "Avizier Total":
+                    existing_summary_lines.setdefault(line.location_id, []).append(line)
+
+            for location_id, total in expected_totals.items():
+                existing_lines = existing_summary_lines.get(location_id, [])
+                primary_line = existing_lines[0] if existing_lines else None
+
+                if primary_line is None:
+                    db.add(database_models.AssociationStatementLine(
+                        statement_id=statement.id,
+                        user_id=statement.user_id,
+                        location_id=location_id,
+                        category_id=None,
+                        raw_label="Total luna",
+                        normalized_label="Avizier Total",
+                        line_kind="statement_total",
+                        amount=total,
+                        consumption_value=None,
+                        unit=None,
+                        include_in_overall_analytics=False,
+                        include_in_category_analytics=False,
+                        include_in_unit_cost=False,
+                    ))
+                    repaired_count += 1
+                    continue
+
+                changed = False
+                if abs((primary_line.amount or 0.0) - total) > 0.01:
+                    primary_line.amount = total
+                    changed = True
+                if primary_line.raw_label != "Total luna":
+                    primary_line.raw_label = "Total luna"
+                    changed = True
+                if primary_line.normalized_label != "Avizier Total":
+                    primary_line.normalized_label = "Avizier Total"
+                    changed = True
+                if primary_line.line_kind != "statement_total":
+                    primary_line.line_kind = "statement_total"
+                    changed = True
+                if primary_line.include_in_overall_analytics:
+                    primary_line.include_in_overall_analytics = False
+                    changed = True
+                if primary_line.include_in_category_analytics:
+                    primary_line.include_in_category_analytics = False
+                    changed = True
+                if primary_line.include_in_unit_cost:
+                    primary_line.include_in_unit_cost = False
+                    changed = True
+                if changed:
+                    repaired_count += 1
+
+                for duplicate_line in existing_lines[1:]:
+                    db.delete(duplicate_line)
+                    repaired_count += 1
+
+        if repaired_count:
+            db.commit()
+            logger.info("Repaired avizier statement totals for %s apartment statement entries.", repaired_count)
+        else:
+            db.rollback()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Association statement total repair pass failed: %s", exc)
     finally:
         db.close()
 

@@ -1,0 +1,3 @@
+{
+  "body": "## New Features\n- Added avizier apartment total repair support so dashboard totals can be rebuilt from each statement row's printed monthly total.\n\n## Improvements\n- Dashboard avizier monthly totals and top-level spend summaries now prefer the statement row total instead of rebuilding that figure from parsed detail lines.\n\n## Bug Fixes\n- Fixed the `Avizier Cost per Month` graph undercounting statements like `Ap 15` February 2026 when detail-line parsing did not fully match the document layout."
+}
