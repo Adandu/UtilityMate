@@ -1,0 +1,5 @@
+{
+  "version": "1.6.7",
+  "title": "UtilityMate v1.6.7",
+  "body": "## New Features\n\n- Added a cleaner inline rename interaction for Rent workspaces with a pencil icon and in-place editing.\n\n## Improvements\n\n- Rent workspace names now edit more naturally and save on Enter or when the field loses focus.\n\n## Bug Fixes\n\n- Fixed the Rent rename UX so workspace names no longer require a permanent textbox and dedicated rename button.\n"
+}
