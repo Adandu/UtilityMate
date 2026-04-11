@@ -513,7 +513,7 @@ def build_dashboard_pdf(
         [
             ("Cost", [point.cost for point in dashboard.overall_cost_series], "#0f766e"),
             ("Last Year", [point.last_year_cost for point in dashboard.overall_cost_series], "#2563eb"),
-            ("Historical Baseline", [point.forecast_cost for point in dashboard.overall_cost_series], "#f97316"),
+            ("Average Over the Years", [point.forecast_cost for point in dashboard.overall_cost_series], "#f97316"),
         ],
         "RON",
     )
@@ -536,12 +536,12 @@ def build_dashboard_pdf(
         labels = [point.label for point in section.monthly_series]
         story.append(Image(
             render_chart_image(
-                f"{section.category_name} Cost, Last Year, and Historical Baseline",
+                f"{section.category_name} Cost, Last Year, and Average Over the Years",
                 labels,
                 [
                     ("Cost", [point.cost for point in section.monthly_series], "#2563eb"),
                     ("Last Year", [point.last_year_cost for point in section.monthly_series], "#0f766e"),
-                    ("Historical Baseline", [point.forecast_cost for point in section.monthly_series], "#f97316"),
+                    ("Average Over the Years", [point.forecast_cost for point in section.monthly_series], "#f97316"),
                 ],
                 "RON",
             ),

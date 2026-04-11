@@ -1,13 +1,13 @@
-# UtilityMate v1.4.28
+# UtilityMate v1.4.29
 
 ## New Features
 
-- Added visible colored legends to the dashboard graphs so each chart shows its series names and colors without relying on hover.
+- Renamed the historical comparison series label to `Average Over the Years` so the dashboard wording matches the meaning of the calculation more clearly.
 
 ## Improvements
 
-- Dashboard chart legends now stay consistent with the line and bar colors used for cost, consumption, unit cost, last year, and historical baseline series.
+- Dashboard and PDF export wording are now aligned for the three-way history comparison lines: current value, last year, and average over the years.
 
 ## Bug Fixes
 
-- Fixed the dashboard graphs being harder to interpret at a glance because series colors were visible only in the plotted lines and not labeled directly on the chart.
+- Fixed the older `Historical Baseline` label being misleading for users who expect the orange line to represent an average across prior years.
