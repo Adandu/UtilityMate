@@ -1,13 +1,13 @@
-# UtilityMate v1.5.0
+# UtilityMate v1.5.1
 
 ## New Features
 
-- Refactored the dashboard into three main utility groups: `Energy` (Hidroelectrica invoices), `Gas` (Engie invoices), and `Avizier`, with nested avizier utility subsections such as `Energy`, `Gas`, `Cold Water`, and `Hot Water`.
+- Added an avizier repair pass that reparses stored association statements and corrects imported gas and heating line amounts from their source PDFs.
 
 ## Improvements
 
-- Cost breakdowns, supplier charts, avizier charts, and summary widgets now keep supplier invoice data separate from avizier costs so unit pricing remains faithful to the original invoices.
+- Avizier gas and heating dashboard sections now follow the actual statement row cost values instead of using the wrong side of the quantity/cost pair.
 
 ## Bug Fixes
 
-- Fixed mixed `Energy` and `Gas` dashboard calculations where avizier costs could inflate supplier unit-cost metrics by adding cost without corresponding invoice consumption.
+- Fixed avizier heating and gas costs being underreported because the parser was storing the first value in each pair instead of the monetary cost value.

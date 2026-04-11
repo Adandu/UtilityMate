@@ -28,6 +28,7 @@ def _metered_segment(
     include_in_category: bool = True,
     include_in_unit_cost: bool = True,
     store_consumption: bool = True,
+    amount_position: str = "first",
 ):
     return {
         "type": "metered",
@@ -40,6 +41,7 @@ def _metered_segment(
         "include_in_category_analytics": include_in_category,
         "include_in_unit_cost": include_in_unit_cost,
         "store_consumption": store_consumption,
+        "amount_position": amount_position,
     }
 
 
@@ -100,8 +102,8 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
@@ -123,8 +125,8 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
@@ -147,8 +149,8 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
@@ -171,8 +173,8 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
@@ -194,8 +196,8 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False),
-            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False),
+            _metered_segment("Gaze naturale", "Gas", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
+            _metered_segment("Caldura", "Heating", "unit", include_in_unit_cost=False, store_consumption=False, amount_position="second"),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
             _charge_segment("Salarii asociatie"),
@@ -410,9 +412,12 @@ class InvoiceParser:
 
         for segment in profile["segments"]:
             if segment["type"] == "metered":
-                amount = InvoiceParser._safe_parse(values[cursor])
-                consumption = InvoiceParser._safe_parse(values[cursor + 1])
+                first_value = InvoiceParser._safe_parse(values[cursor])
+                second_value = InvoiceParser._safe_parse(values[cursor + 1])
                 cursor += 2
+                amount_position = segment.get("amount_position", "first")
+                amount = second_value if amount_position == "second" else first_value
+                consumption = first_value if amount_position == "second" else second_value
                 if abs(amount) < 0.001 and abs(consumption) < 0.001:
                     continue
                 line_items.append({

@@ -309,6 +309,75 @@ def repair_association_statement_totals():
     finally:
         db.close()
 
+
+def repair_association_statement_utility_cost_pairs():
+    repaired_count = 0
+    db = SessionLocal()
+    try:
+        statements = db.query(database_models.AssociationStatement).options(
+            joinedload(database_models.AssociationStatement.lines),
+        ).all()
+        location_cache = {}
+        target_labels = {"gaze naturale", "caldura"}
+
+        for statement in statements:
+            if statement.user_id not in location_cache:
+                locations = db.query(database_models.Location).filter(
+                    database_models.Location.user_id == statement.user_id,
+                ).all()
+                location_cache[statement.user_id] = {
+                    token: location
+                    for location in locations
+                    for token in [_normalize_location_token(location.name)]
+                    if token
+                }
+
+            pdf_path = resolve_invoice_pdf_path(statement.pdf_path)
+            if not pdf_path or not os.path.exists(pdf_path):
+                continue
+
+            pdf_text = InvoiceParser.get_pdf_text(pdf_path)
+            if not pdf_text:
+                continue
+
+            structured = InvoiceParser.parse_association_statement(pdf_text)
+            apartments = structured.get("apartments", [])
+            if not apartments:
+                continue
+
+            location_by_token = location_cache[statement.user_id]
+            expected_amounts = {}
+            for apartment in apartments:
+                location = location_by_token.get(apartment.get("apartment_number"))
+                if not location:
+                    continue
+                for item in apartment.get("line_items", []):
+                    raw_label = (item.get("raw_label") or "").strip().lower()
+                    if raw_label in target_labels:
+                        expected_amounts[(location.id, raw_label)] = item.get("amount", 0.0)
+
+            for line in statement.lines:
+                raw_label = (line.raw_label or "").strip().lower()
+                if raw_label not in target_labels:
+                    continue
+                expected_amount = expected_amounts.get((line.location_id, raw_label))
+                if expected_amount is None:
+                    continue
+                if abs((line.amount or 0.0) - expected_amount) > 0.01:
+                    line.amount = expected_amount
+                    repaired_count += 1
+
+        if repaired_count:
+            db.commit()
+            logger.info("Repaired gas/heating avizier amounts for %s association statement lines.", repaired_count)
+        else:
+            db.rollback()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Association statement gas/heating repair pass failed: %s", exc)
+    finally:
+        db.close()
+
 def verify_and_migrate_db():
     """
     Verifies the database schema and applies simple migrations if necessary.
