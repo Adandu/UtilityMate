@@ -104,6 +104,7 @@ const formatMoney = (value: number) => `${value.toFixed(2)} RON`;
 const Rent: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [savingMonth, setSavingMonth] = useState(false);
+  const [savingLeaseName, setSavingLeaseName] = useState(false);
   const [leases, setLeases] = useState<RentLeaseSummary[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [providers, setProviders] = useState<ProviderOption[]>([]);
@@ -115,6 +116,7 @@ const Rent: React.FC = () => {
   const [draftRoomUsages, setDraftRoomUsages] = useState<RentRoomUsage[]>([]);
   const [draftRoomEnergyUsages, setDraftRoomEnergyUsages] = useState<RentRoomEnergyUsage[]>([]);
   const [noteDraft, setNoteDraft] = useState('');
+  const [leaseNameDraft, setLeaseNameDraft] = useState('');
   const [exportingStatement, setExportingStatement] = useState(false);
 
   const [newLeaseName, setNewLeaseName] = useState('');
@@ -146,6 +148,7 @@ const Rent: React.FC = () => {
   const fetchLeaseDetail = async (leaseId: number) => {
     const response = await api.get<RentLeaseDetail>(`/rent/leases/${leaseId}`);
     setLeaseDetail(response.data);
+    setLeaseNameDraft(response.data.name);
   };
 
   const fetchStatement = async (leaseId: number, month: string) => {
@@ -229,6 +232,19 @@ const Rent: React.FC = () => {
     const remaining = leases.filter((lease) => lease.id !== leaseId);
     setSelectedLeaseId(remaining[0]?.id ?? null);
     await fetchBaseData();
+  };
+
+  const renameLease = async () => {
+    if (!leaseDetail) return;
+    const trimmedName = leaseNameDraft.trim();
+    if (!trimmedName || trimmedName === leaseDetail.name) return;
+    setSavingLeaseName(true);
+    try {
+      await api.put(`/rent/leases/${leaseDetail.id}`, { name: trimmedName });
+      await refreshCurrentLease();
+    } finally {
+      setSavingLeaseName(false);
+    }
   };
 
   const createRoom = async (e: React.FormEvent) => {
@@ -425,7 +441,22 @@ const Rent: React.FC = () => {
               <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h3 className="font-headline text-2xl font-black">{leaseDetail.name}</h3>
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                      <input
+                        value={leaseNameDraft}
+                        onChange={(e) => setLeaseNameDraft(e.target.value)}
+                        className="rounded-xl border border-outline-variant bg-surface-container px-4 py-2 text-2xl font-black"
+                        aria-label="Rent workspace name"
+                      />
+                      <button
+                        onClick={renameLease}
+                        disabled={savingLeaseName || !leaseNameDraft.trim() || leaseNameDraft.trim() === leaseDetail.name}
+                        className="flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-white/70 px-4 py-2 text-sm font-black disabled:opacity-60 dark:bg-slate-900/40"
+                      >
+                        {savingLeaseName ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        Rename Workspace
+                      </button>
+                    </div>
                     <p className="text-sm opacity-70">{leaseDetail.location.name}{leaseDetail.electricity_provider ? ` • Electricity from ${leaseDetail.electricity_provider.name}` : ' • Electricity from Energy invoices'}</p>
                     {leaseDetail.notes && <p className="mt-2 text-sm opacity-60">{leaseDetail.notes}</p>}
                   </div>

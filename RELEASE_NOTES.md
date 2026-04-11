@@ -1,13 +1,13 @@
-# UtilityMate v1.6.5
+# UtilityMate v1.6.6
 
 ## New Features
 
-- Added room-level energy usage in Rent for Hidroelectrica invoices, with any unassigned invoice kWh automatically split equally across utility-paying tenants.
+- Added a direct rename control for Rent workspaces so you can update the workspace name from the Rent page without recreating it.
 
 ## Improvements
 
-- Rent now shows invoice kWh, room-entered kWh, and equal-share remainder so electricity allocation is easier to audit month by month.
+- Rent workspace management is now smoother, with the current workspace name editable inline where you already manage the rest of the setup.
 
 ## Bug Fixes
 
-- Fixed Rent electricity allocation so room-entered usage can affect only the supplier electricity invoice without mixing in avizier energy.
+- Fixed the missing Rent rename workflow so workspace names are no longer effectively locked after creation.
