@@ -1,13 +1,13 @@
-# UtilityMate v1.6.3
+# UtilityMate v1.6.4
 
 ## New Features
 
-- Added per-tenant adjustment notes in Rent so custom credits and debits can carry their explanation through to the monthly statement and exported PDF.
+- Unified the app branding so the sidebar logo now uses the same UtilityMate icon as the favicon.
 
 ## Improvements
 
-- Rent adjustment entry is now cleaner, with simpler wording in the UI and optional notes stored alongside each manual adjustment.
+- UtilityMate branding is now visually consistent across browser tabs and the in-app navigation.
 
 ## Bug Fixes
 
-- Fixed Rent statement exports so manual adjustment context is no longer lost when sharing the monthly PDF with tenants.
+- Fixed the logo mismatch where the app shell still showed a generic icon instead of the UtilityMate mark used for the favicon.

@@ -10,8 +10,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
     <aside className="h-screen w-64 fixed left-0 top-0 hidden md:flex flex-col bg-slate-100 dark:bg-slate-900 border-none z-40 transition-colors duration-300">
       <div className="flex flex-col h-full p-4 gap-y-2">
         <div className="flex items-center gap-3 px-3 py-6 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center">
-            <span className="material-symbols-outlined text-tertiary-fixed-dim" style={{ fontVariationSettings: "'FILL' 1" }}>domain</span>
+          <div className="w-10 h-10 rounded-xl bg-primary-container/60 flex items-center justify-center overflow-hidden">
+            <img src="/favicon.svg" alt="UtilityMate logo" className="h-9 w-9" />
           </div>
           <div>
             <h1 className="font-headline text-lg font-extrabold text-slate-900 dark:text-slate-50">UtilityMate</h1>

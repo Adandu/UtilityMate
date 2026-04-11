@@ -1,0 +1,5 @@
+{
+  "version": "1.6.4",
+  "title": "UtilityMate v1.6.4",
+  "body": "## New Features\n\n- Unified the app branding so the sidebar logo now uses the same UtilityMate icon as the favicon.\n\n## Improvements\n\n- UtilityMate branding is now visually consistent across browser tabs and the in-app navigation.\n\n## Bug Fixes\n\n- Fixed the logo mismatch where the app shell still showed a generic icon instead of the UtilityMate mark used for the favicon.\n"
+}
