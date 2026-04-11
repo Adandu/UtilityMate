@@ -77,6 +77,12 @@ const tooltipStyle = {
   color: 'var(--color-on-surface)',
 };
 
+const historySeriesOrder: Record<string, number> = {
+  Cost: 0,
+  'Last Year': 1,
+  'Average Over the Years': 2,
+};
+
 const legendStyle = {
   color: 'var(--color-on-surface)',
   fontSize: 12,
@@ -115,6 +121,8 @@ const unitCostTooltipFormatter = (unit: string) => (value: unknown, name: unknow
   const numericValue = asNumber(value);
   return [`${numericValue.toFixed(4)} RON / ${unit}`, String(name)];
 };
+
+const historyItemSorter = (item: { name?: string | number }) => historySeriesOrder[String(item.name ?? '')] ?? 99;
 
 const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -224,6 +232,7 @@ const Dashboard: React.FC = () => {
     { label: 'Previous Avg / Month', value: formatMoney(previousPeriodAverage), icon: TrendingDown, tone: 'text-violet-600' },
     { label: 'Utility Categories', value: String(report.summary.active_categories), icon: MapPinned, tone: 'text-rose-600' },
   ];
+  const categoryBreakdown = [...report.category_sections].sort((left, right) => right.total_cost - left.total_cost);
 
   return (
     <div className="ml-64 min-h-screen bg-surface p-8 text-on-surface">
@@ -289,6 +298,46 @@ const Dashboard: React.FC = () => {
         })}
       </div>
 
+      <section className="mb-8 rounded-3xl border border-outline-variant bg-surface-container-low p-6">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="font-headline text-xl font-black">Cost Breakdown by Utility</h3>
+            <p className="text-sm opacity-70">Utility costs for {selectedLocationName} during {selectedPeriodLabel.toLowerCase()}.</p>
+          </div>
+          <div className="rounded-2xl bg-white px-4 py-3 text-sm font-bold dark:bg-slate-900">
+            {formatMoney(report.summary.total_cost)} total
+          </div>
+        </div>
+        <div className="overflow-x-auto rounded-2xl border border-outline-variant bg-white/70 dark:bg-slate-900/40">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-surface-container">
+              <tr>
+                <th className="px-4 py-3 font-black">Utility</th>
+                <th className="px-4 py-3 font-black">Cost</th>
+                <th className="px-4 py-3 font-black">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categoryBreakdown.map((section) => {
+                const share = report.summary.total_cost > 0 ? (section.total_cost / report.summary.total_cost) * 100 : 0;
+                return (
+                  <tr key={section.category_id} className="border-t border-outline-variant">
+                    <td className="px-4 py-3 font-semibold">{section.category_name}</td>
+                    <td className="px-4 py-3">{formatMoney(section.total_cost)}</td>
+                    <td className="px-4 py-3">{share.toFixed(1)}%</td>
+                  </tr>
+                );
+              })}
+              {categoryBreakdown.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 opacity-70" colSpan={3}>No category cost data is available for the selected period.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div className="mb-8 grid grid-cols-1 gap-8 xl:grid-cols-[1.7fr_1fr]">
         <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6">
           <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -313,7 +362,7 @@ const Dashboard: React.FC = () => {
                 <XAxis dataKey="label" axisLine={false} tickLine={false} />
                 <YAxis axisLine={false} tickLine={false} />
                 <Legend wrapperStyle={legendStyle} />
-                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} itemSorter={historyItemSorter} />
                 <Area type="monotone" dataKey="cost" stroke="#7c3aed" fill="url(#overallSpendArea)" strokeWidth={3} name="Cost" />
                 <Line type="monotone" dataKey="last_year_cost" stroke="#0f766e" strokeWidth={2} dot={false} connectNulls name="Last Year" />
                 <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={2} strokeDasharray="8 6" connectNulls dot={false} name="Average Over the Years" />
@@ -441,8 +490,8 @@ const Dashboard: React.FC = () => {
                       <XAxis dataKey="label" axisLine={false} tickLine={false} />
                       <YAxis axisLine={false} tickLine={false} />
                       <Legend wrapperStyle={legendStyle} />
-                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
-                      <Line type="monotone" dataKey="cost" stroke="#7c3aed" strokeWidth={3} dot={{ r: 3 }} name="Current Value" />
+                      <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} itemSorter={historyItemSorter} />
+                      <Line type="monotone" dataKey="cost" stroke="#7c3aed" strokeWidth={3} dot={{ r: 3 }} name="Cost" />
                       <Line type="monotone" dataKey="last_year_cost" stroke="#0f766e" strokeWidth={3} connectNulls dot={false} name="Last Year" />
                       <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={3} strokeDasharray="8 6" connectNulls dot={false} name="Average Over the Years" />
                     </LineChart>

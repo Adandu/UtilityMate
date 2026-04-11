@@ -1,13 +1,13 @@
-# UtilityMate v1.4.33
+# UtilityMate v1.4.34
 
 ## New Features
 
-- Standardized the average-history line styling so the top `Monthly Cost Trend` chart now uses the same dashed treatment as the section history charts.
+- Added a current-period utility cost breakdown table to the dashboard so you can review each utility’s spend contribution for the active filters.
 
 ## Improvements
 
-- The orange `Average Over the Years` series now looks the same across dashboard history views, which makes the chart language more consistent.
+- History chart legends and hover ordering are now standardized as `Cost`, `Last Year`, and `Average Over the Years` for easier comparison.
 
 ## Bug Fixes
 
-- Fixed the main dashboard trend graph showing the average line as solid while the section history graphs showed the same series as dashed.
+- Fixed inconsistent history-series naming and ordering between the dashboard legends and tooltips.
