@@ -1,13 +1,13 @@
-# UtilityMate v1.5.1
+# UtilityMate v1.5.2
 
 ## New Features
 
-- Added an avizier repair pass that reparses stored association statements and corrects imported gas and heating line amounts from their source PDFs.
+- Extended the avizier repair pass so it can also correct gas/heating category assignments when a winter statement layout uses the opposite column order.
 
 ## Improvements
 
-- Avizier gas and heating dashboard sections now follow the actual statement row cost values instead of using the wrong side of the quantity/cost pair.
+- Winter avizier gas and heating charts now follow the utility names implied by the statement rows, not just the previous static column ordering.
 
 ## Bug Fixes
 
-- Fixed avizier heating and gas costs being underreported because the parser was storing the first value in each pair instead of the monetary cost value.
+- Fixed winter avizier statements such as January 2026 `Ap 12` where heating and gas were still swapped even after the cost-pair repair.

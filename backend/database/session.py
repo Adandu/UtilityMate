@@ -354,17 +354,36 @@ def repair_association_statement_utility_cost_pairs():
                 for item in apartment.get("line_items", []):
                     raw_label = (item.get("raw_label") or "").strip().lower()
                     if raw_label in target_labels:
-                        expected_amounts[(location.id, raw_label)] = item.get("amount", 0.0)
+                        expected_amounts[(location.id, raw_label)] = {
+                            "amount": item.get("amount", 0.0),
+                            "normalized_label": item.get("normalized_label"),
+                            "category_name": item.get("category_name"),
+                        }
 
             for line in statement.lines:
                 raw_label = (line.raw_label or "").strip().lower()
                 if raw_label not in target_labels:
                     continue
-                expected_amount = expected_amounts.get((line.location_id, raw_label))
-                if expected_amount is None:
+                expected = expected_amounts.get((line.location_id, raw_label))
+                if expected is None:
                     continue
+                changed = False
+                expected_amount = expected["amount"]
                 if abs((line.amount or 0.0) - expected_amount) > 0.01:
                     line.amount = expected_amount
+                    changed = True
+                expected_label = expected["normalized_label"] or line.normalized_label
+                if line.normalized_label != expected_label:
+                    line.normalized_label = expected_label
+                    changed = True
+                expected_category_name = expected["category_name"]
+                if expected_category_name:
+                    expected_unit = line.unit or "unit"
+                    target_category = _get_or_create_category(db, line.user_id, expected_category_name, expected_unit)
+                    if line.category_id != target_category.id:
+                        line.category_id = target_category.id
+                        changed = True
+                if changed:
                     repaired_count += 1
 
         if repaired_count:
