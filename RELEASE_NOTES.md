@@ -1,13 +1,13 @@
-# UtilityMate v1.5.3
+# UtilityMate v1.5.4
 
 ## New Features
 
-- Rebuilt the winter avizier gas/heating parser model so those columns are interpreted as adjacent charge fields instead of pseudo-meter pairs.
+- Rebuilt the avizier month profiles across the September 2025 through February 2026 statement formats so each supported layout now uses a dedicated column map.
 
 ## Improvements
 
-- Winter avizier monthly profiles now preserve row-length matching while correctly extracting gas and heating costs from the statement layout.
+- Association statement repair now rebuilds stored avizier line items from their source PDFs, so existing imports are refreshed when the parser improves.
 
 ## Bug Fixes
 
-- Fixed January 2026 and similar aviziers where gas and heating were still wrong because the parser model itself did not match the layout structure.
+- Fixed the January 2026 avizier profile being one column short, which caused that month to misalign adjacent utility and fee fields.

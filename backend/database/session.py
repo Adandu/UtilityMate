@@ -397,6 +397,115 @@ def repair_association_statement_utility_cost_pairs():
     finally:
         db.close()
 
+
+def rebuild_association_statement_lines():
+    rebuilt_count = 0
+    db = SessionLocal()
+    try:
+        statements = db.query(database_models.AssociationStatement).options(
+            joinedload(database_models.AssociationStatement.lines),
+        ).all()
+        location_cache = {}
+
+        for statement in statements:
+            if statement.user_id not in location_cache:
+                locations = db.query(database_models.Location).filter(
+                    database_models.Location.user_id == statement.user_id,
+                ).all()
+                location_cache[statement.user_id] = {
+                    token: location
+                    for location in locations
+                    for token in [_normalize_location_token(location.name)]
+                    if token
+                }
+
+            pdf_path = resolve_invoice_pdf_path(statement.pdf_path)
+            if not pdf_path or not os.path.exists(pdf_path):
+                continue
+
+            pdf_text = InvoiceParser.get_pdf_text(pdf_path)
+            if not pdf_text:
+                continue
+
+            structured = InvoiceParser.parse_association_statement(pdf_text)
+            apartments = structured.get("apartments", [])
+            if not apartments:
+                continue
+
+            for line in list(statement.lines):
+                db.delete(line)
+
+            imported_lines = 0
+            location_by_token = location_cache[statement.user_id]
+            for apartment in apartments:
+                location = location_by_token.get(apartment.get("apartment_number"))
+                if not location:
+                    continue
+
+                apartment_total = apartment.get("monthly_total") or apartment.get("total_payable") or 0.0
+                db.add(database_models.AssociationStatementLine(
+                    statement_id=statement.id,
+                    user_id=statement.user_id,
+                    location_id=location.id,
+                    category_id=None,
+                    raw_label="Total luna",
+                    normalized_label="Avizier Total",
+                    line_kind="statement_total",
+                    amount=apartment_total,
+                    consumption_value=None,
+                    unit=None,
+                    include_in_overall_analytics=False,
+                    include_in_category_analytics=False,
+                    include_in_unit_cost=False,
+                ))
+                imported_lines += 1
+
+                for item in apartment.get("line_items", []):
+                    category = None
+                    if item.get("category_name"):
+                        category_unit = item.get("unit") or {
+                            "Water": "m3",
+                            "Energy": "kWh",
+                            "Gas": "unit",
+                            "Heating": "unit",
+                            "Cold Water": "m3",
+                            "Hot Water": "m3",
+                            "Shared Water": "m3",
+                            "Storm Water": "m3",
+                        }.get(item["category_name"], "unit")
+                        category = _get_or_create_category(db, statement.user_id, item["category_name"], category_unit)
+
+                    db.add(database_models.AssociationStatementLine(
+                        statement_id=statement.id,
+                        user_id=statement.user_id,
+                        location_id=location.id,
+                        category_id=category.id if category else None,
+                        raw_label=item["raw_label"],
+                        normalized_label=item["normalized_label"],
+                        line_kind=item["line_kind"],
+                        amount=item["amount"],
+                        consumption_value=item.get("consumption_value"),
+                        unit=item.get("unit"),
+                        include_in_overall_analytics=item["include_in_overall_analytics"],
+                        include_in_category_analytics=item["include_in_category_analytics"],
+                        include_in_unit_cost=item["include_in_unit_cost"],
+                    ))
+                    imported_lines += 1
+
+            if imported_lines:
+                rebuilt_count += 1
+
+        if rebuilt_count:
+            db.commit()
+            logger.info("Rebuilt parsed lines for %s association statements.", rebuilt_count)
+        else:
+            db.rollback()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Association statement line rebuild failed: %s", exc)
+    finally:
+        db.close()
+
 def verify_and_migrate_db():
     """
     Verifies the database schema and applies simple migrations if necessary.

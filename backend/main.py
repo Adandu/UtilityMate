@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from .routers import auth, categories, providers, locations, invoices, consumption, budgets, alerts, households, automation, analytics, association_statements
-from .database.session import engine, repair_association_statement_totals, repair_association_statement_utility_cost_pairs, repair_association_statement_water_categories, repair_pdf_invoice_data, verify_and_migrate_db
+from .database.session import engine, rebuild_association_statement_lines, repair_association_statement_totals, repair_association_statement_utility_cost_pairs, repair_association_statement_water_categories, repair_pdf_invoice_data, verify_and_migrate_db
 from .utils.logging_config import logger
 from .utils.rate_limiter import limiter
 
@@ -76,6 +76,7 @@ async def schedule_invoice_repair():
     threading.Thread(target=repair_pdf_invoice_data, daemon=True).start()
     threading.Thread(target=repair_association_statement_water_categories, daemon=True).start()
     threading.Thread(target=repair_association_statement_utility_cost_pairs, daemon=True).start()
+    threading.Thread(target=rebuild_association_statement_lines, daemon=True).start()
     threading.Thread(target=repair_association_statement_totals, daemon=True).start()
 
 @app.get("/")
