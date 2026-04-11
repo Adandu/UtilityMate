@@ -1,13 +1,13 @@
-# UtilityMate v1.6.4
+# UtilityMate v1.6.5
 
 ## New Features
 
-- Unified the app branding so the sidebar logo now uses the same UtilityMate icon as the favicon.
+- Added room-level energy usage in Rent for Hidroelectrica invoices, with any unassigned invoice kWh automatically split equally across utility-paying tenants.
 
 ## Improvements
 
-- UtilityMate branding is now visually consistent across browser tabs and the in-app navigation.
+- Rent now shows invoice kWh, room-entered kWh, and equal-share remainder so electricity allocation is easier to audit month by month.
 
 ## Bug Fixes
 
-- Fixed the logo mismatch where the app shell still showed a generic icon instead of the UtilityMate mark used for the favicon.
+- Fixed Rent electricity allocation so room-entered usage can affect only the supplier electricity invoice without mixing in avizier energy.

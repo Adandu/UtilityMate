@@ -209,6 +209,7 @@ class RentRoom(Base):
     tenants = relationship("RentTenant", back_populates="default_room")
     month_tenants = relationship("RentMonthTenant", back_populates="room")
     room_usages = relationship("RentRoomUsage", back_populates="room", cascade="all, delete-orphan")
+    energy_usages = relationship("RentRoomEnergyUsage", back_populates="room", cascade="all, delete-orphan")
 
 
 class RentTenant(Base):
@@ -241,6 +242,7 @@ class RentMonth(Base):
     lease = relationship("RentLease", back_populates="months")
     tenant_configs = relationship("RentMonthTenant", back_populates="rent_month", cascade="all, delete-orphan")
     room_usages = relationship("RentRoomUsage", back_populates="rent_month", cascade="all, delete-orphan")
+    room_energy_usages = relationship("RentRoomEnergyUsage", back_populates="rent_month", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("idx_rent_month_unique", "lease_id", "month", unique=True),
@@ -283,6 +285,22 @@ class RentRoomUsage(Base):
 
     __table_args__ = (
         Index("idx_rent_room_usage_unique", "rent_month_id", "room_id", unique=True),
+    )
+
+
+class RentRoomEnergyUsage(Base):
+    __tablename__ = "rent_room_energy_usages"
+    id = Column(Integer, primary_key=True, index=True)
+    rent_month_id = Column(Integer, ForeignKey("rent_months.id", ondelete="CASCADE"), index=True, nullable=False)
+    room_id = Column(Integer, ForeignKey("rent_rooms.id", ondelete="CASCADE"), index=True, nullable=False)
+    usage_kwh = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    rent_month = relationship("RentMonth", back_populates="room_energy_usages")
+    room = relationship("RentRoom", back_populates="energy_usages")
+
+    __table_args__ = (
+        Index("idx_rent_room_energy_usage_unique", "rent_month_id", "room_id", unique=True),
     )
 
 

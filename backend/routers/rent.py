@@ -132,10 +132,15 @@ def _get_or_build_month(
             usage.room_id: usage.usage_value
             for usage in existing_month.room_usages
         }
+        room_energy_usages = {
+            usage.room_id: usage.usage_kwh
+            for usage in existing_month.room_energy_usages
+        }
         notes = existing_month.notes
     else:
         tenant_configs = {}
         room_usages = {}
+        room_energy_usages = {}
         notes = None
 
     config_rows: List[api_schemas.RentTenantMonthConfig] = []
@@ -166,7 +171,16 @@ def _get_or_build_month(
         for room in lease.rooms
     ]
 
-    return notes, config_rows, usage_rows
+    energy_usage_rows = [
+        api_schemas.RentRoomEnergyUsage(
+            room_id=room.id,
+            room_name=room.name,
+            usage_kwh=float(room_energy_usages.get(room.id, 0.0)),
+        )
+        for room in lease.rooms
+    ]
+
+    return notes, config_rows, usage_rows, energy_usage_rows
 
 
 def _calculate_source_summary(db: Session, lease: database_models.RentLease, month_value: date):
@@ -184,7 +198,9 @@ def _calculate_source_summary(db: Session, lease: database_models.RentLease, mon
             database_models.Category, database_models.Category.id == database_models.Provider.category_id
         ).filter(database_models.Category.name == "Energy")
 
-    electricity_total = sum(float(invoice.amount or 0.0) for invoice in electricity_query.all())
+    electricity_invoices = electricity_query.all()
+    electricity_total = sum(float(invoice.amount or 0.0) for invoice in electricity_invoices)
+    electricity_consumption_total = sum(float(invoice.consumption_value or 0.0) for invoice in electricity_invoices)
 
     raw_statement_lines = db.query(database_models.AssociationStatementLine, database_models.AssociationStatement).join(
         database_models.AssociationStatement, database_models.AssociationStatement.id == database_models.AssociationStatementLine.statement_id
@@ -212,10 +228,90 @@ def _calculate_source_summary(db: Session, lease: database_models.RentLease, mon
 
     return api_schemas.RentSourceSummary(
         electricity_total=float(electricity_total),
+        electricity_consumption_total=float(electricity_consumption_total),
         avizier_total=float(avizier_total),
         heating_total=float(heating_total),
         non_heating_utilities_total=float(non_heating_utilities_total),
     )
+
+
+def _build_room_tenant_map(tenant_configs: List[api_schemas.RentTenantMonthConfig]) -> Dict[int, List[int]]:
+    room_tenant_map: Dict[int, List[int]] = defaultdict(list)
+    for config in tenant_configs:
+        if config.is_active and config.pays_utilities and config.room_id:
+            room_tenant_map[config.room_id].append(config.tenant_id)
+    return room_tenant_map
+
+
+def _calculate_heating_distribution(
+    heating_total: float,
+    utility_payers: List[api_schemas.RentTenantMonthConfig],
+    room_usages: List[api_schemas.RentRoomUsage],
+    room_tenant_map: Dict[int, List[int]],
+):
+    heating_by_tenant: Dict[int, float] = defaultdict(float)
+    total_usage = sum(float(usage.usage_value) for usage in room_usages if float(usage.usage_value) > 0)
+    heating_mode = "equal"
+    if heating_total > 0 and total_usage > 0 and room_tenant_map:
+        heating_mode = "room_usage"
+        for usage in room_usages:
+            usage_value = float(usage.usage_value)
+            if usage_value <= 0:
+                continue
+            tenant_ids = room_tenant_map.get(usage.room_id, [])
+            if not tenant_ids:
+                continue
+            room_share = heating_total * (usage_value / total_usage)
+            per_tenant_share = room_share / len(tenant_ids)
+            for tenant_id in tenant_ids:
+                heating_by_tenant[tenant_id] += per_tenant_share
+    elif utility_payers:
+        equal_heating = heating_total / len(utility_payers)
+        for config in utility_payers:
+            heating_by_tenant[config.tenant_id] = equal_heating
+    return heating_by_tenant, heating_mode
+
+
+def _calculate_electricity_distribution(
+    electricity_total: float,
+    electricity_consumption_total: float,
+    utility_payers: List[api_schemas.RentTenantMonthConfig],
+    room_energy_usages: List[api_schemas.RentRoomEnergyUsage],
+    room_tenant_map: Dict[int, List[int]],
+):
+    electricity_by_tenant: Dict[int, float] = defaultdict(float)
+    if not utility_payers:
+        return electricity_by_tenant, "equal"
+
+    if electricity_total <= 0 or electricity_consumption_total <= 0:
+        equal_amount = electricity_total / len(utility_payers)
+        for config in utility_payers:
+            electricity_by_tenant[config.tenant_id] = equal_amount
+        return electricity_by_tenant, "equal"
+
+    assigned_kwh = 0.0
+    for usage in room_energy_usages:
+        usage_kwh = max(float(usage.usage_kwh), 0.0)
+        if usage_kwh <= 0:
+            continue
+        tenant_ids = room_tenant_map.get(usage.room_id, [])
+        if not tenant_ids:
+            continue
+        assigned_kwh += usage_kwh
+        per_tenant_kwh = usage_kwh / len(tenant_ids)
+        for tenant_id in tenant_ids:
+            electricity_by_tenant[tenant_id] += per_tenant_kwh
+
+    remaining_kwh = max(electricity_consumption_total - assigned_kwh, 0.0)
+    equal_remaining_kwh = remaining_kwh / len(utility_payers)
+    for config in utility_payers:
+        electricity_by_tenant[config.tenant_id] += equal_remaining_kwh
+
+    unit_cost = electricity_total / electricity_consumption_total
+    for tenant_id, consumption_kwh in list(electricity_by_tenant.items()):
+        electricity_by_tenant[tenant_id] = consumption_kwh * unit_cost
+
+    return electricity_by_tenant, "room_usage_remainder_split"
 
 
 def _build_statement(
@@ -229,10 +325,11 @@ def _build_statement(
         for month_row in db.query(database_models.RentMonth).options(
             joinedload(database_models.RentMonth.tenant_configs).joinedload(database_models.RentMonthTenant.room),
             joinedload(database_models.RentMonth.room_usages).joinedload(database_models.RentRoomUsage.room),
+            joinedload(database_models.RentMonth.room_energy_usages).joinedload(database_models.RentRoomEnergyUsage.room),
         ).filter(database_models.RentMonth.lease_id == lease.id).all()
     }
 
-    notes, tenant_configs, room_usages = _get_or_build_month(lease, month_value, months_by_key.get(month_value))
+    notes, tenant_configs, room_usages, room_energy_usages = _get_or_build_month(lease, month_value, months_by_key.get(month_value))
     payments = db.query(database_models.RentPayment).options(
         joinedload(database_models.RentPayment.tenant)
     ).filter(
@@ -243,34 +340,22 @@ def _build_statement(
     source_summary = _calculate_source_summary(db, lease, month_value)
     utility_payers = [config for config in tenant_configs if config.is_active and config.pays_utilities]
     utility_payer_count = len(utility_payers)
-    electricity_per_payer = (source_summary.electricity_total / utility_payer_count) if utility_payer_count else 0.0
     shared_utilities_per_payer = (source_summary.non_heating_utilities_total / utility_payer_count) if utility_payer_count else 0.0
 
-    room_usage_map = {usage.room_id: float(usage.usage_value) for usage in room_usages}
-    room_tenant_map: Dict[int, List[int]] = defaultdict(list)
-    for config in tenant_configs:
-        if config.is_active and config.pays_utilities and config.room_id:
-            room_tenant_map[config.room_id].append(config.tenant_id)
-
-    total_usage = sum(value for value in room_usage_map.values() if value > 0)
-    heating_by_tenant: Dict[int, float] = defaultdict(float)
-    heating_mode = "equal"
-    if source_summary.heating_total > 0 and total_usage > 0 and room_tenant_map:
-        heating_mode = "room_usage"
-        for room_id, usage_value in room_usage_map.items():
-            if usage_value <= 0:
-                continue
-            tenant_ids = room_tenant_map.get(room_id, [])
-            if not tenant_ids:
-                continue
-            room_share = source_summary.heating_total * (usage_value / total_usage)
-            per_tenant_share = room_share / len(tenant_ids)
-            for tenant_id in tenant_ids:
-                heating_by_tenant[tenant_id] += per_tenant_share
-    elif utility_payer_count:
-        equal_heating = source_summary.heating_total / utility_payer_count
-        for config in utility_payers:
-            heating_by_tenant[config.tenant_id] = equal_heating
+    room_tenant_map = _build_room_tenant_map(tenant_configs)
+    electricity_by_tenant, electricity_mode = _calculate_electricity_distribution(
+        source_summary.electricity_total,
+        source_summary.electricity_consumption_total,
+        utility_payers,
+        room_energy_usages,
+        room_tenant_map,
+    )
+    heating_by_tenant, heating_mode = _calculate_heating_distribution(
+        source_summary.heating_total,
+        utility_payers,
+        room_usages,
+        room_tenant_map,
+    )
 
     payment_totals = defaultdict(float)
     for payment in payments:
@@ -281,35 +366,26 @@ def _build_statement(
     statement_rows: List[api_schemas.RentTenantStatement] = []
 
     for current_month in ordered_months:
-        _, current_configs, current_room_usages = _get_or_build_month(lease, current_month, months_by_key.get(current_month))
+        _, current_configs, current_room_usages, current_room_energy_usages = _get_or_build_month(lease, current_month, months_by_key.get(current_month))
         current_sources = _calculate_source_summary(db, lease, current_month)
         current_utility_payers = [config for config in current_configs if config.is_active and config.pays_utilities]
         current_utility_payer_count = len(current_utility_payers)
-        current_electricity_per_payer = (current_sources.electricity_total / current_utility_payer_count) if current_utility_payer_count else 0.0
         current_shared_per_payer = (current_sources.non_heating_utilities_total / current_utility_payer_count) if current_utility_payer_count else 0.0
 
-        current_room_usage_map = {usage.room_id: float(usage.usage_value) for usage in current_room_usages}
-        current_room_tenant_map: Dict[int, List[int]] = defaultdict(list)
-        for config in current_configs:
-            if config.is_active and config.pays_utilities and config.room_id:
-                current_room_tenant_map[config.room_id].append(config.tenant_id)
-        current_total_usage = sum(value for value in current_room_usage_map.values() if value > 0)
-        current_heating_by_tenant: Dict[int, float] = defaultdict(float)
-        if current_sources.heating_total > 0 and current_total_usage > 0 and current_room_tenant_map:
-            for room_id, usage_value in current_room_usage_map.items():
-                if usage_value <= 0:
-                    continue
-                tenant_ids = current_room_tenant_map.get(room_id, [])
-                if not tenant_ids:
-                    continue
-                room_share = current_sources.heating_total * (usage_value / current_total_usage)
-                per_tenant_share = room_share / len(tenant_ids)
-                for tenant_id in tenant_ids:
-                    current_heating_by_tenant[tenant_id] += per_tenant_share
-        elif current_utility_payer_count:
-            equal_heating = current_sources.heating_total / current_utility_payer_count
-            for config in current_utility_payers:
-                current_heating_by_tenant[config.tenant_id] = equal_heating
+        current_room_tenant_map = _build_room_tenant_map(current_configs)
+        current_electricity_by_tenant, _ = _calculate_electricity_distribution(
+            current_sources.electricity_total,
+            current_sources.electricity_consumption_total,
+            current_utility_payers,
+            current_room_energy_usages,
+            current_room_tenant_map,
+        )
+        current_heating_by_tenant, _ = _calculate_heating_distribution(
+            current_sources.heating_total,
+            current_utility_payers,
+            current_room_usages,
+            current_room_tenant_map,
+        )
 
         current_payment_rows = db.query(database_models.RentPayment).filter(
             database_models.RentPayment.lease_id == lease.id,
@@ -321,7 +397,7 @@ def _build_statement(
 
         current_rows: List[api_schemas.RentTenantStatement] = []
         for config in current_configs:
-            electricity_amount = current_electricity_per_payer if (config.is_active and config.pays_utilities) else 0.0
+            electricity_amount = current_electricity_by_tenant.get(config.tenant_id, 0.0) if (config.is_active and config.pays_utilities) else 0.0
             shared_utilities_amount = current_shared_per_payer if (config.is_active and config.pays_utilities) else 0.0
             heating_amount = current_heating_by_tenant.get(config.tenant_id, 0.0) if (config.is_active and config.pays_utilities) else 0.0
             utilities_amount = shared_utilities_amount + heating_amount
@@ -365,9 +441,11 @@ def _build_statement(
         notes=notes,
         source_summary=source_summary,
         utility_payer_count=utility_payer_count,
+        electricity_allocation_mode=electricity_mode,
         heating_allocation_mode=heating_mode,
         tenant_configs=tenant_configs,
         room_usages=room_usages,
+        room_energy_usages=room_energy_usages,
         payments=payments,
         tenant_statements=statement_rows,
         totals={
@@ -411,16 +489,17 @@ def _build_rent_statement_pdf(
     ]
 
     summary_rows = [
-        ["Rent", "Electricity", "Avizier", "Heating", "Amount Due"],
+        ["Rent", "Electricity", "Invoice kWh", "Avizier", "Heating", "Amount Due"],
         [
             f"{statement.totals['rent_total']:.2f} RON",
             f"{statement.source_summary.electricity_total:.2f} RON",
+            f"{statement.source_summary.electricity_consumption_total:.2f} kWh",
             f"{statement.source_summary.avizier_total:.2f} RON",
             f"{statement.source_summary.heating_total:.2f} RON",
             f"{statement.totals['amount_due_total']:.2f} RON",
         ],
     ]
-    summary_table = Table(summary_rows, colWidths=[35 * mm, 35 * mm, 35 * mm, 35 * mm, 35 * mm])
+    summary_table = Table(summary_rows, colWidths=[29 * mm, 29 * mm, 29 * mm, 29 * mm, 29 * mm, 31 * mm])
     summary_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
@@ -523,7 +602,7 @@ def _build_rent_statement_pdf(
 
     story.extend([
         Paragraph(
-            f"Utility payer count: <b>{statement.utility_payer_count}</b> • Heating allocation: <b>{'Room usage' if statement.heating_allocation_mode == 'room_usage' else 'Equal fallback'}</b>",
+            f"Utility payer count: <b>{statement.utility_payer_count}</b> • Electricity allocation: <b>{'Room kWh plus equal remainder' if statement.electricity_allocation_mode == 'room_usage_remainder_split' else 'Equal fallback'}</b> • Heating allocation: <b>{'Room usage' if statement.heating_allocation_mode == 'room_usage' else 'Equal fallback'}</b>",
             styles["RentBody"],
         )
     ])
@@ -795,10 +874,14 @@ def upsert_rent_month(
     for usage in payload.room_usages:
         if usage.room_id not in room_ids:
             raise HTTPException(status_code=400, detail="Room does not belong to this lease")
+    for usage in payload.room_energy_usages:
+        if usage.room_id not in room_ids:
+            raise HTTPException(status_code=400, detail="Room does not belong to this lease")
 
     rent_month = db.query(database_models.RentMonth).options(
         joinedload(database_models.RentMonth.tenant_configs),
         joinedload(database_models.RentMonth.room_usages),
+        joinedload(database_models.RentMonth.room_energy_usages),
     ).filter(
         database_models.RentMonth.lease_id == lease.id,
         database_models.RentMonth.month == month_value,
@@ -813,6 +896,8 @@ def upsert_rent_month(
     for row in list(rent_month.tenant_configs):
         db.delete(row)
     for row in list(rent_month.room_usages):
+        db.delete(row)
+    for row in list(rent_month.room_energy_usages):
         db.delete(row)
     db.flush()
 
@@ -834,6 +919,13 @@ def upsert_rent_month(
             rent_month_id=rent_month.id,
             room_id=usage.room_id,
             usage_value=usage.usage_value,
+        ))
+
+    for usage in payload.room_energy_usages:
+        db.add(database_models.RentRoomEnergyUsage(
+            rent_month_id=rent_month.id,
+            room_id=usage.room_id,
+            usage_kwh=usage.usage_kwh,
         ))
 
     db.commit()

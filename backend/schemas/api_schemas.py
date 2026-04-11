@@ -610,11 +610,17 @@ class RentRoomUsageInput(BaseModel):
     usage_value: float = 0.0
 
 
+class RentRoomEnergyUsageInput(BaseModel):
+    room_id: int
+    usage_kwh: float = 0.0
+
+
 class RentMonthUpsert(BaseModel):
     month: date
     notes: Optional[str] = None
     tenant_configs: List[RentMonthTenantConfigInput]
     room_usages: List[RentRoomUsageInput] = []
+    room_energy_usages: List[RentRoomEnergyUsageInput] = []
 
 
 class RentPaymentCreate(BaseModel):
@@ -658,8 +664,15 @@ class RentRoomUsage(BaseModel):
     usage_value: float
 
 
+class RentRoomEnergyUsage(BaseModel):
+    room_id: int
+    room_name: str
+    usage_kwh: float
+
+
 class RentSourceSummary(BaseModel):
     electricity_total: float
+    electricity_consumption_total: float
     avizier_total: float
     heating_total: float
     non_heating_utilities_total: float
@@ -690,9 +703,11 @@ class RentMonthStatement(BaseModel):
     notes: Optional[str] = None
     source_summary: RentSourceSummary
     utility_payer_count: int
+    electricity_allocation_mode: str
     heating_allocation_mode: str
     tenant_configs: List[RentTenantMonthConfig]
     room_usages: List[RentRoomUsage]
+    room_energy_usages: List[RentRoomEnergyUsage]
     payments: List[RentPayment]
     tenant_statements: List[RentTenantStatement]
     totals: dict[str, float]

@@ -43,6 +43,7 @@ interface RentTenantMonthConfig {
   other_adjustment_note?: string | null;
 }
 interface RentRoomUsage { room_id: number; room_name: string; usage_value: number; }
+interface RentRoomEnergyUsage { room_id: number; room_name: string; usage_kwh: number; }
 interface RentPayment {
   id: number;
   tenant_id: number;
@@ -72,14 +73,17 @@ interface RentMonthStatement {
   notes?: string | null;
   source_summary: {
     electricity_total: number;
+    electricity_consumption_total: number;
     avizier_total: number;
     heating_total: number;
     non_heating_utilities_total: number;
   };
   utility_payer_count: number;
+  electricity_allocation_mode: string;
   heating_allocation_mode: string;
   tenant_configs: RentTenantMonthConfig[];
   room_usages: RentRoomUsage[];
+  room_energy_usages: RentRoomEnergyUsage[];
   payments: RentPayment[];
   tenant_statements: RentTenantStatement[];
   totals: {
@@ -109,6 +113,7 @@ const Rent: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
   const [draftConfigs, setDraftConfigs] = useState<RentTenantMonthConfig[]>([]);
   const [draftRoomUsages, setDraftRoomUsages] = useState<RentRoomUsage[]>([]);
+  const [draftRoomEnergyUsages, setDraftRoomEnergyUsages] = useState<RentRoomEnergyUsage[]>([]);
   const [noteDraft, setNoteDraft] = useState('');
   const [exportingStatement, setExportingStatement] = useState(false);
 
@@ -150,6 +155,7 @@ const Rent: React.FC = () => {
     setStatement(response.data);
     setDraftConfigs(response.data.tenant_configs);
     setDraftRoomUsages(response.data.room_usages);
+    setDraftRoomEnergyUsages(response.data.room_energy_usages);
     setNoteDraft(response.data.notes || '');
   };
 
@@ -273,24 +279,29 @@ const Rent: React.FC = () => {
       const response = await api.put<RentMonthStatement>(`/rent/leases/${selectedLeaseId}/month`, {
         month: monthInputToApi(selectedMonth),
         notes: noteDraft,
-          tenant_configs: draftConfigs.map((config) => ({
-            tenant_id: config.tenant_id,
-            room_id: config.room_id,
-            is_active: config.is_active,
-            pays_rent: config.pays_rent,
-            pays_utilities: config.pays_utilities,
-            rent_amount: Number(config.rent_amount || 0),
-            other_adjustment: Number(config.other_adjustment || 0),
-            other_adjustment_note: config.other_adjustment_note || null,
-          })),
+        tenant_configs: draftConfigs.map((config) => ({
+          tenant_id: config.tenant_id,
+          room_id: config.room_id,
+          is_active: config.is_active,
+          pays_rent: config.pays_rent,
+          pays_utilities: config.pays_utilities,
+          rent_amount: Number(config.rent_amount || 0),
+          other_adjustment: Number(config.other_adjustment || 0),
+          other_adjustment_note: config.other_adjustment_note || null,
+        })),
         room_usages: draftRoomUsages.map((usage) => ({
           room_id: usage.room_id,
           usage_value: Number(usage.usage_value || 0),
+        })),
+        room_energy_usages: draftRoomEnergyUsages.map((usage) => ({
+          room_id: usage.room_id,
+          usage_kwh: Number(usage.usage_kwh || 0),
         })),
       });
       setStatement(response.data);
       setDraftConfigs(response.data.tenant_configs);
       setDraftRoomUsages(response.data.room_usages);
+      setDraftRoomEnergyUsages(response.data.room_energy_usages);
       await fetchLeaseDetail(selectedLeaseId);
     } finally {
       setSavingMonth(false);
@@ -326,6 +337,10 @@ const Rent: React.FC = () => {
 
   const updateRoomUsage = (roomId: number, value: string) => {
     setDraftRoomUsages((current) => current.map((usage) => (usage.room_id === roomId ? { ...usage, usage_value: Number(value || 0) } : usage)));
+  };
+
+  const updateRoomEnergyUsage = (roomId: number, value: string) => {
+    setDraftRoomEnergyUsages((current) => current.map((usage) => (usage.room_id === roomId ? { ...usage, usage_kwh: Number(value || 0) } : usage)));
   };
 
   const exportStatementPdf = async () => {
@@ -497,7 +512,7 @@ const Rent: React.FC = () => {
                     </div>
 
                     <div className="mb-6 rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
-                      <p className="text-sm font-bold">Utilities are split across <span className="font-black">{statement.utility_payer_count}</span> utility-paying tenants. Heating allocation mode: <span className="font-black">{statement.heating_allocation_mode === 'room_usage' ? 'Room usage' : 'Equal fallback'}</span>.</p>
+                      <p className="text-sm font-bold">Utilities are split across <span className="font-black">{statement.utility_payer_count}</span> utility-paying tenants. Electricity allocation mode: <span className="font-black">{statement.electricity_allocation_mode === 'room_usage_remainder_split' ? 'Room kWh plus equal remainder' : 'Equal fallback'}</span>. Heating allocation mode: <span className="font-black">{statement.heating_allocation_mode === 'room_usage' ? 'Room usage' : 'Equal fallback'}</span>.</p>
                     </div>
 
                     <div className="mb-6 overflow-x-auto rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
@@ -534,6 +549,32 @@ const Rent: React.FC = () => {
                     </div>
 
                     <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+                      <div className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
+                        <h4 className="mb-4 font-headline text-lg font-black">Room Energy Usage</h4>
+                        <p className="mb-4 text-sm opacity-65">Enter room kWh for the Hidroelectrica invoice only. Any invoice kWh left over after the room entries is split equally across all utility-paying tenants.</p>
+                        <div className="space-y-3">
+                          {draftRoomEnergyUsages.map((usage) => (
+                            <label key={usage.room_id} className="flex items-center justify-between gap-4">
+                              <span className="font-bold">{usage.room_name}</span>
+                              <input type="number" step="0.01" value={usage.usage_kwh} onChange={(e) => updateRoomEnergyUsage(usage.room_id, e.target.value)} className="w-32 rounded-lg border border-outline-variant bg-surface-container px-3 py-2" />
+                            </label>
+                          ))}
+                          {draftRoomEnergyUsages.length === 0 && <p className="text-sm opacity-60">Add rooms first if you want room-based electricity allocation.</p>}
+                          <div className="flex items-center justify-between border-t border-outline-variant/60 pt-3 text-sm">
+                            <span>Invoice electricity usage</span>
+                            <span className="font-bold">{statement.source_summary.electricity_consumption_total.toFixed(2)} kWh</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span>Room-entered usage</span>
+                            <span className="font-bold">{draftRoomEnergyUsages.reduce((sum, usage) => sum + usage.usage_kwh, 0).toFixed(2)} kWh</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span>Equal-share remainder</span>
+                            <span className="font-bold">{Math.max(statement.source_summary.electricity_consumption_total - draftRoomEnergyUsages.reduce((sum, usage) => sum + usage.usage_kwh, 0), 0).toFixed(2)} kWh</span>
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
                         <h4 className="mb-4 font-headline text-lg font-black">Room Heating Usage</h4>
                         <div className="space-y-3">
@@ -654,6 +695,7 @@ const Rent: React.FC = () => {
                         <h4 className="mb-4 font-headline text-lg font-black">Current Month Sources</h4>
                         <div className="space-y-3 text-sm">
                           <div className="flex items-center justify-between"><span>Electricity invoice total</span><span className="font-bold">{formatMoney(statement.source_summary.electricity_total)}</span></div>
+                          <div className="flex items-center justify-between"><span>Electricity invoice usage</span><span className="font-bold">{statement.source_summary.electricity_consumption_total.toFixed(2)} kWh</span></div>
                           <div className="flex items-center justify-between"><span>Avizier total</span><span className="font-bold">{formatMoney(statement.source_summary.avizier_total)}</span></div>
                           <div className="flex items-center justify-between"><span>Heating inside avizier</span><span className="font-bold">{formatMoney(statement.source_summary.heating_total)}</span></div>
                           <div className="flex items-center justify-between"><span>Shared non-heating utilities</span><span className="font-bold">{formatMoney(statement.source_summary.non_heating_utilities_total)}</span></div>
