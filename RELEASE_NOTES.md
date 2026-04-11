@@ -1,13 +1,13 @@
-# UtilityMate v1.4.32
+# UtilityMate v1.4.33
 
 ## New Features
 
-- Added a dedicated `Previous Avg / Month` dashboard widget so the top summary row now shows both total and average views for the current and previous periods.
+- Standardized the average-history line styling so the top `Monthly Cost Trend` chart now uses the same dashed treatment as the section history charts.
 
 ## Improvements
 
-- Renamed the top summary widgets to clearer labels such as `Total Spend`, `Current Avg / Month`, `Previous Period Spend`, and `Utility Categories`.
+- The orange `Average Over the Years` series now looks the same across dashboard history views, which makes the chart language more consistent.
 
 ## Bug Fixes
 
-- Fixed the dashboard summary row making it hard to tell which cards described the current filter and which cards described the previous comparison period.
+- Fixed the main dashboard trend graph showing the average line as solid while the section history graphs showed the same series as dashed.

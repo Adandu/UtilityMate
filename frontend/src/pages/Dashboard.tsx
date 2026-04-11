@@ -316,7 +316,7 @@ const Dashboard: React.FC = () => {
                 <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
                 <Area type="monotone" dataKey="cost" stroke="#7c3aed" fill="url(#overallSpendArea)" strokeWidth={3} name="Cost" />
                 <Line type="monotone" dataKey="last_year_cost" stroke="#0f766e" strokeWidth={2} dot={false} connectNulls name="Last Year" />
-                <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={2} dot={false} name="Average Over the Years" />
+                <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={2} strokeDasharray="8 6" connectNulls dot={false} name="Average Over the Years" />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
