@@ -25,6 +25,14 @@ from ..utils.domain_logic import build_forecast, compute_budget_statuses, genera
 
 router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CATEGORY_DISPLAY_ORDER = {
+    "Energy": 0,
+    "Gas": 1,
+    "Cold Water": 2,
+    "Hot Water": 3,
+    "Shared Water": 4,
+    "Heating": 5,
+}
 
 
 def read_version() -> str:
@@ -322,7 +330,13 @@ def build_dashboard_payload(
                 comparison_rollups[category_id][line.location_id]["consumption"] += line.consumption_value or 0.0
 
     category_sections: List[api_schemas.DashboardCategorySection] = []
-    for category_id, monthly in sorted(category_monthly.items(), key=lambda item: category_meta[item[0]][0].lower()):
+    for category_id, monthly in sorted(
+        category_monthly.items(),
+        key=lambda item: (
+            CATEGORY_DISPLAY_ORDER.get(category_meta[item[0]][0], 999),
+            category_meta[item[0]][0].lower(),
+        ),
+    ):
         name, unit = category_meta[category_id]
         category_invoices = [
             invoice for invoice in selected_invoices

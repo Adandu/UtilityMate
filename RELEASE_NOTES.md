@@ -1,13 +1,13 @@
-# UtilityMate v1.4.29
+# UtilityMate v1.4.30
 
 ## New Features
 
-- Renamed the historical comparison series label to `Average Over the Years` so the dashboard wording matches the meaning of the calculation more clearly.
+- Added an explicit dashboard utility-category display order so the main trend sections now appear in the requested business order instead of plain alphabetical order.
 
 ## Improvements
 
-- Dashboard and PDF export wording are now aligned for the three-way history comparison lines: current value, last year, and average over the years.
+- Dashboard category sections now prioritize `Energy`, `Gas`, `Cold Water`, `Hot Water`, `Shared Water`, and `Heating`, while still placing any extra categories afterward in a stable way.
 
 ## Bug Fixes
 
-- Fixed the older `Historical Baseline` label being misleading for users who expect the orange line to represent an average across prior years.
+- Fixed dashboard utility categories appearing in a less useful alphabetical order that made the most important utilities harder to scan quickly.
