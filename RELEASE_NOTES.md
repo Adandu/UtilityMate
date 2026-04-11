@@ -1,13 +1,13 @@
-# UtilityMate v1.6.1
+# UtilityMate v1.6.2
 
 ## New Features
 
-- Added a dedicated per-tenant Other Adjustments table in Rent, mirroring the spreadsheet-style manual debit and credit workflow with support for negative values.
+- Added a tenant-facing Rent PDF export so each month can be downloaded as a clean proof-of-payment statement with per-person breakdowns and total amounts due.
 
 ## Improvements
 
-- Rent now aligns avizier charges with the statement posting month, so February aviziers flow into March rent calculations the same way they do in the workbook.
+- Rent statement exports now fit into a shareable one-page PDF layout with summary totals, source breakdowns, and a clear section for what each person owes.
 
 ## Bug Fixes
 
-- Fixed rent month source mapping so avizier totals are no longer attached to the statement display month when the payment logic should use the posted month instead.
+- Fixed the missing rent export flow so month statements can be generated directly from the Rent section instead of relying on screenshots or manual copy-paste.

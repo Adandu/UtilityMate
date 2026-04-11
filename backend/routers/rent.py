@@ -1,8 +1,15 @@
 from collections import defaultdict
 from datetime import date
+from io import BytesIO
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -372,6 +379,162 @@ def _build_statement(
     )
 
 
+def _build_rent_statement_pdf(
+    lease: database_models.RentLease,
+    statement: api_schemas.RentMonthStatement,
+) -> BytesIO:
+    buffer = BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+    )
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="RentHeading", parent=styles["Heading1"], fontSize=18, leading=22, textColor=colors.HexColor("#0f172a")))
+    styles.add(ParagraphStyle(name="RentSubheading", parent=styles["Heading2"], fontSize=11, leading=14, textColor=colors.HexColor("#334155")))
+    styles.add(ParagraphStyle(name="RentBody", parent=styles["BodyText"], fontSize=9, leading=12, textColor=colors.HexColor("#334155")))
+
+    month_label = statement.month.strftime("%B %Y")
+    story = [
+        Paragraph("UtilityMate Rent Statement", styles["RentHeading"]),
+        Spacer(1, 3 * mm),
+        Paragraph(
+            f"Workspace: <b>{lease.name}</b><br/>Location: <b>{lease.location.name}</b><br/>Month: <b>{month_label}</b>",
+            styles["RentBody"],
+        ),
+        Spacer(1, 4 * mm),
+    ]
+
+    summary_rows = [
+        ["Rent", "Electricity", "Avizier", "Heating", "Amount Due"],
+        [
+            f"{statement.totals['rent_total']:.2f} RON",
+            f"{statement.source_summary.electricity_total:.2f} RON",
+            f"{statement.source_summary.avizier_total:.2f} RON",
+            f"{statement.source_summary.heating_total:.2f} RON",
+            f"{statement.totals['amount_due_total']:.2f} RON",
+        ],
+    ]
+    summary_table = Table(summary_rows, colWidths=[35 * mm, 35 * mm, 35 * mm, 35 * mm, 35 * mm])
+    summary_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.extend([summary_table, Spacer(1, 4 * mm)])
+
+    if statement.notes:
+        story.extend([
+            Paragraph("Month Notes", styles["RentSubheading"]),
+            Spacer(1, 1.5 * mm),
+            Paragraph(statement.notes.replace("\n", "<br/>"), styles["RentBody"]),
+            Spacer(1, 4 * mm),
+        ])
+
+    story.extend([
+        Paragraph("What Each Person Has to Pay", styles["RentSubheading"]),
+        Spacer(1, 1.5 * mm),
+    ])
+
+    statement_rows = [[
+        "Tenant",
+        "Room",
+        "Rent",
+        "Electricity",
+        "Shared Utilities",
+        "Heating",
+        "Other",
+        "Previous",
+        "Payments",
+        "Amount Due",
+    ]]
+    for tenant in statement.tenant_statements:
+        statement_rows.append([
+            tenant.tenant_name,
+            tenant.room_name or "-",
+            f"{tenant.rent_amount:.2f}",
+            f"{tenant.electricity_amount:.2f}",
+            f"{tenant.shared_utilities_amount:.2f}",
+            f"{tenant.heating_amount:.2f}",
+            f"{tenant.other_adjustment:.2f}",
+            f"{tenant.previous_balance:.2f}",
+            f"{tenant.payments_in_month:.2f}",
+            f"{tenant.amount_due:.2f}",
+        ])
+    statement_table = Table(
+        statement_rows,
+        colWidths=[24 * mm, 20 * mm, 16 * mm, 19 * mm, 24 * mm, 18 * mm, 16 * mm, 18 * mm, 18 * mm, 20 * mm],
+        repeatRows=1,
+    )
+    statement_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dcfce7")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (-1, 1), (-1, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.extend([statement_table, Spacer(1, 4 * mm)])
+
+    story.extend([
+        Paragraph("Per-Person Breakdown", styles["RentSubheading"]),
+        Spacer(1, 1.5 * mm),
+    ])
+    for tenant in statement.tenant_statements:
+        breakdown_rows = [
+            ["Category", "Amount"],
+            ["Rent", f"{tenant.rent_amount:.2f} RON"],
+            ["Electricity", f"{tenant.electricity_amount:.2f} RON"],
+            ["Shared Utilities", f"{tenant.shared_utilities_amount:.2f} RON"],
+            ["Heating", f"{tenant.heating_amount:.2f} RON"],
+            ["Other Adjustments", f"{tenant.other_adjustment:.2f} RON"],
+            ["Previous Balance", f"{tenant.previous_balance:.2f} RON"],
+            ["Payments This Month", f"-{tenant.payments_in_month:.2f} RON"],
+            ["Amount Due", f"{tenant.amount_due:.2f} RON"],
+        ]
+        story.append(Paragraph(f"<b>{tenant.tenant_name}</b>{f' • {tenant.room_name}' if tenant.room_name else ''}", styles["RentBody"]))
+        person_table = Table(breakdown_rows, colWidths=[55 * mm, 35 * mm])
+        person_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+            ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("ALIGN", (1, 1), (1, -1), "RIGHT"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.extend([Spacer(1, 1.5 * mm), person_table, Spacer(1, 2.5 * mm)])
+
+    story.extend([
+        Paragraph(
+            f"Utility payer count: <b>{statement.utility_payer_count}</b> • Heating allocation: <b>{'Room usage' if statement.heating_allocation_mode == 'room_usage' else 'Equal fallback'}</b>",
+            styles["RentBody"],
+        )
+    ])
+
+    document.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+def _slugify_filename_part(value: str) -> str:
+    cleaned = "".join(char.lower() if char.isalnum() else "-" for char in value)
+    return "-".join(part for part in cleaned.split("-") if part) or "statement"
+
+
 @router.get("/leases", response_model=List[api_schemas.RentLeaseSummary])
 def list_rent_leases(
     db: Session = Depends(get_db),
@@ -588,6 +751,24 @@ def get_rent_statement(
 ):
     lease = _get_owned_lease(db, current_user.id, lease_id)
     return _build_statement(db, lease, month)
+
+
+@router.get("/leases/{lease_id}/statement-export")
+def export_rent_statement(
+    lease_id: int,
+    month: date = Query(...),
+    db: Session = Depends(get_db),
+    current_user: database_models.User = Depends(auth_utils.get_current_user),
+):
+    lease = _get_owned_lease(db, current_user.id, lease_id)
+    statement = _build_statement(db, lease, month)
+    pdf_buffer = _build_rent_statement_pdf(lease, statement)
+    filename = f"utilitymate-rent-{_slugify_filename_part(lease.location.name)}-{statement.month.strftime('%Y-%m')}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.put("/leases/{lease_id}/month", response_model=api_schemas.RentMonthStatement)

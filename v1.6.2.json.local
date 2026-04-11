@@ -1,0 +1,5 @@
+{
+  "version": "1.6.2",
+  "title": "UtilityMate v1.6.2",
+  "body": "## New Features\n\n- Added a tenant-facing Rent PDF export so each month can be downloaded as a clean proof-of-payment statement with per-person breakdowns and total amounts due.\n\n## Improvements\n\n- Rent statement exports now fit into a shareable one-page PDF layout with summary totals, source breakdowns, and a clear section for what each person owes.\n\n## Bug Fixes\n\n- Fixed the missing rent export flow so month statements can be generated directly from the Rent section instead of relying on screenshots or manual copy-paste.\n"
+}

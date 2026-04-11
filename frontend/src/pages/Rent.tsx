@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Home, Loader2, Plus, ReceiptText, Trash2, Users, BedDouble, CreditCard, Save } from 'lucide-react';
+import { Home, Loader2, Plus, ReceiptText, Trash2, Users, BedDouble, CreditCard, Save, Download } from 'lucide-react';
 import api from '../utils/api';
 
 interface LocationOption { id: number; name: string; }
@@ -108,6 +108,7 @@ const Rent: React.FC = () => {
   const [draftConfigs, setDraftConfigs] = useState<RentTenantMonthConfig[]>([]);
   const [draftRoomUsages, setDraftRoomUsages] = useState<RentRoomUsage[]>([]);
   const [noteDraft, setNoteDraft] = useState('');
+  const [exportingStatement, setExportingStatement] = useState(false);
 
   const [newLeaseName, setNewLeaseName] = useState('');
   const [newLeaseLocationId, setNewLeaseLocationId] = useState('');
@@ -324,6 +325,35 @@ const Rent: React.FC = () => {
     setDraftRoomUsages((current) => current.map((usage) => (usage.room_id === roomId ? { ...usage, usage_value: Number(value || 0) } : usage)));
   };
 
+  const exportStatementPdf = async () => {
+    if (!selectedLeaseId || !leaseDetail) return;
+    setExportingStatement(true);
+    try {
+      const response = await api.get(`/rent/leases/${selectedLeaseId}/statement-export`, {
+        params: { month: monthInputToApi(selectedMonth) },
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const objectUrl = window.URL.createObjectURL(blob);
+      const contentDisposition = response.headers['content-disposition'] as string | undefined;
+      const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
+      const fallbackName = `utilitymate-rent-${leaseDetail.location.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${selectedMonth}.pdf`;
+      const filename = match?.[1] || fallbackName;
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.error('Rent statement export failed', error);
+      window.alert('Rent statement export failed. Please try again in a few seconds.');
+    } finally {
+      setExportingStatement(false);
+    }
+  };
+
   if (loading && !leaseDetail && leases.length === 0) {
     return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
@@ -442,6 +472,10 @@ const Rent: React.FC = () => {
                     <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
                       {statementMonthOptions.map((month) => <option key={month} value={month}>{month}</option>)}
                     </select>
+                    <button onClick={exportStatementPdf} disabled={!statement || exportingStatement} className="flex items-center gap-2 rounded-xl border border-outline-variant bg-white/70 px-4 py-3 font-bold disabled:opacity-60 dark:bg-slate-900/40">
+                      {exportingStatement ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                      Export Tenant PDF
+                    </button>
                     <button onClick={saveMonthSetup} disabled={savingMonth} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white disabled:opacity-60">
                       {savingMonth ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                       Save Month Setup
