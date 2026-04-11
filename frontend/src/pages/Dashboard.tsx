@@ -69,7 +69,8 @@ interface DashboardResponse {
   overall_cost_series: DashboardSeriesPoint[];
   avizier_cost_series: DashboardSeriesPoint[];
   avizier_location_comparison: LocationComparisonPoint[];
-  category_sections: DashboardCategorySection[];
+  supplier_sections: DashboardCategorySection[];
+  avizier_sections: DashboardCategorySection[];
 }
 
 const tooltipStyle = {
@@ -232,9 +233,16 @@ const Dashboard: React.FC = () => {
     { label: 'Current Avg / Month', value: formatMoney(report.summary.avg_monthly_cost), icon: Sparkles, tone: 'text-blue-600' },
     { label: 'Previous Period Spend', value: formatMoney(report.summary.previous_period_cost), icon: TrendingUp, tone: 'text-amber-600' },
     { label: 'Previous Avg / Month', value: formatMoney(previousPeriodAverage), icon: TrendingDown, tone: 'text-violet-600' },
-    { label: 'Utility Categories', value: String(report.summary.active_categories), icon: MapPinned, tone: 'text-rose-600' },
+    { label: 'Main Utility Groups', value: String(report.summary.active_categories), icon: MapPinned, tone: 'text-rose-600' },
   ];
-  const categoryBreakdown = [...report.category_sections].sort((left, right) => right.total_cost - left.total_cost);
+  const supplierBreakdown = [...report.supplier_sections].sort((left, right) => right.total_cost - left.total_cost);
+  const avizierBreakdown = [...report.avizier_sections].sort((left, right) => right.total_cost - left.total_cost);
+  const avizierTotalCost = report.avizier_cost_series.reduce((sum, point) => sum + point.cost, 0);
+  const categoryBreakdown = [
+    ...supplierBreakdown.map((section) => ({ key: `supplier-${section.category_id}`, label: section.category_name, total_cost: section.total_cost, isSubsection: false })),
+    { key: 'avizier-total', label: 'Avizier', total_cost: avizierTotalCost, isSubsection: false },
+    ...avizierBreakdown.map((section) => ({ key: `avizier-${section.category_id}`, label: `Avizier / ${section.category_name}`, total_cost: section.total_cost, isSubsection: true })),
+  ];
 
   return (
     <div className="ml-64 min-h-screen bg-surface p-8 text-on-surface">
@@ -325,8 +333,8 @@ const Dashboard: React.FC = () => {
                 const share = report.summary.total_cost > 0 ? (section.total_cost / report.summary.total_cost) * 100 : 0;
                 const averagePerMonth = report.summary.months_covered > 0 ? section.total_cost / report.summary.months_covered : 0;
                 return (
-                  <tr key={section.category_id} className="border-t border-outline-variant">
-                    <td className="px-4 py-3 font-semibold">{section.category_name}</td>
+                  <tr key={section.key} className="border-t border-outline-variant">
+                    <td className={`px-4 py-3 ${section.isSubsection ? 'pl-8 font-medium opacity-85' : 'font-semibold'}`}>{section.label}</td>
                     <td className="px-4 py-3">{formatMoney(section.total_cost)}</td>
                     <td className="px-4 py-3">{formatMoney(averagePerMonth)}</td>
                     <td className="px-4 py-3">{share.toFixed(1)}%</td>
@@ -406,19 +414,19 @@ const Dashboard: React.FC = () => {
       <section className="space-y-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-headline text-2xl font-black">Utility Categories</h3>
-            <p className="text-sm opacity-70">Expand a category to inspect spend, consumption, cost per unit, same-month last year, historical average, and cross-location comparison for the selected period.</p>
+            <h3 className="font-headline text-2xl font-black">Main Utility Categories</h3>
+            <p className="text-sm opacity-70">Supplier-backed categories stay separate from association-statement costs so unit pricing remains faithful to the original invoices.</p>
           </div>
         </div>
 
-        {report.category_sections.length === 0 && (
+        {report.supplier_sections.length === 0 && (
           <div className="rounded-3xl border border-outline-variant bg-surface-container-low p-10 text-center">
             <p className="text-lg font-black">No invoice data is available for this filter.</p>
-            <p className="mt-2 text-sm opacity-70">Try another location or widen the time range to see category analytics.</p>
+            <p className="mt-2 text-sm opacity-70">Try another location or widen the time range to see supplier category analytics.</p>
           </div>
         )}
 
-        {report.category_sections.map((section, index) => (
+        {report.supplier_sections.map((section, index) => (
           <details key={section.category_id} className="group rounded-3xl border border-outline-variant bg-surface-container-low p-6" open={index === 0}>
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
               <div>
@@ -529,10 +537,10 @@ const Dashboard: React.FC = () => {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="mt-3 text-sm opacity-70">The comparison uses the current period filter across all locations so you can benchmark this utility category side by side.</p>
-              </div>
+              <p className="mt-3 text-sm opacity-70">The comparison uses the current period filter across all locations so you can benchmark this supplier category side by side.</p>
             </div>
-          </details>
+          </div>
+        </details>
         ))}
       </section>
 
@@ -541,7 +549,7 @@ const Dashboard: React.FC = () => {
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
             <div>
               <h3 className="font-headline text-2xl font-black">Avizier Cost per Month</h3>
-              <p className="mt-2 text-sm opacity-70">Monthly apartment-statement totals, history comparison, and cross-location benchmarking for the active period filter.</p>
+              <p className="mt-2 text-sm opacity-70">Association-statement totals stay separate from supplier invoices, with drill-down subsections for every avizier utility found in the selected period.</p>
             </div>
             <ChevronDown className="transition-transform duration-200 group-open:rotate-180" />
           </summary>
@@ -609,6 +617,136 @@ const Dashboard: React.FC = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="xl:col-span-2">
+              <div className="mb-4">
+                <h5 className="font-black">Avizier Utilities</h5>
+                <p className="mt-1 text-sm opacity-70">Expand a subsection to inspect monthly cost, consumption, unit cost where available, history, and location comparison for that avizier utility.</p>
+              </div>
+              <div className="space-y-5">
+                {report.avizier_sections.map((section, index) => (
+                  <details key={`avizier-section-${section.category_id}`} className="group rounded-3xl border border-outline-variant bg-surface-container p-6" open={index === 0}>
+                    <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.2em] opacity-50">Avizier Utility</p>
+                        <h4 className="mt-1 font-headline text-2xl font-black">{section.category_name}</h4>
+                        <p className="mt-2 text-sm opacity-70">
+                          {formatMoney(section.total_cost)} spent • {section.total_consumption.toFixed(2)} {section.unit} consumed • {formatUnitCost(section.avg_unit_cost, section.unit)}
+                        </p>
+                      </div>
+                      <ChevronDown className="transition-transform duration-200 group-open:rotate-180" />
+                    </summary>
+
+                    <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+                      <div className="rounded-3xl border border-outline-variant bg-white/70 p-5 dark:bg-slate-900/40">
+                        <h5 className="mb-4 font-black">Cost per Month</h5>
+                        <div className="h-72">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={section.monthly_series}>
+                              <defs>
+                                <linearGradient id={`avizier-costArea-${section.category_id}`} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
+                                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0.04} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
+                              <XAxis dataKey="label" axisLine={false} tickLine={false} />
+                              <YAxis axisLine={false} tickLine={false} />
+                              <Legend wrapperStyle={legendStyle} />
+                              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} />
+                              <Area type="monotone" dataKey="cost" stroke="#2563eb" fill={`url(#avizier-costArea-${section.category_id})`} strokeWidth={3} name="Cost" />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl border border-outline-variant bg-white/70 p-5 dark:bg-slate-900/40">
+                        <h5 className="mb-4 font-black">Consumption per Month</h5>
+                        <div className="h-72">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={section.monthly_series}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
+                              <XAxis dataKey="label" axisLine={false} tickLine={false} />
+                              <YAxis axisLine={false} tickLine={false} />
+                              <Legend wrapperStyle={legendStyle} />
+                              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={consumptionTooltipFormatter(section.unit)} />
+                              <Bar dataKey="consumption" fill="#14b8a6" radius={[10, 10, 0, 0]} name="Consumption" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl border border-outline-variant bg-white/70 p-5 dark:bg-slate-900/40">
+                        <h5 className="mb-4 font-black">Unit Cost</h5>
+                        <div className="h-72">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={section.monthly_series}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
+                              <XAxis dataKey="label" axisLine={false} tickLine={false} />
+                              <YAxis axisLine={false} tickLine={false} />
+                              <Legend wrapperStyle={legendStyle} />
+                              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={unitCostTooltipFormatter(section.unit)} />
+                              <Line type="monotone" dataKey="unit_cost" stroke="#7c3aed" strokeWidth={3} connectNulls dot={{ r: 3 }} name="Unit Cost" />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl border border-outline-variant bg-white/70 p-5 dark:bg-slate-900/40">
+                        <h5 className="mb-4 font-black">History Comparison</h5>
+                        <div className="h-72">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={section.monthly_series}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
+                              <XAxis dataKey="label" axisLine={false} tickLine={false} />
+                              <YAxis axisLine={false} tickLine={false} />
+                              <Legend wrapperStyle={legendStyle} />
+                              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--color-on-surface)' }} itemStyle={{ color: 'var(--color-on-surface)' }} formatter={costTooltipFormatter} itemSorter={historyItemSorter} />
+                              <Line type="monotone" dataKey="cost" stroke="#7c3aed" strokeWidth={3} dot={{ r: 3 }} name="Cost" />
+                              <Line type="monotone" dataKey="last_year_cost" stroke="#0f766e" strokeWidth={3} connectNulls dot={false} name="Last Year" />
+                              <Line type="monotone" dataKey="forecast_cost" stroke="#f97316" strokeWidth={3} strokeDasharray="8 6" connectNulls dot={false} name="Average Over the Years" />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl border border-outline-variant bg-white/70 p-5 dark:bg-slate-900/40 xl:col-span-2">
+                        <h5 className="mb-4 font-black">Compare Locations for {section.category_name}</h5>
+                        <div className="h-80">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={section.location_comparison}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.12} />
+                              <XAxis dataKey="location_name" axisLine={false} tickLine={false} />
+                              <YAxis axisLine={false} tickLine={false} />
+                              <Legend wrapperStyle={legendStyle} />
+                              <Tooltip
+                                contentStyle={tooltipStyle}
+                                labelStyle={{ color: 'var(--color-on-surface)' }}
+                                itemStyle={{ color: 'var(--color-on-surface)' }}
+                                formatter={(value, name) => {
+                                  if (name === 'Cost') {
+                                    return costTooltipFormatter(value, name);
+                                  }
+                                  return unitCostTooltipFormatter(section.unit)(value, name);
+                                }}
+                              />
+                              <Bar dataKey="cost" fill="#0f766e" radius={[10, 10, 0, 0]} name="Cost" />
+                              <Bar dataKey="unit_cost" fill="#7c3aed" radius={[10, 10, 0, 0]} name="Unit Cost" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <p className="mt-3 text-sm opacity-70">The comparison uses the current period filter across all locations so you can benchmark this avizier utility side by side.</p>
+                      </div>
+                    </div>
+                  </details>
+                ))}
+                {report.avizier_sections.length === 0 && (
+                  <div className="rounded-3xl border border-outline-variant bg-surface-container p-8 text-center">
+                    <p className="text-sm opacity-70">No avizier utility subsections are available for the selected filters.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </details>

@@ -430,7 +430,8 @@ class DashboardAnalyticsResponse(BaseModel):
     overall_cost_series: List[DashboardSeriesPoint]
     avizier_cost_series: List[DashboardSeriesPoint]
     avizier_location_comparison: List[LocationComparisonPoint]
-    category_sections: List[DashboardCategorySection]
+    supplier_sections: List[DashboardCategorySection]
+    avizier_sections: List[DashboardCategorySection]
 
 
 class AppStats(BaseModel):

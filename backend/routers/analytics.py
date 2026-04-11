@@ -32,6 +32,7 @@ CATEGORY_DISPLAY_ORDER = {
     "Hot Water": 3,
     "Shared Water": 4,
     "Heating": 5,
+    "Storm Water": 6,
 }
 
 
@@ -310,8 +311,10 @@ def build_dashboard_payload(
 
     overall_monthly: Dict[str, Dict[str, float]] = defaultdict(lambda: {"cost": 0.0, "consumption": 0.0})
     avizier_monthly: Dict[str, Dict[str, float]] = defaultdict(lambda: {"cost": 0.0, "consumption": 0.0})
-    category_monthly: Dict[int, Dict[str, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
-    category_meta: Dict[int, Tuple[str, str]] = {}
+    supplier_monthly: Dict[int, Dict[str, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
+    supplier_meta: Dict[int, Tuple[str, str]] = {}
+    avizier_category_monthly: Dict[int, Dict[str, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
+    avizier_category_meta: Dict[int, Tuple[str, str]] = {}
 
     for invoice in filtered_invoices:
         bucket = invoice.invoice_date.strftime("%Y-%m")
@@ -319,9 +322,9 @@ def build_dashboard_payload(
         overall_monthly[bucket]["consumption"] += invoice.consumption_value or 0.0
         if invoice.provider and invoice.provider.category:
             category = invoice.provider.category
-            category_meta[category.id] = (category.name, category.unit)
-            category_monthly[category.id][bucket]["cost"] += invoice.amount
-            category_monthly[category.id][bucket]["consumption"] += invoice.consumption_value or 0.0
+            supplier_meta[category.id] = (category.name, category.unit)
+            supplier_monthly[category.id][bucket]["cost"] += invoice.amount
+            supplier_monthly[category.id][bucket]["consumption"] += invoice.consumption_value or 0.0
 
     for item in filtered_statement_totals:
         bucket = item.invoice_date.strftime("%Y-%m")
@@ -332,10 +335,10 @@ def build_dashboard_payload(
         bucket = line.statement.statement_month.strftime("%Y-%m")
         if line.include_in_category_analytics and line.category:
             category = line.category
-            category_meta[category.id] = (category.name, category.unit)
-            category_monthly[category.id][bucket]["cost"] += line.amount
+            avizier_category_meta[category.id] = (category.name, category.unit)
+            avizier_category_monthly[category.id][bucket]["cost"] += line.amount
             if line.include_in_unit_cost:
-                category_monthly[category.id][bucket]["consumption"] += line.consumption_value or 0.0
+                avizier_category_monthly[category.id][bucket]["consumption"] += line.consumption_value or 0.0
 
     overall_history_invoices = list(selected_invoices)
     overall_history_invoices.extend(selected_statement_totals)
@@ -354,13 +357,14 @@ def build_dashboard_payload(
         avizier_forecast_lookup,
     )
 
-    comparison_rollups: Dict[int, Dict[int, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
+    supplier_comparison_rollups: Dict[int, Dict[int, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
     avizier_comparison_rollups: Dict[int, float] = defaultdict(float)
+    avizier_category_comparison_rollups: Dict[int, Dict[int, Dict[str, float]]] = defaultdict(lambda: defaultdict(lambda: {"cost": 0.0, "consumption": 0.0}))
     for invoice in comparison_invoices:
         if invoice.provider and invoice.provider.category:
             category_id = invoice.provider.category.id
-            comparison_rollups[category_id][invoice.location_id]["cost"] += invoice.amount
-            comparison_rollups[category_id][invoice.location_id]["consumption"] += invoice.consumption_value or 0.0
+            supplier_comparison_rollups[category_id][invoice.location_id]["cost"] += invoice.amount
+            supplier_comparison_rollups[category_id][invoice.location_id]["consumption"] += invoice.consumption_value or 0.0
 
     for item in comparison_statement_totals:
         avizier_comparison_rollups[item.location_id] += item.amount
@@ -368,33 +372,24 @@ def build_dashboard_payload(
     for line in comparison_statement_lines:
         if line.include_in_category_analytics and line.category:
             category_id = line.category.id
-            comparison_rollups[category_id][line.location_id]["cost"] += line.amount
+            avizier_category_comparison_rollups[category_id][line.location_id]["cost"] += line.amount
             if line.include_in_unit_cost:
-                comparison_rollups[category_id][line.location_id]["consumption"] += line.consumption_value or 0.0
+                avizier_category_comparison_rollups[category_id][line.location_id]["consumption"] += line.consumption_value or 0.0
 
-    category_sections: List[api_schemas.DashboardCategorySection] = []
+    supplier_sections: List[api_schemas.DashboardCategorySection] = []
     for category_id, monthly in sorted(
-        category_monthly.items(),
+        supplier_monthly.items(),
         key=lambda item: (
-            CATEGORY_DISPLAY_ORDER.get(category_meta[item[0]][0], 999),
-            category_meta[item[0]][0].lower(),
+            CATEGORY_DISPLAY_ORDER.get(supplier_meta[item[0]][0], 999),
+            supplier_meta[item[0]][0].lower(),
         ),
     ):
-        name, unit = category_meta[category_id]
+        name, unit = supplier_meta[category_id]
         category_invoices = [
             invoice for invoice in selected_invoices
             if invoice.provider and invoice.provider.category and invoice.provider.category.id == category_id
         ]
-        category_history_points = list(category_invoices)
-        category_history_points.extend(
-            type("SyntheticInvoice", (), {
-                "invoice_date": line.statement.statement_month,
-                "amount": line.amount,
-            })()
-            for line in selected_statement_lines
-            if line.include_in_category_analytics and line.category and line.category.id == category_id and line.statement
-        )
-        previous_year_lookup, forecast_lookup = build_history_lookups(category_history_points)
+        previous_year_lookup, forecast_lookup = build_history_lookups(category_invoices)
         monthly_series = build_monthly_series(
             monthly,
             month_labels,
@@ -407,7 +402,7 @@ def build_dashboard_payload(
 
         location_comparison: List[api_schemas.LocationComparisonPoint] = []
         for location in locations:
-            location_totals = comparison_rollups[category_id][location.id]
+            location_totals = supplier_comparison_rollups[category_id][location.id]
             unit_cost = (
                 round(location_totals["cost"] / location_totals["consumption"], 4)
                 if location_totals["consumption"] > 0 else None
@@ -420,7 +415,61 @@ def build_dashboard_payload(
                 unit_cost=unit_cost,
             ))
 
-        category_sections.append(api_schemas.DashboardCategorySection(
+        supplier_sections.append(api_schemas.DashboardCategorySection(
+            category_id=category_id,
+            category_name=name,
+            unit=unit,
+            total_cost=round(total_cost, 2),
+            total_consumption=round(total_consumption, 3),
+            avg_unit_cost=avg_unit_cost,
+            monthly_series=monthly_series,
+            location_comparison=location_comparison,
+        ))
+
+    avizier_sections: List[api_schemas.DashboardCategorySection] = []
+    for category_id, monthly in sorted(
+        avizier_category_monthly.items(),
+        key=lambda item: (
+            CATEGORY_DISPLAY_ORDER.get(avizier_category_meta[item[0]][0], 999),
+            avizier_category_meta[item[0]][0].lower(),
+        ),
+    ):
+        name, unit = avizier_category_meta[category_id]
+        history_points = [
+            type("SyntheticInvoice", (), {
+                "invoice_date": line.statement.statement_month,
+                "amount": line.amount,
+            })()
+            for line in selected_statement_lines
+            if line.include_in_category_analytics and line.category and line.category.id == category_id and line.statement
+        ]
+        previous_year_lookup, forecast_lookup = build_history_lookups(history_points)
+        monthly_series = build_monthly_series(
+            monthly,
+            month_labels,
+            previous_year_lookup,
+            forecast_lookup,
+        )
+        total_cost = sum(point.cost for point in monthly_series)
+        total_consumption = sum(point.consumption for point in monthly_series)
+        avg_unit_cost = round(total_cost / total_consumption, 4) if total_consumption > 0 else None
+
+        location_comparison: List[api_schemas.LocationComparisonPoint] = []
+        for location in locations:
+            location_totals = avizier_category_comparison_rollups[category_id][location.id]
+            unit_cost = (
+                round(location_totals["cost"] / location_totals["consumption"], 4)
+                if location_totals["consumption"] > 0 else None
+            )
+            location_comparison.append(api_schemas.LocationComparisonPoint(
+                location_id=location.id,
+                location_name=location.name,
+                cost=round(location_totals["cost"], 2),
+                consumption=round(location_totals["consumption"], 3),
+                unit_cost=unit_cost,
+            ))
+
+        avizier_sections.append(api_schemas.DashboardCategorySection(
             category_id=category_id,
             category_name=name,
             unit=unit,
@@ -456,7 +505,7 @@ def build_dashboard_payload(
         avg_monthly_cost=round(total_cost / max(1, len(month_labels)), 2),
         previous_period_cost=previous_period_cost,
         change_ratio=change_ratio,
-        active_categories=len(category_sections),
+        active_categories=len(supplier_sections) + (1 if selected_statement_totals else 0),
         months_covered=len(month_labels),
     )
 
@@ -470,7 +519,8 @@ def build_dashboard_payload(
         overall_cost_series=overall_cost_series,
         avizier_cost_series=avizier_cost_series,
         avizier_location_comparison=avizier_location_comparison,
-        category_sections=category_sections,
+        supplier_sections=supplier_sections,
+        avizier_sections=avizier_sections,
     )
 
 
@@ -551,7 +601,7 @@ def build_dashboard_pdf(
 
     summary_table = Table(
         [
-            ["Period Spend", "Average / Month", "Previous Period", "Tracked Categories"],
+            ["Period Spend", "Average / Month", "Previous Period", "Main Utility Groups"],
             [
                 f"{dashboard.summary.total_cost:.2f} RON",
                 f"{dashboard.summary.avg_monthly_cost:.2f} RON",
@@ -577,10 +627,26 @@ def build_dashboard_pdf(
     category_breakdown_rows = [["Utility", "Cost", "Average / Month", "Share"]]
     total_cost = dashboard.summary.total_cost or 0.0
     months_covered = max(1, dashboard.summary.months_covered)
-    for section in sorted(dashboard.category_sections, key=lambda item: item.total_cost, reverse=True):
+    for section in sorted(dashboard.supplier_sections, key=lambda item: item.total_cost, reverse=True):
         share = (section.total_cost / total_cost * 100) if total_cost > 0 else 0.0
         category_breakdown_rows.append([
             section.category_name,
+            f"{section.total_cost:.2f} RON",
+            f"{(section.total_cost / months_covered):.2f} RON",
+            f"{share:.1f}%",
+        ])
+    avizier_total_cost = sum(point.cost for point in dashboard.avizier_cost_series)
+    avizier_total_share = (avizier_total_cost / total_cost * 100) if total_cost > 0 else 0.0
+    category_breakdown_rows.append([
+        "Avizier",
+        f"{avizier_total_cost:.2f} RON",
+        f"{(avizier_total_cost / months_covered):.2f} RON",
+        f"{avizier_total_share:.1f}%",
+    ])
+    for section in sorted(dashboard.avizier_sections, key=lambda item: item.total_cost, reverse=True):
+        share = (section.total_cost / total_cost * 100) if total_cost > 0 else 0.0
+        category_breakdown_rows.append([
+            f"  Avizier / {section.category_name}",
             f"{section.total_cost:.2f} RON",
             f"{(section.total_cost / months_covered):.2f} RON",
             f"{share:.1f}%",
@@ -621,7 +687,7 @@ def build_dashboard_pdf(
         Spacer(1, 6 * mm),
     ])
 
-    for section in dashboard.category_sections:
+    for section in dashboard.supplier_sections:
         story.append(Paragraph(section.category_name, styles["UtilityMateSubheading"]))
         story.append(Paragraph(
             f"Total Cost: <b>{section.total_cost:.2f} RON</b> | Total Consumption: <b>{section.total_consumption:.3f} {section.unit}</b> | Unit Cost: <b>{section.avg_unit_cost:.4f} RON / {section.unit}</b>" if section.avg_unit_cost is not None else
@@ -728,6 +794,58 @@ def build_dashboard_pdf(
         ),
         Spacer(1, 6 * mm),
     ])
+
+    for section in dashboard.avizier_sections:
+        story.append(Paragraph(f"Avizier / {section.category_name}", styles["UtilityMateSubheading"]))
+        story.append(Paragraph(
+            f"Total Cost: <b>{section.total_cost:.2f} RON</b> | Total Consumption: <b>{section.total_consumption:.3f} {section.unit}</b> | Unit Cost: <b>{section.avg_unit_cost:.4f} RON / {section.unit}</b>" if section.avg_unit_cost is not None else
+            f"Total Cost: <b>{section.total_cost:.2f} RON</b> | Total Consumption: <b>{section.total_consumption:.3f} {section.unit}</b> | Unit Cost: <b>No data</b>",
+            styles["UtilityMateBody"],
+        ))
+        story.append(Spacer(1, 2 * mm))
+
+        labels = [point.label for point in section.monthly_series]
+        story.append(Image(
+            render_chart_image(
+                f"Avizier {section.category_name} Cost, Last Year, and Average Over the Years",
+                labels,
+                [
+                    ("Cost", [point.cost for point in section.monthly_series], "#2563eb"),
+                    ("Last Year", [point.last_year_cost for point in section.monthly_series], "#0f766e"),
+                    ("Average Over the Years", [point.forecast_cost for point in section.monthly_series], "#f97316"),
+                ],
+                "RON",
+            ),
+            width=180 * mm,
+            height=68 * mm,
+        ))
+        story.append(Spacer(1, 2 * mm))
+        story.append(Image(
+            render_chart_image(
+                f"Avizier {section.category_name} Consumption and Unit Cost",
+                labels,
+                [
+                    ("Consumption", [point.consumption for point in section.monthly_series], "#14b8a6"),
+                    ("Unit Cost", [point.unit_cost for point in section.monthly_series], "#7c3aed"),
+                ],
+                f"{section.unit} / RON",
+            ),
+            width=180 * mm,
+            height=68 * mm,
+        ))
+        story.append(Spacer(1, 2 * mm))
+        story.append(Image(
+            render_bar_chart_image(
+                f"Avizier {section.category_name} Location Comparison",
+                [point.location_name for point in section.location_comparison],
+                [point.cost for point in section.location_comparison],
+                "#0f766e",
+                "RON",
+            ),
+            width=180 * mm,
+            height=68 * mm,
+        ))
+        story.append(Spacer(1, 6 * mm))
 
     document.build(story)
     buffer.seek(0)

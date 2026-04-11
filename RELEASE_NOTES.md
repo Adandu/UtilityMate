@@ -1,13 +1,13 @@
-# UtilityMate v1.4.38
+# UtilityMate v1.4.39
 
 ## New Features
 
-- Added an `Average / Month` column to the `Cost Breakdown by Utility` table in both the dashboard and the PDF export.
+- Refactored the dashboard into three main utility groups: `Energy` (Hidroelectrica invoices), `Gas` (Engie invoices), and `Avizier`, with nested avizier utility subsections such as `Energy`, `Gas`, `Cold Water`, and `Hot Water`.
 
 ## Improvements
 
-- The utility breakdown table now gives a quicker period-normalized read of each category without needing to calculate monthly averages mentally.
+- Cost breakdowns, supplier charts, avizier charts, and summary widgets now keep supplier invoice data separate from avizier costs so unit pricing remains faithful to the original invoices.
 
 ## Bug Fixes
 
-- Fixed the dashboard and export tables drifting out of sync by keeping the same utility breakdown columns in both places.
+- Fixed mixed `Energy` and `Gas` dashboard calculations where avizier costs could inflate supplier unit-cost metrics by adding cost without corresponding invoice consumption.
