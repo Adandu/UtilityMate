@@ -1,16 +1,16 @@
-# UtilityMate v1.7.0
+# UtilityMate v1.7.1
 
 ## New Features
 
-- Added a dedicated `Meter Readings` section with stream-based history, device labels, inline editing, and invoice-aware reading context.
-- Added separate meter stream summaries so apartments can track multiple devices in the same category, such as kitchen water, bathroom water, and room-level heat meters.
+- Added Excel meter-reading import for the `AP 12` and `AP 15` workbook sheets directly from the dedicated Meter Readings page.
+- Added import summaries so each workbook upload reports what was imported, updated, or skipped for every detected meter stream.
 
 ## Improvements
 
-- Meter history now calculates the difference against the previous reading for each individual stream instead of flattening everything into one category-level list.
-- Operations now links out to the dedicated Meter Readings workspace instead of mixing raw measurement management into the broader operations view.
+- Meter imports now ignore workbook invoice sections entirely and only bring in the raw meter histories that belong in UtilityMate.
+- Existing invoices remain the billing source of truth while imported readings still link back to nearby invoices for reconciliation inside the Meter Readings page.
 
 ## Bug Fixes
 
-- Fixed the old one-reading-per-category-per-day limitation by migrating meter uniqueness to `location + category + meter label + date`.
-- Fixed meter workflows so existing invoices remain the single billing source while readings can still be linked back for reconciliation.
+- Fixed duplicate handling for repeated workbook uploads by preserving manual readings and allowing optional replacement of earlier Excel-imported rows only.
+- Fixed workbook parsing by using explicit AP 12 / AP 15 stream mappings for electricity, gas, water, and radiator histories.

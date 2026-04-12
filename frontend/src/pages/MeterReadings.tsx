@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { CalendarDays, ChevronRight, Gauge, Loader2, Pencil, Plus, Receipt, Save, Trash2, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { CalendarDays, ChevronRight, FileSpreadsheet, Gauge, Loader2, Pencil, Plus, Receipt, Save, Trash2, Upload, X } from 'lucide-react';
 import api from '../utils/api';
 
 interface Category {
@@ -69,6 +69,24 @@ interface StreamListResponse {
   items: StreamSummary[];
 }
 
+interface ImportResult {
+  worksheet_name: string;
+  location_name: string;
+  category_name: string;
+  meter_label: string;
+  imported: number;
+  updated: number;
+  skipped: number;
+}
+
+interface ImportResponse {
+  filename: string;
+  imported_total: number;
+  updated_total: number;
+  skipped_total: number;
+  results: ImportResult[];
+}
+
 const streamKey = (locationId: number, categoryId: number, meterLabel: string) => `${locationId}:${categoryId}:${meterLabel}`;
 
 const formatNumber = (value?: number | null) => (typeof value === 'number' ? value.toFixed(2) : '—');
@@ -84,6 +102,9 @@ const MeterReadings: React.FC = () => {
   const [locationFilter, setLocationFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedStreamKey, setSelectedStreamKey] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [replaceExistingExcel, setReplaceExistingExcel] = useState(false);
+  const [importSummary, setImportSummary] = useState<ImportResponse | null>(null);
   const [formLocation, setFormLocation] = useState('');
   const [formCategory, setFormCategory] = useState('');
   const [formMeterLabel, setFormMeterLabel] = useState('');
@@ -95,6 +116,7 @@ const MeterReadings: React.FC = () => {
   const [editValue, setEditValue] = useState('');
   const [editMeterLabel, setEditMeterLabel] = useState('');
   const [editNotes, setEditNotes] = useState('');
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const fetchBaseData = async () => {
     setLoading(true);
@@ -264,6 +286,33 @@ const MeterReadings: React.FC = () => {
     }
   };
 
+  const importWorkbook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const file = importInputRef.current?.files?.[0];
+    if (!file) {
+      setPageError('Choose the Excel workbook first.');
+      return;
+    }
+
+    setImporting(true);
+    setPageError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('replace_existing_excel', String(replaceExistingExcel));
+      const response = await api.post<ImportResponse>('/consumption/import/excel', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setImportSummary(response.data);
+      if (importInputRef.current) importInputRef.current.value = '';
+      await fetchBaseData();
+    } catch (error: any) {
+      setPageError(error?.response?.data?.detail || 'Workbook import failed.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (loading) {
     return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
@@ -311,6 +360,44 @@ const MeterReadings: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-8 xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="space-y-6">
+          <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <FileSpreadsheet size={18} className="text-emerald-600" />
+              <h3 className="font-headline text-xl font-black">Import From Excel</h3>
+            </div>
+            <form onSubmit={importWorkbook} className="space-y-4">
+              <input ref={importInputRef} type="file" accept=".xlsx" className="w-full rounded-xl border border-outline-variant bg-surface-container p-3" />
+              <label className="flex items-start gap-3 rounded-xl border border-outline-variant bg-surface-container p-3 text-sm">
+                <input type="checkbox" checked={replaceExistingExcel} onChange={(e) => setReplaceExistingExcel(e.target.checked)} className="mt-1" />
+                <span>Replace existing `excel_import` readings for the same stream and date. Manual readings are always preserved.</span>
+              </label>
+              <button disabled={importing} type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white disabled:opacity-60">
+                <Upload size={16} /> {importing ? 'Importing...' : 'Import Workbook'}
+              </button>
+            </form>
+            <p className="mt-3 text-xs opacity-60">Supported sheets: `AP 12` and `AP 15`. Invoice sections are ignored; only meter histories are imported.</p>
+
+            {importSummary && (
+              <div className="mt-5 space-y-3">
+                <div className="rounded-2xl border border-outline-variant bg-white/70 p-4 text-sm dark:bg-slate-900/40">
+                  <p className="font-black">{importSummary.filename}</p>
+                  <p className="mt-2 opacity-70">
+                    Imported {importSummary.imported_total}, updated {importSummary.updated_total}, skipped {importSummary.skipped_total}.
+                  </p>
+                </div>
+                <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                  {importSummary.results.map((result) => (
+                    <div key={`${result.worksheet_name}-${result.location_name}-${result.category_name}-${result.meter_label}`} className="rounded-2xl border border-outline-variant bg-white/70 p-4 text-sm dark:bg-slate-900/40">
+                      <p className="font-black">{result.location_name} • {result.category_name}</p>
+                      <p className="opacity-70">{result.meter_label} from {result.worksheet_name}</p>
+                      <p className="mt-2 text-xs font-bold uppercase opacity-60">Imported {result.imported} • Updated {result.updated} • Skipped {result.skipped}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
           <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6">
             <div className="mb-4 flex items-center gap-2">
               <Plus size={18} className="text-emerald-600" />
