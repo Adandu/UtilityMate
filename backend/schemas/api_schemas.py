@@ -269,24 +269,6 @@ class ConsumptionStreamListResponse(BaseModel):
     items: List[ConsumptionStreamSummary]
 
 
-class ConsumptionImportResult(BaseModel):
-    worksheet_name: str
-    location_name: str
-    category_name: str
-    meter_label: str
-    imported: int
-    updated: int
-    skipped: int
-
-
-class ConsumptionImportResponse(BaseModel):
-    filename: str
-    imported_total: int
-    updated_total: int
-    skipped_total: int
-    results: List[ConsumptionImportResult]
-
-
 class HouseholdBase(BaseModel):
     name: str
     description: Optional[str] = None

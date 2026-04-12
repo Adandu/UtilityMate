@@ -1,8 +1,7 @@
-from collections import defaultdict
 from datetime import date
 from typing import Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -11,7 +10,6 @@ from ..models import database_models
 from ..schemas import api_schemas
 from ..utils import auth_utils
 from ..utils.domain_logic import generate_consumption_alert
-from ..utils.meter_import import normalize_location_name, parse_meter_workbook
 
 router = APIRouter()
 
@@ -32,52 +30,6 @@ def _resolve_category(
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     return category
-
-
-def _resolve_category_by_name(
-    db: Session,
-    category_name: str,
-    current_user: database_models.User,
-) -> database_models.Category:
-    normalized = category_name.strip().lower()
-    candidates = db.query(database_models.Category).filter(
-        (database_models.Category.user_id == current_user.id) | (database_models.Category.user_id.is_(None))
-    ).all()
-
-    for category in candidates:
-        if (category.name or "").strip().lower() == normalized and category.user_id == current_user.id:
-            return category
-    for category in candidates:
-        if (category.name or "").strip().lower() == normalized:
-            return category
-
-    synonyms = {
-        "energy": ("electricity",),
-        "heating": ("heat",),
-    }
-    for alias in synonyms.get(normalized, ()):
-        for category in candidates:
-            if (category.name or "").strip().lower() == alias and category.user_id == current_user.id:
-                return category
-        for category in candidates:
-            if (category.name or "").strip().lower() == alias:
-                return category
-
-    raise HTTPException(status_code=404, detail=f"Category '{category_name}' is missing from Configuration")
-
-
-def _resolve_location_by_key(
-    db: Session,
-    location_key: str,
-    current_user: database_models.User,
-) -> database_models.Location:
-    locations = db.query(database_models.Location).filter(
-        database_models.Location.user_id == current_user.id
-    ).all()
-    for location in locations:
-        if normalize_location_name(location.name) == location_key:
-            return location
-    raise HTTPException(status_code=404, detail=f"Location mapping failed for workbook key '{location_key}'")
 
 
 def _load_candidate_invoices(
@@ -341,102 +293,3 @@ def delete_consumption_index(
     db.delete(index)
     db.commit()
     return {"message": "Consumption index deleted"}
-
-
-@router.post("/import/excel", response_model=api_schemas.ConsumptionImportResponse)
-async def import_consumption_indexes_from_excel(
-    file: UploadFile = File(...),
-    replace_existing_excel: bool = Form(False),
-    db: Session = Depends(get_db),
-    current_user: database_models.User = Depends(auth_utils.get_current_user),
-):
-    filename = file.filename or "meter-readings.xlsx"
-    if not filename.lower().endswith(".xlsx"):
-        raise HTTPException(status_code=400, detail="Please upload an .xlsx workbook")
-
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded workbook is empty")
-
-    try:
-        parsed_readings = parse_meter_workbook(file_bytes)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Workbook could not be parsed: {exc}")
-
-    if not parsed_readings:
-        raise HTTPException(status_code=400, detail="No supported meter readings were found in AP 12 / AP 15")
-
-    grouped_results: Dict[Tuple[str, str, str, str], Dict[str, int]] = defaultdict(lambda: {"imported": 0, "updated": 0, "skipped": 0})
-    imported_total = 0
-    updated_total = 0
-    skipped_total = 0
-
-    for parsed in parsed_readings:
-        location = _resolve_location_by_key(db, parsed.location_key, current_user)
-        category = _resolve_category_by_name(db, parsed.category_name, current_user)
-        result_key = (parsed.worksheet_name, location.name, category.name, parsed.meter_label)
-
-        existing = db.query(database_models.ConsumptionIndex).filter(
-            database_models.ConsumptionIndex.user_id == current_user.id,
-            database_models.ConsumptionIndex.location_id == location.id,
-            database_models.ConsumptionIndex.category_id == category.id,
-            database_models.ConsumptionIndex.meter_label == parsed.meter_label,
-            database_models.ConsumptionIndex.reading_date == parsed.reading_date,
-        ).first()
-
-        if existing:
-            if existing.source_type == "manual":
-                grouped_results[result_key]["skipped"] += 1
-                skipped_total += 1
-                continue
-            if existing.source_type == "excel_import" and not replace_existing_excel:
-                grouped_results[result_key]["skipped"] += 1
-                skipped_total += 1
-                continue
-
-            existing.value = parsed.value
-            existing.notes = parsed.notes
-            existing.source_type = "excel_import"
-            grouped_results[result_key]["updated"] += 1
-            updated_total += 1
-            continue
-
-        db.add(database_models.ConsumptionIndex(
-            user_id=current_user.id,
-            location_id=location.id,
-            category_id=category.id,
-            meter_label=parsed.meter_label,
-            value=parsed.value,
-            reading_date=parsed.reading_date,
-            source_type="excel_import",
-            notes=parsed.notes,
-        ))
-        grouped_results[result_key]["imported"] += 1
-        imported_total += 1
-
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="Workbook import created duplicate readings for the same stream/date")
-
-    results = [
-        api_schemas.ConsumptionImportResult(
-            worksheet_name=worksheet_name,
-            location_name=location_name,
-            category_name=category_name,
-            meter_label=meter_label,
-            imported=stats["imported"],
-            updated=stats["updated"],
-            skipped=stats["skipped"],
-        )
-        for (worksheet_name, location_name, category_name, meter_label), stats in sorted(grouped_results.items())
-    ]
-
-    return api_schemas.ConsumptionImportResponse(
-        filename=filename,
-        imported_total=imported_total,
-        updated_total=updated_total,
-        skipped_total=skipped_total,
-        results=results,
-    )
