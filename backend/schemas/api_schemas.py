@@ -176,10 +176,16 @@ class InvoiceListResponse(BaseModel):
 class ConsumptionIndexBase(BaseModel):
     location_id: int
     category_id: int
+    meter_label: str = ""
     value: float
     reading_date: date
     source_type: str = "manual"
     notes: Optional[str] = None
+
+    @field_validator("meter_label", mode="before")
+    @classmethod
+    def normalize_meter_label(cls, v: Optional[str]) -> str:
+        return str(v or "").strip()
 
     @field_validator("reading_date")
     @classmethod
@@ -194,11 +200,19 @@ class ConsumptionIndexCreate(ConsumptionIndexBase):
 
 
 class ConsumptionIndexUpdate(BaseModel):
+    meter_label: Optional[str] = None
     value: Optional[float] = None
     reading_date: Optional[date] = None
     source_type: Optional[str] = None
     photo_path: Optional[str] = None
     notes: Optional[str] = None
+
+    @field_validator("meter_label", mode="before")
+    @classmethod
+    def normalize_optional_meter_label(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        return str(v).strip()
 
 
 class ConsumptionIndex(ConsumptionIndexBase):
@@ -209,6 +223,50 @@ class ConsumptionIndex(ConsumptionIndexBase):
 
     class Config:
         from_attributes = True
+
+
+class ConsumptionLinkedInvoice(BaseModel):
+    id: int
+    invoice_date: date
+    amount: float
+    consumption_value: Optional[float] = None
+    status: str
+    provider: Optional[ProviderSimple] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ConsumptionReading(ConsumptionIndex):
+    location: Optional[LocationSimple] = None
+    category: Optional[Category] = None
+    previous_value: Optional[float] = None
+    delta_value: Optional[float] = None
+    linked_invoice: Optional[ConsumptionLinkedInvoice] = None
+
+
+class ConsumptionReadingListResponse(BaseModel):
+    items: List[ConsumptionReading]
+    total: int
+    skip: int
+    limit: int
+
+
+class ConsumptionStreamSummary(BaseModel):
+    location_id: int
+    category_id: int
+    meter_label: str
+    location: Optional[LocationSimple] = None
+    category: Optional[Category] = None
+    reading_count: int
+    latest_reading_date: Optional[date] = None
+    latest_value: Optional[float] = None
+    latest_delta: Optional[float] = None
+    linked_invoice: Optional[ConsumptionLinkedInvoice] = None
+
+
+class ConsumptionStreamListResponse(BaseModel):
+    items: List[ConsumptionStreamSummary]
 
 
 class HouseholdBase(BaseModel):

@@ -1,0 +1,5 @@
+{
+  "version": "1.7.0",
+  "title": "UtilityMate v1.7.0",
+  "body": "## New Features\n\n- Added a dedicated `Meter Readings` section with stream-based history, device labels, inline editing, and invoice-aware reading context.\n- Added separate meter stream summaries so apartments can track multiple devices in the same category, such as kitchen water, bathroom water, and room-level heat meters.\n\n## Improvements\n\n- Meter history now calculates the difference against the previous reading for each individual stream instead of flattening everything into one category-level list.\n- Operations now links out to the dedicated Meter Readings workspace instead of mixing raw measurement management into the broader operations view.\n\n## Bug Fixes\n\n- Fixed the old one-reading-per-category-per-day limitation by migrating meter uniqueness to `location + category + meter label + date`.\n- Fixed meter workflows so existing invoices remain the single billing source while readings can still be linked back for reconciliation.\n"
+}

@@ -148,6 +148,7 @@ class ConsumptionIndex(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="CASCADE"), index=True)
     category_id = Column(Integer, ForeignKey("categories.id"), index=True)
+    meter_label = Column(String, nullable=False, default="")
     value = Column(Float, nullable=False)
     reading_date = Column(Date, nullable=False)
     source_type = Column(String, default="manual")
@@ -159,9 +160,9 @@ class ConsumptionIndex(Base):
     location = relationship("Location", back_populates="indexes")
     category = relationship("Category", back_populates="indexes")
     
-    # Avoid duplicate readings for same location/category on same date
+    # Avoid duplicate readings for the same device stream on the same date.
     __table_args__ = (
-        Index("idx_consumption_unique", "location_id", "category_id", "reading_date", unique=True),
+        Index("idx_consumption_stream_unique", "location_id", "category_id", "meter_label", "reading_date", unique=True),
     )
 
 

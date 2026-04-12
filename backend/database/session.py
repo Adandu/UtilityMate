@@ -569,6 +569,7 @@ def verify_and_migrate_db():
                 conn.execute(text(statement))
 
         consumption_columns = {
+            "meter_label": "ALTER TABLE consumption_indexes ADD COLUMN meter_label VARCHAR NOT NULL DEFAULT ''",
             "source_type": "ALTER TABLE consumption_indexes ADD COLUMN source_type VARCHAR DEFAULT 'manual'",
             "photo_path": "ALTER TABLE consumption_indexes ADD COLUMN photo_path VARCHAR",
             "notes": "ALTER TABLE consumption_indexes ADD COLUMN notes VARCHAR",
@@ -579,6 +580,16 @@ def verify_and_migrate_db():
                 if column_name not in columns:
                     logger.info("Migration: Adding %s to consumption_indexes", column_name)
                     conn.execute(text(statement))
+
+            conn.execute(text("UPDATE consumption_indexes SET meter_label = '' WHERE meter_label IS NULL"))
+            index_names = {index["name"] for index in inspector.get_indexes("consumption_indexes")}
+            if "idx_consumption_stream_unique" not in index_names:
+                if "idx_consumption_unique" in index_names:
+                    logger.info("Migration: Replacing legacy consumption uniqueness index")
+                    conn.execute(text("DROP INDEX IF EXISTS idx_consumption_unique"))
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_consumption_stream_unique ON consumption_indexes (location_id, category_id, meter_label, reading_date)"
+                ))
 
         if "locations" in tables:
             columns = [c["name"] for c in inspector.get_columns("locations")]

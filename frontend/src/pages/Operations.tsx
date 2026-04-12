@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bell, Home, Wallet, Webhook, Download, Gauge, Loader2, Plus, CheckCircle2, Building2, AlertTriangle, Trash2, Upload, Eye, FileStack } from 'lucide-react';
+import { Bell, Home, Wallet, Webhook, Download, Gauge, Loader2, Plus, CheckCircle2, Building2, AlertTriangle, Trash2, Upload, Eye, FileStack, ArrowRight } from 'lucide-react';
 import api from '../utils/api';
 
 interface Category { id: number; name: string; unit: string; }
@@ -15,7 +15,6 @@ interface BudgetStatus {
 interface AlertItem { id: number; severity: string; title: string; message: string; is_read: boolean; created_at: string; }
 interface Household { id: number; name: string; description?: string; members: { id: number; user_id: number; role: string }[]; }
 interface AutomationEvent { id: number; source: string; event_type: string; status: string; created_at: string; }
-interface ConsumptionIndex { id: number; location_id: number; category_id: number; value: number; reading_date: string; source_type: string; notes?: string; }
 interface AssociationStatementLine { id: number; raw_label: string; normalized_label: string; amount: number; location?: Location; }
 interface AssociationStatement {
   id: number;
@@ -44,7 +43,6 @@ const Operations: React.FC = () => {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [households, setHouseholds] = useState<Household[]>([]);
   const [events, setEvents] = useState<AutomationEvent[]>([]);
-  const [indexes, setIndexes] = useState<ConsumptionIndex[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -58,10 +56,6 @@ const Operations: React.FC = () => {
   const [newBudgetLocation, setNewBudgetLocation] = useState('');
   const [newBudgetLimit, setNewBudgetLimit] = useState('');
   const [newHouseholdName, setNewHouseholdName] = useState('');
-  const [meterLocation, setMeterLocation] = useState('');
-  const [meterCategory, setMeterCategory] = useState('');
-  const [meterValue, setMeterValue] = useState('');
-  const [meterNotes, setMeterNotes] = useState('');
 
   const fetchData = async () => {
     setLoading(true);
@@ -70,7 +64,6 @@ const Operations: React.FC = () => {
       api.get('/alerts?unread_only=true'),
       api.get('/households/'),
       api.get('/automation/events'),
-      api.get('/consumption/'),
       api.get('/categories/'),
       api.get('/locations/'),
       api.get('/providers/'),
@@ -91,19 +84,16 @@ const Operations: React.FC = () => {
     if (results[3].status === 'fulfilled') setEvents(results[3].value.data);
     else errors.push('Automation events could not be loaded.');
 
-    if (results[4].status === 'fulfilled') setIndexes(results[4].value.data);
-    else errors.push('Meter readings could not be loaded.');
-
-    if (results[5].status === 'fulfilled') setCategories(results[5].value.data);
+    if (results[4].status === 'fulfilled') setCategories(results[4].value.data);
     else errors.push('Categories could not be loaded.');
 
-    if (results[6].status === 'fulfilled') setLocations(results[6].value.data);
+    if (results[5].status === 'fulfilled') setLocations(results[5].value.data);
     else errors.push('Locations could not be loaded.');
 
-    if (results[7].status === 'fulfilled') setProviders(results[7].value.data);
+    if (results[6].status === 'fulfilled') setProviders(results[6].value.data);
     else errors.push('Providers could not be loaded.');
 
-    if (results[8].status === 'fulfilled') setAssociationStatements(results[8].value.data);
+    if (results[7].status === 'fulfilled') setAssociationStatements(results[7].value.data);
     else errors.push('Association statements could not be loaded.');
 
     setPageErrors(errors);
@@ -136,23 +126,6 @@ const Operations: React.FC = () => {
     fetchData();
   };
 
-  const createMeterReading = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await api.post('/consumption/', {
-      location_id: parseInt(meterLocation),
-      category_id: parseInt(meterCategory),
-      value: parseFloat(meterValue),
-      reading_date: new Date().toISOString().split('T')[0],
-      source_type: 'manual',
-      notes: meterNotes,
-    });
-    setMeterLocation('');
-    setMeterCategory('');
-    setMeterValue('');
-    setMeterNotes('');
-    fetchData();
-  };
-
   const markAlertRead = async (id: number) => {
     await api.patch(`/alerts/${id}/read`);
     fetchData();
@@ -166,12 +139,6 @@ const Operations: React.FC = () => {
   const deleteHousehold = async (householdId: number) => {
     if (!window.confirm('Delete this household? Linked locations and budgets will be detached.')) return;
     await api.delete(`/households/${householdId}`);
-    fetchData();
-  };
-
-  const deleteMeterReading = async (indexId: number) => {
-    if (!window.confirm('Delete this manual meter reading?')) return;
-    await api.delete(`/consumption/${indexId}`);
     fetchData();
   };
 
@@ -390,36 +357,12 @@ const Operations: React.FC = () => {
 
         <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6">
           <div className="mb-5 flex items-center gap-3"><Gauge className="text-purple-600" /><h3 className="font-headline text-xl font-black">Meter Readings</h3></div>
-          <form onSubmit={createMeterReading} className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
-            <select required value={meterLocation} onChange={(e) => setMeterLocation(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
-              <option value="">Location</option>
-              {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-            </select>
-            <select required value={meterCategory} onChange={(e) => setMeterCategory(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
-              <option value="">Category</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-            </select>
-            <input required type="number" step="0.01" value={meterValue} onChange={(e) => setMeterValue(e.target.value)} placeholder="Reading value" className="rounded-xl border border-outline-variant bg-surface-container p-3" />
-            <input value={meterNotes} onChange={(e) => setMeterNotes(e.target.value)} placeholder="Notes (optional)" className="rounded-xl border border-outline-variant bg-surface-container p-3" />
-            <button type="submit" className="rounded-xl bg-purple-600 px-4 py-3 font-bold text-white md:col-span-4">Save Reading</button>
-          </form>
-          <div className="space-y-3">
-            {indexes.slice(0, 6).map((index) => (
-              <div key={index.id} className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-black">{locations.find((l) => l.id === index.location_id)?.name || 'Location'} • {categories.find((c) => c.id === index.category_id)?.name || 'Category'}</p>
-                    <p className="text-sm opacity-70">{index.value} on {index.reading_date} • {index.source_type}</p>
-                    {index.notes && <p className="text-xs opacity-50">{index.notes}</p>}
-                  </div>
-                  {index.source_type === 'manual' && (
-                    <button onClick={() => deleteMeterReading(index.id)} className="rounded-xl border border-outline-variant px-3 py-2 text-xs font-black uppercase text-red-600">
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="rounded-3xl border border-outline-variant bg-white/70 p-5 dark:bg-slate-900/40">
+            <p className="font-black">Meter history lives in its own workspace now.</p>
+            <p className="mt-2 text-sm opacity-70">Open the dedicated Meter Readings page to manage stream-specific devices, inspect the difference from the previous reading, edit historical lines, and compare readings with the linked invoices already stored in UtilityMate.</p>
+            <button onClick={() => { window.location.href = '/meters'; }} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-3 font-bold text-white">
+              Open Meter Readings <ArrowRight size={16} />
+            </button>
           </div>
         </section>
 
