@@ -71,10 +71,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 📝 Prepare GitHub release notes
+        shell: bash
+        run: |
+          awk 'NR==1 && /^# / {next} NR==2 && /^$/ {next} {print}' RELEASE_NOTES.md > "$RUNNER_TEMP/github-release-notes.md"
+
       - name: 📢 Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: RELEASE_NOTES.md
+          body_path: ${{ runner.temp }}/github-release-notes.md
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,6 +107,11 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "title=UtilityMate ${tag}" >> "$GITHUB_OUTPUT"
 
+      - name: 📝 Prepare GitHub release notes
+        shell: bash
+        run: |
+          awk 'NR==1 && /^# / {next} NR==2 && /^$/ {next} {print}' RELEASE_NOTES.md > "$RUNNER_TEMP/github-release-notes.md"
+
       - name: 🏷️ Ensure release tag exists
         shell: bash
         run: |
@@ -124,7 +134,7 @@ jobs:
           tag="${{ steps.release-meta.outputs.tag }}"
           title="${{ steps.release-meta.outputs.title }}"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release edit "$tag" --title "$title" --notes-file RELEASE_NOTES.md
+            gh release edit "$tag" --title "$title" --notes-file "$RUNNER_TEMP/github-release-notes.md"
           else
-            gh release create "$tag" --title "$title" --notes-file RELEASE_NOTES.md --target "${GITHUB_SHA}"
+            gh release create "$tag" --title "$title" --notes-file "$RUNNER_TEMP/github-release-notes.md" --target "${GITHUB_SHA}"
           fi
