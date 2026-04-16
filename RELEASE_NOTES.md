@@ -1,13 +1,13 @@
-# UtilityMate v1.7.4
+# UtilityMate v1.7.5
 
 ## New Features
 
-- Added a top-level `Meter Stream` filter on the Meter Readings page so stream selection is available directly in the primary filter bar.
+- No new features in this release.
 
 ## Improvements
 
-- Positioned the stream selector between `All categories` and the stream summary cards to keep the filter flow aligned with the page layout.
+- Refreshed the frontend lockfile so the Vite 8 toolchain resolves its optional Rolldown native binding correctly during install.
 
 ## Bug Fixes
 
-- No bug fixes in this release.
+- Fixed the frontend production build failing with `Cannot find native binding` after an incomplete optional dependency install.
