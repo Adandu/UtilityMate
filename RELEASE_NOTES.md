@@ -1,13 +1,13 @@
-# UtilityMate v1.7.6
+# UtilityMate v1.7.7
 
 ## New Features
 
-- Added automatic GitHub release publishing from `VERSION` and `RELEASE_NOTES.md` updates on `main`.
+- No new features in this release.
 
 ## Improvements
 
-- Docker images published from `main` now also receive the current app version tag without requiring a separate Git tag push.
+- Simplified the Operations page by removing the unused Automation & Integrations section.
 
 ## Bug Fixes
 
-- Fixed release automation getting stuck at `v1.7.2` when newer versions updated local release files but never received a matching Git tag.
+- Fixed stale automation-only API surface remaining in the backend after the Operations page workflow moved elsewhere.

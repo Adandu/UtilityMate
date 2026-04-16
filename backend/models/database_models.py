@@ -32,7 +32,6 @@ class User(Base):
     indexes = relationship("ConsumptionIndex", back_populates="owner", cascade="all, delete-orphan")
     budgets = relationship("Budget", back_populates="owner", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="owner", cascade="all, delete-orphan")
-    automation_events = relationship("AutomationEvent", back_populates="owner", cascade="all, delete-orphan")
     owned_households = relationship("Household", back_populates="owner", cascade="all, delete-orphan", foreign_keys=[Household.owner_user_id])
     household_memberships = relationship("HouseholdMember", back_populates="user", cascade="all, delete-orphan")
     rent_leases = relationship("RentLease", back_populates="owner", cascade="all, delete-orphan")
@@ -351,16 +350,3 @@ class Alert(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     owner = relationship("User", back_populates="alerts")
-
-
-class AutomationEvent(Base):
-    __tablename__ = "automation_events"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
-    source = Column(String, nullable=False)
-    event_type = Column(String, nullable=False)
-    payload_json = Column(Text, nullable=True)
-    status = Column(String, default="received")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
-    owner = relationship("User", back_populates="automation_events")

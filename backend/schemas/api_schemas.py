@@ -367,26 +367,6 @@ class Alert(AlertBase):
     class Config:
         from_attributes = True
 
-
-class AutomationEventCreate(BaseModel):
-    source: str
-    event_type: str
-    payload_json: Optional[str] = None
-
-
-class AutomationEvent(BaseModel):
-    id: int
-    user_id: int
-    source: str
-    event_type: str
-    payload_json: Optional[str] = None
-    status: str
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class UserBase(BaseModel):
     email: EmailStr
 

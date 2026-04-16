@@ -1,0 +1,5 @@
+{
+  "version": "1.7.7",
+  "title": "UtilityMate v1.7.7",
+  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Simplified the Operations page by removing the unused Automation & Integrations section.\n\n## Bug Fixes\n\n- Fixed stale automation-only API surface remaining in the backend after the Operations page workflow moved elsewhere.\n"
+}

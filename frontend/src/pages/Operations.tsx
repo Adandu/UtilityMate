@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bell, Home, Wallet, Webhook, Download, Gauge, Loader2, Plus, CheckCircle2, Building2, AlertTriangle, Trash2, Upload, Eye, FileStack, ArrowRight } from 'lucide-react';
+import { Bell, Home, Wallet, Download, Gauge, Loader2, Plus, Building2, AlertTriangle, Trash2, Upload, Eye, FileStack, ArrowRight } from 'lucide-react';
 import api from '../utils/api';
 
 interface Category { id: number; name: string; unit: string; }
@@ -14,7 +14,6 @@ interface BudgetStatus {
 }
 interface AlertItem { id: number; severity: string; title: string; message: string; is_read: boolean; created_at: string; }
 interface Household { id: number; name: string; description?: string; members: { id: number; user_id: number; role: string }[]; }
-interface AutomationEvent { id: number; source: string; event_type: string; status: string; created_at: string; }
 interface AssociationStatementLine { id: number; raw_label: string; normalized_label: string; amount: number; location?: Location; }
 interface AssociationStatement {
   id: number;
@@ -42,7 +41,6 @@ const Operations: React.FC = () => {
   const [budgets, setBudgets] = useState<BudgetStatus[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [households, setHouseholds] = useState<Household[]>([]);
-  const [events, setEvents] = useState<AutomationEvent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -63,7 +61,6 @@ const Operations: React.FC = () => {
       api.get('/budgets/status'),
       api.get('/alerts?unread_only=true'),
       api.get('/households/'),
-      api.get('/automation/events'),
       api.get('/categories/'),
       api.get('/locations/'),
       api.get('/providers/'),
@@ -81,19 +78,16 @@ const Operations: React.FC = () => {
     if (results[2].status === 'fulfilled') setHouseholds(results[2].value.data);
     else errors.push('Households could not be loaded.');
 
-    if (results[3].status === 'fulfilled') setEvents(results[3].value.data);
-    else errors.push('Automation events could not be loaded.');
-
-    if (results[4].status === 'fulfilled') setCategories(results[4].value.data);
+    if (results[3].status === 'fulfilled') setCategories(results[3].value.data);
     else errors.push('Categories could not be loaded.');
 
-    if (results[5].status === 'fulfilled') setLocations(results[5].value.data);
+    if (results[4].status === 'fulfilled') setLocations(results[4].value.data);
     else errors.push('Locations could not be loaded.');
 
-    if (results[6].status === 'fulfilled') setProviders(results[6].value.data);
+    if (results[5].status === 'fulfilled') setProviders(results[5].value.data);
     else errors.push('Providers could not be loaded.');
 
-    if (results[7].status === 'fulfilled') setAssociationStatements(results[7].value.data);
+    if (results[6].status === 'fulfilled') setAssociationStatements(results[6].value.data);
     else errors.push('Association statements could not be loaded.');
 
     setPageErrors(errors);
@@ -128,11 +122,6 @@ const Operations: React.FC = () => {
 
   const markAlertRead = async (id: number) => {
     await api.patch(`/alerts/${id}/read`);
-    fetchData();
-  };
-
-  const triggerFolderScan = async () => {
-    await api.post('/automation/scan-folder');
     fetchData();
   };
 
@@ -366,27 +355,6 @@ const Operations: React.FC = () => {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6 xl:col-span-2">
-          <div className="mb-5 flex items-center justify-between">
-            <div className="flex items-center gap-3"><Webhook className="text-rose-600" /><h3 className="font-headline text-xl font-black">Automation & Integrations</h3></div>
-            <button onClick={triggerFolderScan} className="rounded-xl bg-rose-600 px-4 py-3 font-bold text-white">Scan Inbox</button>
-          </div>
-          <p className="mb-4 text-sm opacity-70">Use the authenticated `/api/automation/webhook` endpoint for Home Assistant, scripts, or N8N-style triggers. Folder scans check the configured invoice inbox for new PDFs.</p>
-          <div className="space-y-3">
-            {events.length === 0 && <p className="text-sm opacity-60">No automation events yet.</p>}
-            {events.slice(0, 8).map((event) => (
-              <div key={event.id} className="flex items-center justify-between rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
-                <div>
-                  <p className="font-black">{event.source} • {event.event_type}</p>
-                  <p className="text-sm opacity-70">{new Date(event.created_at).toLocaleString()}</p>
-                </div>
-                <div className="flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black uppercase text-emerald-700">
-                  <CheckCircle2 size={14} /> {event.status}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
       </div>
     </div>
   );
