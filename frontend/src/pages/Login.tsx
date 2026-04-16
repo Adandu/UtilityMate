@@ -31,7 +31,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       onLogin(response.data.access_token);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid credentials. Access Denied.');
+      setError(err.response?.data?.detail || 'Invalid credentials. Access denied.');
     } finally {
       setLoading(false);
     }
@@ -44,8 +44,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="w-16 h-16 bg-primary-container rounded-2xl flex items-center justify-center text-on-primary-fixed mx-auto mb-6 shadow-lg">
             <Shield size={32} />
           </div>
-          <h2 className="font-headline text-3xl font-black text-on-surface tracking-tight">Identity Verification</h2>
-          <p className="text-on-surface-variant font-medium mt-2 opacity-60 uppercase text-[10px] tracking-[0.2em]">UtilityMate Secure Gateway</p>
+          <h2 className="font-headline text-3xl font-black text-on-surface tracking-tight">Login</h2>
+          <p className="text-on-surface-variant font-medium mt-2 opacity-60 uppercase text-[10px] tracking-[0.2em]">Access your UtilityMate account</p>
         </div>
         
         {error && (
@@ -57,7 +57,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Terminal Address</label>
+            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Email Address</label>
             <input 
               type="email" 
               required
@@ -70,7 +70,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
           
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Access Key</label>
+            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Password</label>
             <input 
               type="password" 
               required
@@ -89,7 +89,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           >
             {loading ? <Loader2 className="animate-spin" size={20} /> : (
               <>
-                <span className="uppercase tracking-[0.1em] text-sm">Establish Connection</span>
+                <span className="uppercase tracking-[0.1em] text-sm">Login</span>
                 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </>
             )}
@@ -97,12 +97,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </form>
         
         <div className="mt-10 text-center">
-          <p className="text-xs font-bold text-on-surface-variant opacity-40 uppercase tracking-widest mb-4">Unauthorized Access Restricted</p>
+          <p className="text-xs font-bold text-on-surface-variant opacity-40 uppercase tracking-widest mb-4">Need an account?</p>
           <button 
             onClick={() => navigate('/register')}
             className="text-blue-600 dark:text-blue-400 text-xs font-black uppercase tracking-widest hover:underline decoration-2 underline-offset-4"
           >
-            Request Credentials
+            Register
           </button>
         </div>
       </div>
