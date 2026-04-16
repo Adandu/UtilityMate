@@ -1,4 +1,4 @@
-# UtilityMate v1.7.10
+# UtilityMate v1.7.11
 
 ## New Features
 
@@ -6,8 +6,8 @@
 
 ## Improvements
 
-- Aligned the Association Statements sidebar entry with the main navigation spacing so it sits cleanly beside Invoices and Raw Data.
+- Budget category selection now collapses duplicate category names so the Operations page budget form stays clean even when both system and user categories exist.
 
 ## Bug Fixes
 
-- Fixed the Association Statements sidebar button rendering out of line because it still used nested-item indentation styles.
+- Fixed the Budgets category dropdown showing duplicate `Gas` entries.

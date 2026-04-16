@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, Home, Wallet, Download, Gauge, Loader2, Plus, Building2, AlertTriangle, ArrowRight } from 'lucide-react';
 import api from '../utils/api';
 
-interface Category { id: number; name: string; unit: string; }
+interface Category { id: number; name: string; unit: string; user_id?: number | null; }
 interface Location { id: number; name: string; }
 interface Provider { id: number; name: string; category_id: number; }
 interface BudgetStatus {
@@ -28,6 +28,17 @@ const Operations: React.FC = () => {
   const [newBudgetLocation, setNewBudgetLocation] = useState('');
   const [newBudgetLimit, setNewBudgetLimit] = useState('');
   const [newHouseholdName, setNewHouseholdName] = useState('');
+
+  const budgetCategories = useMemo(() => {
+    const uniqueByName = new Map<string, Category>();
+    categories.forEach((category) => {
+      const existing = uniqueByName.get(category.name);
+      if (!existing || (category.user_id && !existing.user_id)) {
+        uniqueByName.set(category.name, category);
+      }
+    });
+    return Array.from(uniqueByName.values());
+  }, [categories]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -144,7 +155,7 @@ const Operations: React.FC = () => {
           <form onSubmit={createBudget} className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
             <select required value={newBudgetCategory} onChange={(e) => setNewBudgetCategory(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
               <option value="">Category</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              {budgetCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
             <select value={newBudgetLocation} onChange={(e) => setNewBudgetLocation(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
               <option value="">All Locations</option>
