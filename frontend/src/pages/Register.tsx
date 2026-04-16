@@ -50,8 +50,8 @@ const Register: React.FC = () => {
           <div className="w-16 h-16 bg-tertiary-container rounded-2xl flex items-center justify-center text-on-tertiary-container mx-auto mb-6 shadow-lg">
             <UserPlus size={32} />
           </div>
-          <h2 className="font-headline text-3xl font-black text-on-surface tracking-tight">Credential Setup</h2>
-          <p className="text-on-surface-variant font-medium mt-2 opacity-60 uppercase text-[10px] tracking-[0.2em]">Initialize your UtilityMate node</p>
+          <h2 className="font-headline text-3xl font-black text-on-surface tracking-tight">Register</h2>
+          <p className="text-on-surface-variant font-medium mt-2 opacity-60 uppercase text-[10px] tracking-[0.2em]">Create your UtilityMate account</p>
         </div>
         
         {error && (
@@ -63,7 +63,7 @@ const Register: React.FC = () => {
         
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Assigned Address</label>
+            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Email Address</label>
             <input 
               type="email" 
               required
@@ -76,7 +76,7 @@ const Register: React.FC = () => {
           </div>
           
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">New Access Key</label>
+            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Password</label>
             <input 
               type="password" 
               required
@@ -90,7 +90,7 @@ const Register: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Confirm Key</label>
+            <label className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest ml-1">Confirm Password</label>
             <input 
               type="password" 
               required
@@ -110,7 +110,7 @@ const Register: React.FC = () => {
           >
             {loading ? <Loader2 className="animate-spin" size={20} /> : (
               <>
-                <span className="uppercase tracking-[0.1em] text-sm">Initialize Account</span>
+                <span className="uppercase tracking-[0.1em] text-sm">Register</span>
                 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </>
             )}
@@ -122,7 +122,7 @@ const Register: React.FC = () => {
             onClick={() => navigate('/login')}
             className="text-on-surface-variant text-xs font-bold uppercase tracking-widest hover:text-on-surface hover:underline decoration-2 underline-offset-4 transition-colors"
           >
-            Existing Credentials? Login
+            Already have an account? Login
           </button>
         </div>
       </div>
