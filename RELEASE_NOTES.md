@@ -1,13 +1,13 @@
-# UtilityMate v1.7.8
+# UtilityMate v1.7.9
 
 ## New Features
 
-- Added a dedicated Association Statements page with its own route and navigation entry under Invoices.
+- No new features in this release.
 
 ## Improvements
 
-- Moved the avizier PDF import and review workflow out of Operations so invoice-related monthly statement work lives in its own focused workspace.
+- Kept the Association Statements entry nested under Invoices while switching it to a Material icon that the current sidebar font actually supports.
 
 ## Bug Fixes
 
-- No bug fixes in this release.
+- Fixed the broken Association Statements sidebar item rendering as large fallback text instead of an icon.

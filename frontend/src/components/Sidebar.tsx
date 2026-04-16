@@ -40,7 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout }) => {
             to="/association-statements"
             className={({ isActive }) => `ml-6 flex items-center gap-3 px-3 py-2 rounded-lg font-semibold transition-all duration-150 ${isActive ? 'bg-white dark:bg-slate-950 text-emerald-600 dark:text-emerald-400 shadow-sm scale-95' : 'text-slate-400 dark:text-slate-500 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100'}`}
           >
-            <span className="material-symbols-outlined text-[18px]">stacked_file</span>
+            <span className="material-symbols-outlined text-[18px]">description</span>
             <span className="font-body text-sm">Association Statements</span>
           </NavLink>
 

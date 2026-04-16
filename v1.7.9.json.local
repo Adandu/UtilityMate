@@ -1,0 +1,5 @@
+{
+  "version": "1.7.9",
+  "title": "UtilityMate v1.7.9",
+  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Kept the Association Statements entry nested under Invoices while switching it to a Material icon that the current sidebar font actually supports.\n\n## Bug Fixes\n\n- Fixed the broken Association Statements sidebar item rendering as large fallback text instead of an icon.\n"
+}
