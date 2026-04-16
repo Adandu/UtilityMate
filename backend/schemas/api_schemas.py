@@ -320,6 +320,7 @@ class BudgetCreate(BudgetBase):
 
 
 class BudgetUpdate(BaseModel):
+    category_id: Optional[int] = None
     monthly_limit: Optional[float] = None
     warning_threshold: Optional[float] = None
     is_active: Optional[bool] = None

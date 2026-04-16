@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Bell, Home, Wallet, Download, Gauge, Loader2, Plus, Building2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Bell, Home, Wallet, Download, Gauge, Loader2, Plus, Building2, AlertTriangle, ArrowRight, Pencil, Save, Trash2, X } from 'lucide-react';
 import api from '../utils/api';
 
 interface Category { id: number; name: string; unit: string; user_id?: number | null; }
@@ -28,6 +28,11 @@ const Operations: React.FC = () => {
   const [newBudgetLocation, setNewBudgetLocation] = useState('');
   const [newBudgetLimit, setNewBudgetLimit] = useState('');
   const [newHouseholdName, setNewHouseholdName] = useState('');
+  const [editingBudgetId, setEditingBudgetId] = useState<number | null>(null);
+  const [editBudgetCategory, setEditBudgetCategory] = useState('');
+  const [editBudgetLocation, setEditBudgetLocation] = useState('');
+  const [editBudgetLimit, setEditBudgetLimit] = useState('');
+  const [editBudgetWarningThreshold, setEditBudgetWarningThreshold] = useState('');
 
   const budgetCategories = useMemo(() => {
     const uniqueByName = new Map<string, Category>();
@@ -123,6 +128,42 @@ const Operations: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const startEditBudget = (budget: BudgetStatus['budget']) => {
+    setEditingBudgetId(budget.id);
+    setEditBudgetCategory(String(budget.category_id));
+    setEditBudgetLocation(budget.location ? String(budget.location.id) : '');
+    setEditBudgetLimit(String(budget.monthly_limit));
+    setEditBudgetWarningThreshold(String(budget.warning_threshold));
+  };
+
+  const cancelEditBudget = () => {
+    setEditingBudgetId(null);
+    setEditBudgetCategory('');
+    setEditBudgetLocation('');
+    setEditBudgetLimit('');
+    setEditBudgetWarningThreshold('');
+  };
+
+  const saveBudget = async (budgetId: number) => {
+    await api.patch(`/budgets/${budgetId}`, {
+      category_id: parseInt(editBudgetCategory),
+      location_id: editBudgetLocation ? parseInt(editBudgetLocation) : null,
+      monthly_limit: parseFloat(editBudgetLimit),
+      warning_threshold: parseFloat(editBudgetWarningThreshold),
+    });
+    cancelEditBudget();
+    fetchData();
+  };
+
+  const deleteBudget = async (budgetId: number) => {
+    if (!window.confirm('Delete this budget?')) return;
+    await api.delete(`/budgets/${budgetId}`);
+    if (editingBudgetId === budgetId) {
+      cancelEditBudget();
+    }
+    fetchData();
+  };
+
   if (loading) {
     return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
@@ -168,14 +209,50 @@ const Operations: React.FC = () => {
             {budgets.length === 0 && <p className="text-sm opacity-60">No budgets yet.</p>}
             {budgets.map((item) => (
               <div key={item.budget.id} className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="font-black">{item.budget.category?.name || 'Category'} {item.budget.location ? `• ${item.budget.location.name}` : '• Global'}</p>
-                  <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${item.status === 'exceeded' ? 'bg-red-100 text-red-700' : item.status === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.status}</span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                  <div className={`h-full ${item.status === 'exceeded' ? 'bg-red-500' : item.status === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(item.usage_ratio * 100, 100)}%` }} />
-                </div>
-                <p className="mt-2 text-sm font-medium opacity-70">{item.spent.toFixed(2)} / {item.budget.monthly_limit.toFixed(2)} RON • Remaining {item.remaining.toFixed(2)} RON</p>
+                {editingBudgetId === item.budget.id ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <select value={editBudgetCategory} onChange={(e) => setEditBudgetCategory(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
+                        {budgetCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                      </select>
+                      <select value={editBudgetLocation} onChange={(e) => setEditBudgetLocation(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
+                        <option value="">All Locations</option>
+                        {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <input type="number" step="0.01" value={editBudgetLimit} onChange={(e) => setEditBudgetLimit(e.target.value)} placeholder="Monthly RON" className="rounded-xl border border-outline-variant bg-surface-container p-3" />
+                      <input type="number" step="0.01" min="0" max="1" value={editBudgetWarningThreshold} onChange={(e) => setEditBudgetWarningThreshold(e.target.value)} placeholder="Warning threshold" className="rounded-xl border border-outline-variant bg-surface-container p-3" />
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => saveBudget(item.budget.id)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black uppercase text-white">
+                        <Save size={14} />
+                      </button>
+                      <button onClick={cancelEditBudget} className="rounded-xl border border-outline-variant px-3 py-2 text-xs font-black uppercase">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="font-black">{item.budget.category?.name || 'Category'} {item.budget.location ? `• ${item.budget.location.name}` : '• Global'}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${item.status === 'exceeded' ? 'bg-red-100 text-red-700' : item.status === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.status}</span>
+                        <button onClick={() => startEditBudget(item.budget)} className="rounded-xl border border-outline-variant px-3 py-2 text-xs font-black uppercase">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => deleteBudget(item.budget.id)} className="rounded-xl border border-red-200 px-3 py-2 text-xs font-black uppercase text-red-600">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                      <div className={`h-full ${item.status === 'exceeded' ? 'bg-red-500' : item.status === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min(item.usage_ratio * 100, 100)}%` }} />
+                    </div>
+                    <p className="mt-2 text-sm font-medium opacity-70">{item.spent.toFixed(2)} / {item.budget.monthly_limit.toFixed(2)} RON • Remaining {item.remaining.toFixed(2)} RON</p>
+                  </>
+                )}
               </div>
             ))}
           </div>

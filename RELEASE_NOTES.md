@@ -1,13 +1,13 @@
-# UtilityMate v1.7.11
+# UtilityMate v1.7.12
 
 ## New Features
 
-- No new features in this release.
+- Added edit and delete controls for configured budgets directly in the Operations page.
 
 ## Improvements
 
-- Budget category selection now collapses duplicate category names so the Operations page budget form stays clean even when both system and user categories exist.
+- Budget edits can now change the category, location scope, monthly limit, and warning threshold instead of requiring budget recreation.
 
 ## Bug Fixes
 
-- Fixed the Budgets category dropdown showing duplicate `Gas` entries.
+- No bug fixes in this release.
