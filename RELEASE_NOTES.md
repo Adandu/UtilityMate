@@ -1,13 +1,13 @@
-# UtilityMate v1.7.5
+# UtilityMate v1.7.6
 
 ## New Features
 
-- No new features in this release.
+- Added automatic GitHub release publishing from `VERSION` and `RELEASE_NOTES.md` updates on `main`.
 
 ## Improvements
 
-- Refreshed the frontend lockfile so the Vite 8 toolchain resolves its optional Rolldown native binding correctly during install.
+- Docker images published from `main` now also receive the current app version tag without requiring a separate Git tag push.
 
 ## Bug Fixes
 
-- Fixed the frontend production build failing with `Cannot find native binding` after an incomplete optional dependency install.
+- Fixed release automation getting stuck at `v1.7.2` when newer versions updated local release files but never received a matching Git tag.

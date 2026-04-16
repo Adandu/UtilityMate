@@ -1,0 +1,5 @@
+{
+  "version": "1.7.6",
+  "title": "UtilityMate v1.7.6",
+  "body": "## New Features\n\n- Added automatic GitHub release publishing from `VERSION` and `RELEASE_NOTES.md` updates on `main`.\n\n## Improvements\n\n- Docker images published from `main` now also receive the current app version tag without requiring a separate Git tag push.\n\n## Bug Fixes\n\n- Fixed release automation getting stuck at `v1.7.2` when newer versions updated local release files but never received a matching Git tag.\n"
+}
