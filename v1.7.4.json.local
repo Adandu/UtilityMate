@@ -1,0 +1,5 @@
+{
+  "version": "1.7.4",
+  "title": "UtilityMate v1.7.4",
+  "body": "## New Features\n\n- Added a top-level `Meter Stream` filter on the Meter Readings page so stream selection is available directly in the primary filter bar.\n\n## Improvements\n\n- Positioned the stream selector between `All categories` and the stream summary cards to keep the filter flow aligned with the page layout.\n\n## Bug Fixes\n\n- No bug fixes in this release.\n"
+}

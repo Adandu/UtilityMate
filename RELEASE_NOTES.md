@@ -1,14 +1,13 @@
-# UtilityMate v1.7.3
+# UtilityMate v1.7.4
 
 ## New Features
 
-- No new features in this release.
+- Added a top-level `Meter Stream` filter on the Meter Readings page so stream selection is available directly in the primary filter bar.
 
 ## Improvements
 
-- Simplified the authentication screens so the primary actions are labeled clearly as `Login` and `Register`.
-- Updated the supporting text on both auth pages to use straightforward account language instead of themed gateway terminology.
+- Positioned the stream selector between `All categories` and the stream summary cards to keep the filter flow aligned with the page layout.
 
 ## Bug Fixes
 
-- Fixed the login and register page copy to match the actual actions users expect when accessing UtilityMate.
+- No bug fixes in this release.

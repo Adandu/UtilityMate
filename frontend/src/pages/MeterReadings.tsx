@@ -72,6 +72,7 @@ interface StreamListResponse {
 const streamKey = (locationId: number, categoryId: number, meterLabel: string) => `${locationId}:${categoryId}:${meterLabel}`;
 
 const formatNumber = (value?: number | null) => (typeof value === 'number' ? value.toFixed(2) : '—');
+const formatStreamLabel = (stream: StreamSummary) => `${stream.location?.name || 'Location'} • ${stream.category?.name || 'Category'} • ${stream.meter_label || 'Default stream'}`;
 
 const MeterReadings: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -286,7 +287,7 @@ const MeterReadings: React.FC = () => {
         </div>
       )}
 
-      <section className="mb-8 grid grid-cols-1 gap-4 rounded-3xl border border-outline-variant bg-surface-container-low p-6 lg:grid-cols-5">
+      <section className="mb-8 grid grid-cols-1 gap-4 rounded-3xl border border-outline-variant bg-surface-container-low p-6 lg:grid-cols-6">
         <select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
           <option value="">All locations</option>
           {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
@@ -294,6 +295,13 @@ const MeterReadings: React.FC = () => {
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
           <option value="">All categories</option>
           {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+        </select>
+        <select value={selectedStreamKey} onChange={(e) => setSelectedStreamKey(e.target.value)} className="rounded-xl border border-outline-variant bg-surface-container p-3">
+          <option value="">All meter streams</option>
+          {streams.map((stream) => {
+            const key = streamKey(stream.location_id, stream.category_id, stream.meter_label);
+            return <option key={key} value={key}>{formatStreamLabel(stream)}</option>;
+          })}
         </select>
         <div className="rounded-xl border border-outline-variant bg-surface-container px-4 py-3">
           <p className="text-xs font-black uppercase tracking-[0.2em] opacity-50">Streams</p>
