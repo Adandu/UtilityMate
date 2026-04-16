@@ -1,4 +1,4 @@
-# UtilityMate v1.7.9
+# UtilityMate v1.7.10
 
 ## New Features
 
@@ -6,8 +6,8 @@
 
 ## Improvements
 
-- Kept the Association Statements entry nested under Invoices while switching it to a Material icon that the current sidebar font actually supports.
+- Aligned the Association Statements sidebar entry with the main navigation spacing so it sits cleanly beside Invoices and Raw Data.
 
 ## Bug Fixes
 
-- Fixed the broken Association Statements sidebar item rendering as large fallback text instead of an icon.
+- Fixed the Association Statements sidebar button rendering out of line because it still used nested-item indentation styles.
