@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Invoices from './pages/Invoices';
+import AssociationStatements from './pages/AssociationStatements';
 import RawData from './pages/RawData';
 import Config from './pages/Config';
 import Operations from './pages/Operations';
@@ -45,6 +46,7 @@ const App: React.FC = () => {
             
             <Route path="/" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/invoices" element={isAuthenticated ? <Invoices /> : <Navigate to="/login" />} />
+            <Route path="/association-statements" element={isAuthenticated ? <AssociationStatements /> : <Navigate to="/login" />} />
             <Route path="/data" element={isAuthenticated ? <RawData /> : <Navigate to="/login" />} />
             <Route path="/operations" element={isAuthenticated ? <Operations /> : <Navigate to="/login" />} />
             <Route path="/meters" element={isAuthenticated ? <MeterReadings /> : <Navigate to="/login" />} />

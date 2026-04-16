@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Bell, Home, Wallet, Download, Gauge, Loader2, Plus, Building2, AlertTriangle, Trash2, Upload, Eye, FileStack, ArrowRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Bell, Home, Wallet, Download, Gauge, Loader2, Plus, Building2, AlertTriangle, ArrowRight } from 'lucide-react';
 import api from '../utils/api';
 
 interface Category { id: number; name: string; unit: string; }
@@ -14,28 +14,6 @@ interface BudgetStatus {
 }
 interface AlertItem { id: number; severity: string; title: string; message: string; is_read: boolean; created_at: string; }
 interface Household { id: number; name: string; description?: string; members: { id: number; user_id: number; role: string }[]; }
-interface AssociationStatementLine { id: number; raw_label: string; normalized_label: string; amount: number; location?: Location; }
-interface AssociationStatement {
-  id: number;
-  statement_month: string;
-  display_month: string;
-  posted_date?: string | null;
-  due_date?: string | null;
-  source_name?: string | null;
-  total_payable?: number | null;
-  parsing_profile?: string | null;
-  lines: AssociationStatementLine[];
-}
-interface AssociationStatementUploadResult {
-  filename: string;
-  status: string;
-  detail: string;
-  statement_id?: number;
-  display_month?: string;
-  imported_locations: string[];
-  imported_lines: number;
-}
-
 const Operations: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [budgets, setBudgets] = useState<BudgetStatus[]>([]);
@@ -44,11 +22,7 @@ const Operations: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [associationStatements, setAssociationStatements] = useState<AssociationStatement[]>([]);
   const [pageErrors, setPageErrors] = useState<string[]>([]);
-  const [uploadingStatements, setUploadingStatements] = useState(false);
-  const [statementUploadResults, setStatementUploadResults] = useState<AssociationStatementUploadResult[]>([]);
-  const statementFileInputRef = useRef<HTMLInputElement>(null);
 
   const [newBudgetCategory, setNewBudgetCategory] = useState('');
   const [newBudgetLocation, setNewBudgetLocation] = useState('');
@@ -64,7 +38,6 @@ const Operations: React.FC = () => {
       api.get('/categories/'),
       api.get('/locations/'),
       api.get('/providers/'),
-      api.get('/association-statements/'),
     ]);
 
     const errors: string[] = [];
@@ -86,9 +59,6 @@ const Operations: React.FC = () => {
 
     if (results[5].status === 'fulfilled') setProviders(results[5].value.data);
     else errors.push('Providers could not be loaded.');
-
-    if (results[6].status === 'fulfilled') setAssociationStatements(results[6].value.data);
-    else errors.push('Association statements could not be loaded.');
 
     setPageErrors(errors);
     setLoading(false);
@@ -128,38 +98,6 @@ const Operations: React.FC = () => {
   const deleteHousehold = async (householdId: number) => {
     if (!window.confirm('Delete this household? Linked locations and budgets will be detached.')) return;
     await api.delete(`/households/${householdId}`);
-    fetchData();
-  };
-
-  const uploadAssociationStatements = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const files = statementFileInputRef.current?.files;
-    if (!files?.length) return;
-    const formData = new FormData();
-    Array.from(files).forEach((file) => formData.append('files', file));
-    setUploadingStatements(true);
-    setStatementUploadResults([]);
-    try {
-      const response = await api.post<AssociationStatementUploadResult[]>('/association-statements/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setStatementUploadResults(response.data);
-      if (statementFileInputRef.current) statementFileInputRef.current.value = '';
-      fetchData();
-    } finally {
-      setUploadingStatements(false);
-    }
-  };
-
-  const openAssociationStatementPdf = async (statementId: number) => {
-    const response = await api.get(`/association-statements/${statementId}/pdf`, { responseType: 'blob' });
-    const blobUrl = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-    window.open(blobUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  const deleteAssociationStatement = async (statementId: number) => {
-    if (!window.confirm('Delete this imported association statement and all of its parsed line items?')) return;
-    await api.delete(`/association-statements/${statementId}`);
     fetchData();
   };
 
@@ -283,62 +221,6 @@ const Operations: React.FC = () => {
               <div key={provider.id} className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
                 <p className="font-black">{provider.name}</p>
                 <p className="text-sm opacity-60">{categories.find((category) => category.id === provider.category_id)?.name || 'Unassigned category'}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-outline-variant bg-surface-container-low p-6">
-          <div className="mb-5 flex items-center gap-3"><FileStack className="text-teal-600" /><h3 className="font-headline text-xl font-black">Association Statements</h3></div>
-          <p className="mb-4 text-sm opacity-70">Import BlocManagerNET avizier PDFs once per month. UtilityMate will map rows like `Ap 12` and `Ap 15` into normalized line items and feed the dashboard without forcing them into the normal invoice flow.</p>
-          <form onSubmit={uploadAssociationStatements} className="mb-6 space-y-3">
-            <input ref={statementFileInputRef} type="file" accept=".pdf" multiple className="w-full rounded-xl border border-outline-variant bg-surface-container p-3" />
-            <button type="submit" disabled={uploadingStatements} className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 font-bold text-white disabled:opacity-60">
-              {uploadingStatements ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-              {uploadingStatements ? 'Importing Statements...' : 'Import Avizier PDFs'}
-            </button>
-          </form>
-          {statementUploadResults.length > 0 && (
-            <div className="mb-6 space-y-3">
-              {statementUploadResults.map((result, index) => (
-                <div key={`${result.filename}-${index}`} className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-black">{result.filename}</p>
-                      <p className="text-sm opacity-70">{result.detail}</p>
-                      {result.display_month && <p className="mt-1 text-xs font-bold uppercase opacity-50">{result.display_month}</p>}
-                    </div>
-                    <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${result.status === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{result.status}</span>
-                  </div>
-                  {result.status === 'success' && (
-                    <p className="mt-3 text-xs opacity-60">{result.imported_lines} line items imported for {result.imported_locations.join(', ') || 'matched locations'}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="space-y-3">
-            {associationStatements.length === 0 && <p className="text-sm opacity-60">No association statements imported yet.</p>}
-            {associationStatements.slice(0, 8).map((statement) => (
-              <div key={statement.id} className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-black">{statement.display_month}</p>
-                    <p className="text-sm opacity-70">{statement.source_name || 'Imported avizier PDF'}</p>
-                    <p className="mt-2 text-xs font-bold uppercase opacity-50">
-                      {statement.lines.length} parsed line items • {new Set(statement.lines.map((line) => line.location?.name).filter(Boolean)).size} locations
-                    </p>
-                    {typeof statement.total_payable === 'number' && <p className="mt-2 text-sm font-bold">Imported total payable: {statement.total_payable.toFixed(2)} RON</p>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => openAssociationStatementPdf(statement.id)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black uppercase text-white">
-                      <Eye size={14} />
-                    </button>
-                    <button onClick={() => deleteAssociationStatement(statement.id)} className="rounded-xl border border-outline-variant px-3 py-2 text-xs font-black uppercase text-red-600">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
               </div>
             ))}
           </div>

@@ -1,13 +1,13 @@
-# UtilityMate v1.7.7
+# UtilityMate v1.7.8
 
 ## New Features
 
-- No new features in this release.
+- Added a dedicated Association Statements page with its own route and navigation entry under Invoices.
 
 ## Improvements
 
-- Simplified the Operations page by removing the unused Automation & Integrations section.
+- Moved the avizier PDF import and review workflow out of Operations so invoice-related monthly statement work lives in its own focused workspace.
 
 ## Bug Fixes
 
-- Fixed stale automation-only API surface remaining in the backend after the Operations page workflow moved elsewhere.
+- No bug fixes in this release.
