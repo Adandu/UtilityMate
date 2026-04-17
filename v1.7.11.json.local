@@ -1,5 +1,0 @@
-{
-  "version": "1.7.11",
-  "title": "UtilityMate v1.7.11",
-  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Budget category selection now collapses duplicate category names so the Operations page budget form stays clean even when both system and user categories exist.\n\n## Bug Fixes\n\n- Fixed the Budgets category dropdown showing duplicate `Gas` entries.\n"
-}

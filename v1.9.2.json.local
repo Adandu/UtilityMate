@@ -1,5 +1,0 @@
-{
-  "version": "1.9.2",
-  "title": "UtilityMate v1.9.2",
-  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Removed the separate graph page from the rent statement export to keep the report focused on actionable billing details.\n- Added current-month electricity and heating usage to each tenant's per-person breakdown.\n- Widened the breakdown label column so longer adjustment-note labels and values render cleanly in the two-column layout.\n\n## Bug Fixes\n\n- Fixed zero balances such as previous balance rendering as `-0.00` in the rent statement tables.\n"
-}

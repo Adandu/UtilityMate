@@ -1,5 +1,0 @@
-{
-  "version": "1.6.6",
-  "title": "UtilityMate v1.6.6",
-  "body": "## New Features\n\n- Added a direct rename control for Rent workspaces so you can update the workspace name from the Rent page without recreating it.\n\n## Improvements\n\n- Rent workspace management is now smoother, with the current workspace name editable inline where you already manage the rest of the setup.\n\n## Bug Fixes\n\n- Fixed the missing Rent rename workflow so workspace names are no longer effectively locked after creation.\n"
-}

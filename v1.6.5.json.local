@@ -1,5 +1,0 @@
-{
-  "version": "1.6.5",
-  "title": "UtilityMate v1.6.5",
-  "body": "## New Features\n\n- Added room-level energy usage in Rent for Hidroelectrica invoices, with any unassigned invoice kWh automatically split equally across utility-paying tenants.\n\n## Improvements\n\n- Rent now shows invoice kWh, room-entered kWh, and equal-share remainder so electricity allocation is easier to audit month by month.\n\n## Bug Fixes\n\n- Fixed Rent electricity allocation so room-entered usage can affect only the supplier electricity invoice without mixing in avizier energy.\n"
-}

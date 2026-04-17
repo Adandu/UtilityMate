@@ -1,5 +1,0 @@
-{
-  "version": "1.9.1",
-  "title": "UtilityMate v1.9.1",
-  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Moved the `What Each Person Has to Pay` section ahead of the trend charts so the current-month obligations appear first in the export.\n- Split the rent statement into dedicated pages for the billing table, graphs, and per-person breakdown.\n- Reworked the per-person breakdown into a two-column layout to use the landscape page more efficiently.\n\n## Bug Fixes\n\n- Fixed the rent statement flow feeling out of order once charts and detailed person breakdowns were added.\n"
-}

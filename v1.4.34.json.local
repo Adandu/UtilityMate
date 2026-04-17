@@ -1,3 +1,0 @@
-{
-  "body": "## New Features\n- Added a current-period utility cost breakdown table to the dashboard so you can review each utility’s spend contribution for the active filters.\n\n## Improvements\n- History chart legends and hover ordering are now standardized as `Cost`, `Last Year`, and `Average Over the Years` for easier comparison.\n\n## Bug Fixes\n- Fixed inconsistent history-series naming and ordering between the dashboard legends and tooltips."
-}

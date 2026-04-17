@@ -1,5 +1,0 @@
-{
-  "version": "1.7.3",
-  "title": "UtilityMate v1.7.3",
-  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Simplified the authentication screens so the primary actions are labeled clearly as `Login` and `Register`.\n- Updated the supporting text on both auth pages to use straightforward account language instead of themed gateway terminology.\n\n## Bug Fixes\n\n- Fixed the login and register page copy to match the actual actions users expect when accessing UtilityMate.\n"
-}

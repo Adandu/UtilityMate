@@ -8,5 +8,6 @@ Invoice/
 data/
 _agents/
 *.md.local
+v*.json.local
 stitch.zip
 stitch_design/

@@ -1,5 +1,0 @@
-{
-  "version": "1.7.10",
-  "title": "UtilityMate v1.7.10",
-  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Aligned the Association Statements sidebar entry with the main navigation spacing so it sits cleanly beside Invoices and Raw Data.\n\n## Bug Fixes\n\n- Fixed the Association Statements sidebar button rendering out of line because it still used nested-item indentation styles.\n"
-}

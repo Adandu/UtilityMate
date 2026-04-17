@@ -1,5 +1,0 @@
-{
-  "version": "1.6.3",
-  "title": "UtilityMate v1.6.3",
-  "body": "## New Features\n\n- Added per-tenant adjustment notes in Rent so custom credits and debits can carry their explanation through to the monthly statement and exported PDF.\n\n## Improvements\n\n- Rent adjustment entry is now cleaner, with simpler wording in the UI and optional notes stored alongside each manual adjustment.\n\n## Bug Fixes\n\n- Fixed Rent statement exports so manual adjustment context is no longer lost when sharing the monthly PDF with tenants.\n"
-}

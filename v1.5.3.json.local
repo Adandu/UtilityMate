@@ -1,3 +1,0 @@
-{
-  "body": "## New Features\n- Rebuilt the winter avizier gas/heating parser model so those columns are interpreted as adjacent charge fields instead of pseudo-meter pairs.\n\n## Improvements\n- Winter avizier monthly profiles now preserve row-length matching while correctly extracting gas and heating costs from the statement layout.\n\n## Bug Fixes\n- Fixed January 2026 and similar aviziers where gas and heating were still wrong because the parser model itself did not match the layout structure."
-}

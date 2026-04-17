@@ -1,5 +1,0 @@
-{
-  "version": "1.7.5",
-  "title": "UtilityMate v1.7.5",
-  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Refreshed the frontend lockfile so the Vite 8 toolchain resolves its optional Rolldown native binding correctly during install.\n\n## Bug Fixes\n\n- Fixed the frontend production build failing with `Cannot find native binding` after an incomplete optional dependency install.\n"
-}

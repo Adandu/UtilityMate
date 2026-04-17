@@ -1,5 +1,0 @@
-{
-  "version": "1.7.12",
-  "title": "UtilityMate v1.7.12",
-  "body": "## New Features\n\n- Added edit and delete controls for configured budgets directly in the Operations page.\n\n## Improvements\n\n- Budget edits can now change the category, location scope, monthly limit, and warning threshold instead of requiring budget recreation.\n\n## Bug Fixes\n\n- No bug fixes in this release.\n"
-}
