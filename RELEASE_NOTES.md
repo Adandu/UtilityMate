@@ -1,4 +1,4 @@
-# UtilityMate v1.9.3
+# UtilityMate v1.9.4
 
 ## New Features
 
@@ -6,10 +6,9 @@
 
 ## Improvements
 
-- Sorted the rent export tenant sections by room name first and tenant name second for easier scanning.
-- Widened the `Room` column in `What Each Person Has to Pay` so longer room names such as `Small Bedroom` fit cleanly.
-- Centered the two-column `Per-Person Breakdown` grid on the page for a more balanced landscape layout.
+- Added the UtilityMate logo to the rent statement header with the title centered independently of the icon.
+- Increased the size of the workspace, location, and month summary text below the title for better readability.
 
 ## Bug Fixes
 
-- Fixed the `Previous` value in `Per-Person Breakdown` appearing bold when it should use normal body weight.
+- Fixed the rent statement header feeling visually unbalanced at the top of the page.

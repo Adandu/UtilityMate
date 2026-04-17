@@ -1,0 +1,5 @@
+{
+  "version": "1.9.4",
+  "title": "UtilityMate v1.9.4",
+  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Added the UtilityMate logo to the rent statement header with the title centered independently of the icon.\n- Increased the size of the workspace, location, and month summary text below the title for better readability.\n\n## Bug Fixes\n\n- Fixed the rent statement header feeling visually unbalanced at the top of the page.\n"
+}

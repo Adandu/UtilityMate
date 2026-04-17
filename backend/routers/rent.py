@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import date
 from io import BytesIO
+import os
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,7 +10,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -19,6 +20,8 @@ from ..schemas import api_schemas
 from ..utils import auth_utils
 
 router = APIRouter()
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+RENT_PDF_LOGO_PATH = os.path.join(BASE_DIR, "backend", "assets", "utilitymate-logo.png")
 
 
 def _month_start(value: date) -> date:
@@ -607,14 +610,29 @@ def _build_rent_statement_pdf(
     styles.add(ParagraphStyle(name="RentHeading", parent=styles["Heading1"], fontSize=18, leading=22, textColor=colors.HexColor("#0f172a")))
     styles.add(ParagraphStyle(name="RentSubheading", parent=styles["Heading2"], fontSize=10.5, leading=13, textColor=colors.HexColor("#334155")))
     styles.add(ParagraphStyle(name="RentBody", parent=styles["BodyText"], fontSize=8.5, leading=11, textColor=colors.HexColor("#334155")))
+    styles.add(ParagraphStyle(name="RentMeta", parent=styles["BodyText"], fontSize=10, leading=13, textColor=colors.HexColor("#334155"), alignment=1))
 
     month_label = statement.month.strftime("%B %Y")
+    header_cells = ["", Paragraph("UtilityMate Rent Statement", styles["RentHeading"]), ""]
+    if os.path.exists(RENT_PDF_LOGO_PATH):
+        header_cells[0] = Image(RENT_PDF_LOGO_PATH, width=16 * mm, height=16 * mm)
+        header_cells[2] = Spacer(16 * mm, 1)
+    header_table = Table([header_cells], colWidths=[20 * mm, 227 * mm, 20 * mm])
+    header_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (0, 0), "LEFT"),
+        ("ALIGN", (1, 0), (1, 0), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
     story = [
-        Paragraph("UtilityMate Rent Statement", styles["RentHeading"]),
+        header_table,
         Spacer(1, 3 * mm),
         Paragraph(
             f"Workspace: <b>{lease.name}</b><br/>Location: <b>{lease.location.name}</b><br/>Month: <b>{month_label}</b>",
-            styles["RentBody"],
+            styles["RentMeta"],
         ),
         Spacer(1, 4 * mm),
     ]
