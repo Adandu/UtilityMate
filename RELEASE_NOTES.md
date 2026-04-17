@@ -1,4 +1,4 @@
-# UtilityMate v1.9.4
+# UtilityMate v1.9.5
 
 ## New Features
 
@@ -6,9 +6,8 @@
 
 ## Improvements
 
-- Added the UtilityMate logo to the rent statement header with the title centered independently of the icon.
-- Increased the size of the workspace, location, and month summary text below the title for better readability.
+- Rebalanced the per-person breakdown card column widths so amount and label text fit cleanly inside the two-column layout.
 
 ## Bug Fixes
 
-- Fixed the rent statement header feeling visually unbalanced at the top of the page.
+- Fixed per-person breakdown values overlapping the cell boundaries when labels or amounts were wider than expected.

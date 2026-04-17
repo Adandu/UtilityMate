@@ -1,0 +1,5 @@
+{
+  "version": "1.9.5",
+  "title": "UtilityMate v1.9.5",
+  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Rebalanced the per-person breakdown card column widths so amount and label text fit cleanly inside the two-column layout.\n\n## Bug Fixes\n\n- Fixed per-person breakdown values overlapping the cell boundaries when labels or amounts were wider than expected.\n"
+}

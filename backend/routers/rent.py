@@ -568,7 +568,7 @@ def _build_person_breakdown_card(
         f"<b>{tenant.tenant_name}</b>{f' • {tenant.room_name}' if tenant.room_name else ''}",
         styles["RentBody"],
     )
-    person_table = Table(breakdown_rows, colWidths=[35 * mm, 18 * mm, 22 * mm, 34 * mm])
+    person_table = Table(breakdown_rows, colWidths=[31 * mm, 25 * mm, 26 * mm, 27 * mm])
     person_table_style = [
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
