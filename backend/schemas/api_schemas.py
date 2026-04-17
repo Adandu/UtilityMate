@@ -733,8 +733,10 @@ class RentTenantStatement(BaseModel):
     pays_rent: bool
     pays_utilities: bool
     rent_amount: float
+    electricity_usage_kwh: float = 0.0
     electricity_amount: float
     shared_utilities_amount: float
+    heating_usage_value: float = 0.0
     heating_amount: float
     utilities_amount: float
     other_adjustment: float

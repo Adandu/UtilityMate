@@ -3,16 +3,13 @@ from datetime import date
 from io import BytesIO
 from typing import Dict, List, Optional
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -32,9 +29,9 @@ def _next_month(value: date) -> date:
     return date(value.year + (1 if value.month == 12 else 0), 1 if value.month == 12 else value.month + 1, 1)
 
 
-def _shift_month(value: date, months: int) -> date:
-    zero_based = value.month - 1 + months
-    return date(value.year + (zero_based // 12), (zero_based % 12) + 1, 1)
+def _display_amount(value: float) -> str:
+    normalized = 0.0 if abs(float(value)) < 0.005 else float(value)
+    return f"{normalized:.2f}"
 
 
 def _statement_effective_month(statement: database_models.AssociationStatement) -> Optional[date]:
@@ -322,6 +319,67 @@ def _calculate_electricity_distribution(
     return electricity_by_tenant, "room_usage_remainder_split"
 
 
+def _calculate_electricity_usage_distribution(
+    electricity_consumption_total: float,
+    utility_payers: List[api_schemas.RentTenantMonthConfig],
+    room_energy_usages: List[api_schemas.RentRoomEnergyUsage],
+    room_tenant_map: Dict[int, List[int]],
+):
+    usage_by_tenant: Dict[int, float] = defaultdict(float)
+    if not utility_payers or electricity_consumption_total <= 0:
+        return usage_by_tenant
+
+    assigned_kwh = 0.0
+    for usage in room_energy_usages:
+        usage_kwh = max(float(usage.usage_kwh), 0.0)
+        if usage_kwh <= 0:
+            continue
+        tenant_ids = room_tenant_map.get(usage.room_id, [])
+        if not tenant_ids:
+            continue
+        assigned_kwh += usage_kwh
+        per_tenant_kwh = usage_kwh / len(tenant_ids)
+        for tenant_id in tenant_ids:
+            usage_by_tenant[tenant_id] += per_tenant_kwh
+
+    remaining_kwh = max(electricity_consumption_total - assigned_kwh, 0.0)
+    if remaining_kwh > 0:
+        equal_remaining_kwh = remaining_kwh / len(utility_payers)
+        for config in utility_payers:
+            usage_by_tenant[config.tenant_id] += equal_remaining_kwh
+
+    return usage_by_tenant
+
+
+def _calculate_heating_usage_distribution(
+    utility_payers: List[api_schemas.RentTenantMonthConfig],
+    room_usages: List[api_schemas.RentRoomUsage],
+    room_tenant_map: Dict[int, List[int]],
+):
+    usage_by_tenant: Dict[int, float] = defaultdict(float)
+    if not utility_payers:
+        return usage_by_tenant
+
+    total_usage = sum(float(usage.usage_value) for usage in room_usages if float(usage.usage_value) > 0)
+    if total_usage > 0 and room_tenant_map:
+        for usage in room_usages:
+            usage_value = max(float(usage.usage_value), 0.0)
+            if usage_value <= 0:
+                continue
+            tenant_ids = room_tenant_map.get(usage.room_id, [])
+            if not tenant_ids:
+                continue
+            per_tenant_usage = usage_value / len(tenant_ids)
+            for tenant_id in tenant_ids:
+                usage_by_tenant[tenant_id] += per_tenant_usage
+        return usage_by_tenant
+
+    equal_usage = 1.0 / len(utility_payers)
+    for config in utility_payers:
+        usage_by_tenant[config.tenant_id] = equal_usage
+    return usage_by_tenant
+
+
 def _build_statement(
     db: Session,
     lease: database_models.RentLease,
@@ -358,8 +416,19 @@ def _build_statement(
         room_energy_usages,
         room_tenant_map,
     )
+    electricity_usage_by_tenant = _calculate_electricity_usage_distribution(
+        source_summary.electricity_consumption_total,
+        utility_payers,
+        room_energy_usages,
+        room_tenant_map,
+    )
     heating_by_tenant, heating_mode = _calculate_heating_distribution(
         source_summary.heating_total,
+        utility_payers,
+        room_usages,
+        room_tenant_map,
+    )
+    heating_usage_by_tenant = _calculate_heating_usage_distribution(
         utility_payers,
         room_usages,
         room_tenant_map,
@@ -422,8 +491,10 @@ def _build_statement(
                 pays_rent=config.pays_rent,
                 pays_utilities=config.pays_utilities,
                 rent_amount=float(config.rent_amount if config.pays_rent else 0.0),
+                electricity_usage_kwh=float(electricity_usage_by_tenant.get(config.tenant_id, 0.0) if (config.is_active and config.pays_utilities) else 0.0),
                 electricity_amount=float(electricity_amount),
                 shared_utilities_amount=float(shared_utilities_amount),
+                heating_usage_value=float(heating_usage_by_tenant.get(config.tenant_id, 0.0) if (config.is_active and config.pays_utilities) else 0.0),
                 heating_amount=float(heating_amount),
                 utilities_amount=float(utilities_amount),
                 other_adjustment=float(config.other_adjustment),
@@ -466,48 +537,16 @@ def _build_statement(
         },
     )
 
-
-def _render_rent_chart_image(
-    title: str,
-    labels: List[str],
-    series: List[tuple[str, List[float], str]],
-    y_label: str,
-) -> BytesIO:
-    figure, axis = plt.subplots(figsize=(7.4, 2.4))
-    for name, values, color in series:
-        axis.plot(labels, values, marker="o", linewidth=2, label=name, color=color)
-    axis.set_title(title, fontsize=11, fontweight="bold")
-    axis.set_ylabel(y_label, fontsize=9)
-    axis.grid(True, axis="y", alpha=0.2)
-    axis.tick_params(axis="x", labelsize=8)
-    axis.tick_params(axis="y", labelsize=8)
-    axis.legend(loc="best", fontsize=8)
-    figure.tight_layout()
-    output = BytesIO()
-    figure.savefig(output, format="png", dpi=160, bbox_inches="tight")
-    plt.close(figure)
-    output.seek(0)
-    return output
-
-
-def _build_recent_month_summaries(
-    db: Session,
-    lease: database_models.RentLease,
-    target_month: date,
-) -> List[api_schemas.RentMonthStatement]:
-    months = [_shift_month(target_month, offset) for offset in (-2, -1, 0)]
-    return [_build_statement(db, lease, month_value) for month_value in months]
-
-
 def _build_person_breakdown_card(
     tenant: api_schemas.RentTenantStatement,
     styles,
 ) -> List:
     breakdown_rows = [
-        ["Rent", f"{tenant.rent_amount:.2f} RON", "Electricity", f"{tenant.electricity_amount:.2f} RON"],
-        ["Shared Utilities", f"{tenant.shared_utilities_amount:.2f} RON", "Heating", f"{tenant.heating_amount:.2f} RON"],
-        ["Other", f"{tenant.other_adjustment:.2f} RON", "Previous", f"{tenant.previous_balance:.2f} RON"],
-        ["Payments", f"-{tenant.payments_in_month:.2f} RON", "Amount Due", f"{tenant.amount_due:.2f} RON"],
+        ["Rent", f"{_display_amount(tenant.rent_amount)} RON", "Electricity", f"{_display_amount(tenant.electricity_amount)} RON"],
+        ["Energy Usage", f"{_display_amount(tenant.electricity_usage_kwh)} kWh", "Heating", f"{_display_amount(tenant.heating_amount)} RON"],
+        ["Heating Usage", _display_amount(tenant.heating_usage_value), "Shared Utilities", f"{_display_amount(tenant.shared_utilities_amount)} RON"],
+        ["Other", f"{_display_amount(tenant.other_adjustment)} RON", "Previous", f"{_display_amount(tenant.previous_balance)} RON"],
+        ["Payments", f"{_display_amount(-tenant.payments_in_month)} RON", "Amount Due", f"{_display_amount(tenant.amount_due)} RON"],
     ]
     if tenant.other_adjustment_note:
         breakdown_rows.append(["Adjustment Note", tenant.other_adjustment_note, "", ""])
@@ -516,7 +555,7 @@ def _build_person_breakdown_card(
         f"<b>{tenant.tenant_name}</b>{f' • {tenant.room_name}' if tenant.room_name else ''}",
         styles["RentBody"],
     )
-    person_table = Table(breakdown_rows, colWidths=[27 * mm, 23 * mm, 27 * mm, 23 * mm])
+    person_table = Table(breakdown_rows, colWidths=[35 * mm, 18 * mm, 22 * mm, 34 * mm])
     person_table_style = [
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
@@ -561,7 +600,6 @@ def _build_rent_statement_pdf(
     styles.add(ParagraphStyle(name="RentBody", parent=styles["BodyText"], fontSize=8.5, leading=11, textColor=colors.HexColor("#334155")))
 
     month_label = statement.month.strftime("%B %Y")
-    recent_statements = _build_recent_month_summaries(db, lease, statement.month)
     story = [
         Paragraph("UtilityMate Rent Statement", styles["RentHeading"]),
         Spacer(1, 3 * mm),
@@ -575,12 +613,12 @@ def _build_rent_statement_pdf(
     summary_rows = [
         ["Rent", "Electricity", "Invoice kWh", "Avizier", "Heating", "Amount Due"],
         [
-            f"{statement.totals['rent_total']:.2f} RON",
-            f"{statement.source_summary.electricity_total:.2f} RON",
-            f"{statement.source_summary.electricity_consumption_total:.2f} kWh",
-            f"{statement.source_summary.avizier_total:.2f} RON",
-            f"{statement.source_summary.heating_total:.2f} RON",
-            f"{statement.totals['amount_due_total']:.2f} RON",
+            f"{_display_amount(statement.totals['rent_total'])} RON",
+            f"{_display_amount(statement.source_summary.electricity_total)} RON",
+            f"{_display_amount(statement.source_summary.electricity_consumption_total)} kWh",
+            f"{_display_amount(statement.source_summary.avizier_total)} RON",
+            f"{_display_amount(statement.source_summary.heating_total)} RON",
+            f"{_display_amount(statement.totals['amount_due_total'])} RON",
         ],
     ]
     summary_table = Table(summary_rows, colWidths=[44 * mm, 44 * mm, 44 * mm, 44 * mm, 44 * mm, 48 * mm])
@@ -626,14 +664,14 @@ def _build_rent_statement_pdf(
         statement_rows.append([
             tenant.tenant_name,
             tenant.room_name or "-",
-            f"{tenant.rent_amount:.2f}",
-            f"{tenant.electricity_amount:.2f}",
-            f"{tenant.shared_utilities_amount:.2f}",
-            f"{tenant.heating_amount:.2f}",
-            f"{tenant.other_adjustment:.2f}",
-            f"{tenant.previous_balance:.2f}",
-            f"{tenant.payments_in_month:.2f}",
-            f"{tenant.amount_due:.2f}",
+            _display_amount(tenant.rent_amount),
+            _display_amount(tenant.electricity_amount),
+            _display_amount(tenant.shared_utilities_amount),
+            _display_amount(tenant.heating_amount),
+            _display_amount(tenant.other_adjustment),
+            _display_amount(tenant.previous_balance),
+            _display_amount(tenant.payments_in_month),
+            _display_amount(tenant.amount_due),
         ])
     statement_table = Table(
         statement_rows,
@@ -652,61 +690,6 @@ def _build_rent_statement_pdf(
         ("TOPPADDING", (0, 0), (-1, -1), 5),
     ]))
     story.extend([statement_table, Spacer(1, 4 * mm)])
-
-    trend_labels = [item.month.strftime("%b %Y") for item in recent_statements]
-    totals_chart = _render_rent_chart_image(
-        "Recent 3-Month Rent Totals",
-        trend_labels,
-        [
-            ("Amount Due", [item.totals["amount_due_total"] for item in recent_statements], "#0f766e"),
-            ("Payments", [item.totals["payments_total"] for item in recent_statements], "#2563eb"),
-            ("Current Charges", [item.totals["current_total"] for item in recent_statements], "#f97316"),
-        ],
-        "RON",
-    )
-    utilities_chart = _render_rent_chart_image(
-        "Recent 3-Month Utility Costs",
-        trend_labels,
-        [
-            ("Electricity", [item.source_summary.electricity_total for item in recent_statements], "#7c3aed"),
-            ("Avizier", [item.source_summary.avizier_total for item in recent_statements], "#14b8a6"),
-            ("Heating", [item.source_summary.heating_total for item in recent_statements], "#ef4444"),
-        ],
-        "RON",
-    )
-    recent_rows = [["Month", "Current Charges", "Payments", "Amount Due", "Electricity", "Avizier", "Heating"]]
-    for item in recent_statements:
-        recent_rows.append([
-            item.month.strftime("%b %Y"),
-            f"{item.totals['current_total']:.2f}",
-            f"{item.totals['payments_total']:.2f}",
-            f"{item.totals['amount_due_total']:.2f}",
-            f"{item.source_summary.electricity_total:.2f}",
-            f"{item.source_summary.avizier_total:.2f}",
-            f"{item.source_summary.heating_total:.2f}",
-        ])
-    recent_table = Table(recent_rows, colWidths=[28 * mm, 31 * mm, 29 * mm, 29 * mm, 27 * mm, 27 * mm, 27 * mm], repeatRows=1)
-    recent_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
-        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story.extend([
-        PageBreak(),
-        Paragraph("Recent Trend Snapshot", styles["RentSubheading"]),
-        Spacer(1, 1.5 * mm),
-        Image(totals_chart, width=180 * mm, height=58 * mm),
-        Spacer(1, 3 * mm),
-        Image(utilities_chart, width=180 * mm, height=58 * mm),
-        Spacer(1, 3 * mm),
-        recent_table,
-        Spacer(1, 4 * mm),
-    ])
 
     story.extend([
         PageBreak(),
