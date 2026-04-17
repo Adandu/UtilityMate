@@ -1,0 +1,5 @@
+{
+  "version": "1.9.3",
+  "title": "UtilityMate v1.9.3",
+  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Sorted the rent export tenant sections by room name first and tenant name second for easier scanning.\n- Widened the `Room` column in `What Each Person Has to Pay` so longer room names such as `Small Bedroom` fit cleanly.\n- Centered the two-column `Per-Person Breakdown` grid on the page for a more balanced landscape layout.\n\n## Bug Fixes\n\n- Fixed the `Previous` value in `Per-Person Breakdown` appearing bold when it should use normal body weight.\n"
+}

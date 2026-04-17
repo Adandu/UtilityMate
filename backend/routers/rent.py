@@ -34,6 +34,16 @@ def _display_amount(value: float) -> str:
     return f"{normalized:.2f}"
 
 
+def _sort_tenant_statements(tenants: List[api_schemas.RentTenantStatement]) -> List[api_schemas.RentTenantStatement]:
+    return sorted(
+        tenants,
+        key=lambda tenant: (
+            (tenant.room_name or "").strip().lower(),
+            tenant.tenant_name.strip().lower(),
+        ),
+    )
+
+
 def _statement_effective_month(statement: database_models.AssociationStatement) -> Optional[date]:
     anchor = statement.posted_date or statement.statement_month
     return _month_start(anchor) if anchor else None
@@ -562,7 +572,6 @@ def _build_person_breakdown_card(
         ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
         ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
         ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
-        ("FONTNAME", (3, 3), (3, 3), "Helvetica-Bold"),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
         ("ALIGN", (1, 0), (1, -1), "RIGHT"),
         ("ALIGN", (3, 0), (3, -1), "RIGHT"),
@@ -660,7 +669,8 @@ def _build_rent_statement_pdf(
         "Payments",
         "Amount Due",
     ]]
-    for tenant in statement.tenant_statements:
+    sorted_tenants = _sort_tenant_statements(statement.tenant_statements)
+    for tenant in sorted_tenants:
         statement_rows.append([
             tenant.tenant_name,
             tenant.room_name or "-",
@@ -675,7 +685,7 @@ def _build_rent_statement_pdf(
         ])
     statement_table = Table(
         statement_rows,
-        colWidths=[35 * mm, 24 * mm, 18 * mm, 22 * mm, 29 * mm, 20 * mm, 18 * mm, 22 * mm, 22 * mm, 25 * mm],
+        colWidths=[31 * mm, 31 * mm, 18 * mm, 20 * mm, 27 * mm, 18 * mm, 17 * mm, 20 * mm, 20 * mm, 23 * mm],
         repeatRows=1,
     )
     statement_table.setStyle(TableStyle([
@@ -697,7 +707,7 @@ def _build_rent_statement_pdf(
         Spacer(1, 1.5 * mm),
     ])
 
-    person_cards = [_build_person_breakdown_card(tenant, styles) for tenant in statement.tenant_statements]
+    person_cards = [_build_person_breakdown_card(tenant, styles) for tenant in sorted_tenants]
     breakdown_grid_rows = []
     for index in range(0, len(person_cards), 2):
         left_card = person_cards[index]
@@ -707,7 +717,7 @@ def _build_rent_statement_pdf(
     breakdown_grid = Table(
         breakdown_grid_rows or [[Paragraph("No tenant breakdown available.", styles["RentBody"]), ""]],
         colWidths=[133 * mm, 133 * mm],
-        hAlign="LEFT",
+        hAlign="CENTER",
     )
     breakdown_grid.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),

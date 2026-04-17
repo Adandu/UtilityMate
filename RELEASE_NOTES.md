@@ -1,4 +1,4 @@
-# UtilityMate v1.9.2
+# UtilityMate v1.9.3
 
 ## New Features
 
@@ -6,10 +6,10 @@
 
 ## Improvements
 
-- Removed the separate graph page from the rent statement export to keep the report focused on actionable billing details.
-- Added current-month electricity and heating usage to each tenant's per-person breakdown.
-- Widened the breakdown label column so longer adjustment-note labels and values render cleanly in the two-column layout.
+- Sorted the rent export tenant sections by room name first and tenant name second for easier scanning.
+- Widened the `Room` column in `What Each Person Has to Pay` so longer room names such as `Small Bedroom` fit cleanly.
+- Centered the two-column `Per-Person Breakdown` grid on the page for a more balanced landscape layout.
 
 ## Bug Fixes
 
-- Fixed zero balances such as previous balance rendering as `-0.00` in the rent statement tables.
+- Fixed the `Previous` value in `Per-Person Breakdown` appearing bold when it should use normal body weight.
