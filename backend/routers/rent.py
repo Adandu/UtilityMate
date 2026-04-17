@@ -3,13 +3,16 @@ from datetime import date
 from io import BytesIO
 from typing import Dict, List, Optional
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -27,6 +30,11 @@ def _month_start(value: date) -> date:
 
 def _next_month(value: date) -> date:
     return date(value.year + (1 if value.month == 12 else 0), 1 if value.month == 12 else value.month + 1, 1)
+
+
+def _shift_month(value: date, months: int) -> date:
+    zero_based = value.month - 1 + months
+    return date(value.year + (zero_based // 12), (zero_based % 12) + 1, 1)
 
 
 def _statement_effective_month(statement: database_models.AssociationStatement) -> Optional[date]:
@@ -459,25 +467,59 @@ def _build_statement(
     )
 
 
+def _render_rent_chart_image(
+    title: str,
+    labels: List[str],
+    series: List[tuple[str, List[float], str]],
+    y_label: str,
+) -> BytesIO:
+    figure, axis = plt.subplots(figsize=(7.4, 2.4))
+    for name, values, color in series:
+        axis.plot(labels, values, marker="o", linewidth=2, label=name, color=color)
+    axis.set_title(title, fontsize=11, fontweight="bold")
+    axis.set_ylabel(y_label, fontsize=9)
+    axis.grid(True, axis="y", alpha=0.2)
+    axis.tick_params(axis="x", labelsize=8)
+    axis.tick_params(axis="y", labelsize=8)
+    axis.legend(loc="best", fontsize=8)
+    figure.tight_layout()
+    output = BytesIO()
+    figure.savefig(output, format="png", dpi=160, bbox_inches="tight")
+    plt.close(figure)
+    output.seek(0)
+    return output
+
+
+def _build_recent_month_summaries(
+    db: Session,
+    lease: database_models.RentLease,
+    target_month: date,
+) -> List[api_schemas.RentMonthStatement]:
+    months = [_shift_month(target_month, offset) for offset in (-2, -1, 0)]
+    return [_build_statement(db, lease, month_value) for month_value in months]
+
+
 def _build_rent_statement_pdf(
+    db: Session,
     lease: database_models.RentLease,
     statement: api_schemas.RentMonthStatement,
 ) -> BytesIO:
     buffer = BytesIO()
     document = SimpleDocTemplate(
         buffer,
-        pagesize=A4,
-        leftMargin=12 * mm,
-        rightMargin=12 * mm,
-        topMargin=12 * mm,
-        bottomMargin=12 * mm,
+        pagesize=landscape(A4),
+        leftMargin=10 * mm,
+        rightMargin=10 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
     )
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="RentHeading", parent=styles["Heading1"], fontSize=18, leading=22, textColor=colors.HexColor("#0f172a")))
-    styles.add(ParagraphStyle(name="RentSubheading", parent=styles["Heading2"], fontSize=11, leading=14, textColor=colors.HexColor("#334155")))
-    styles.add(ParagraphStyle(name="RentBody", parent=styles["BodyText"], fontSize=9, leading=12, textColor=colors.HexColor("#334155")))
+    styles.add(ParagraphStyle(name="RentSubheading", parent=styles["Heading2"], fontSize=10.5, leading=13, textColor=colors.HexColor("#334155")))
+    styles.add(ParagraphStyle(name="RentBody", parent=styles["BodyText"], fontSize=8.5, leading=11, textColor=colors.HexColor("#334155")))
 
     month_label = statement.month.strftime("%B %Y")
+    recent_statements = _build_recent_month_summaries(db, lease, statement.month)
     story = [
         Paragraph("UtilityMate Rent Statement", styles["RentHeading"]),
         Spacer(1, 3 * mm),
@@ -499,7 +541,7 @@ def _build_rent_statement_pdf(
             f"{statement.totals['amount_due_total']:.2f} RON",
         ],
     ]
-    summary_table = Table(summary_rows, colWidths=[29 * mm, 29 * mm, 29 * mm, 29 * mm, 29 * mm, 31 * mm])
+    summary_table = Table(summary_rows, colWidths=[44 * mm, 44 * mm, 44 * mm, 44 * mm, 44 * mm, 48 * mm])
     summary_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
@@ -512,6 +554,60 @@ def _build_rent_statement_pdf(
         ("TOPPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.extend([summary_table, Spacer(1, 4 * mm)])
+
+    trend_labels = [item.month.strftime("%b %Y") for item in recent_statements]
+    totals_chart = _render_rent_chart_image(
+        "Recent 3-Month Rent Totals",
+        trend_labels,
+        [
+            ("Amount Due", [item.totals["amount_due_total"] for item in recent_statements], "#0f766e"),
+            ("Payments", [item.totals["payments_total"] for item in recent_statements], "#2563eb"),
+            ("Current Charges", [item.totals["current_total"] for item in recent_statements], "#f97316"),
+        ],
+        "RON",
+    )
+    utilities_chart = _render_rent_chart_image(
+        "Recent 3-Month Utility Costs",
+        trend_labels,
+        [
+            ("Electricity", [item.source_summary.electricity_total for item in recent_statements], "#7c3aed"),
+            ("Avizier", [item.source_summary.avizier_total for item in recent_statements], "#14b8a6"),
+            ("Heating", [item.source_summary.heating_total for item in recent_statements], "#ef4444"),
+        ],
+        "RON",
+    )
+    recent_rows = [["Month", "Current Charges", "Payments", "Amount Due", "Electricity", "Avizier", "Heating"]]
+    for item in recent_statements:
+        recent_rows.append([
+            item.month.strftime("%b %Y"),
+            f"{item.totals['current_total']:.2f}",
+            f"{item.totals['payments_total']:.2f}",
+            f"{item.totals['amount_due_total']:.2f}",
+            f"{item.source_summary.electricity_total:.2f}",
+            f"{item.source_summary.avizier_total:.2f}",
+            f"{item.source_summary.heating_total:.2f}",
+        ])
+    recent_table = Table(recent_rows, colWidths=[28 * mm, 31 * mm, 29 * mm, 29 * mm, 27 * mm, 27 * mm, 27 * mm], repeatRows=1)
+    recent_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.extend([
+        Paragraph("Recent Trend Snapshot", styles["RentSubheading"]),
+        Spacer(1, 1.5 * mm),
+        Image(totals_chart, width=132 * mm, height=44 * mm),
+        Spacer(1, 2 * mm),
+        Image(utilities_chart, width=132 * mm, height=44 * mm),
+        Spacer(1, 2 * mm),
+        recent_table,
+        Spacer(1, 4 * mm),
+    ])
 
     if statement.notes:
         story.extend([
@@ -553,7 +649,7 @@ def _build_rent_statement_pdf(
         ])
     statement_table = Table(
         statement_rows,
-        colWidths=[24 * mm, 20 * mm, 16 * mm, 19 * mm, 24 * mm, 18 * mm, 16 * mm, 18 * mm, 18 * mm, 20 * mm],
+        colWidths=[35 * mm, 24 * mm, 18 * mm, 22 * mm, 29 * mm, 20 * mm, 18 * mm, 22 * mm, 22 * mm, 25 * mm],
         repeatRows=1,
     )
     statement_table.setStyle(TableStyle([
@@ -575,29 +671,36 @@ def _build_rent_statement_pdf(
     ])
     for tenant in statement.tenant_statements:
         breakdown_rows = [
-            ["Category", "Amount"],
-            ["Rent", f"{tenant.rent_amount:.2f} RON"],
-            ["Electricity", f"{tenant.electricity_amount:.2f} RON"],
-            ["Shared Utilities", f"{tenant.shared_utilities_amount:.2f} RON"],
-            ["Heating", f"{tenant.heating_amount:.2f} RON"],
-            ["Other Adjustments", f"{tenant.other_adjustment:.2f} RON"],
-            ["Adjustment Note", tenant.other_adjustment_note or "-"],
-            ["Previous Balance", f"{tenant.previous_balance:.2f} RON"],
-            ["Payments This Month", f"-{tenant.payments_in_month:.2f} RON"],
-            ["Amount Due", f"{tenant.amount_due:.2f} RON"],
+            ["Rent", f"{tenant.rent_amount:.2f} RON", "Electricity", f"{tenant.electricity_amount:.2f} RON"],
+            ["Shared Utilities", f"{tenant.shared_utilities_amount:.2f} RON", "Heating", f"{tenant.heating_amount:.2f} RON"],
+            ["Other", f"{tenant.other_adjustment:.2f} RON", "Previous", f"{tenant.previous_balance:.2f} RON"],
+            ["Payments", f"-{tenant.payments_in_month:.2f} RON", "Amount Due", f"{tenant.amount_due:.2f} RON"],
         ]
+        if tenant.other_adjustment_note:
+            breakdown_rows.append(["Adjustment Note", tenant.other_adjustment_note, "", ""])
         story.append(Paragraph(f"<b>{tenant.tenant_name}</b>{f' • {tenant.room_name}' if tenant.room_name else ''}", styles["RentBody"]))
-        person_table = Table(breakdown_rows, colWidths=[55 * mm, 35 * mm])
-        person_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+        person_table = Table(breakdown_rows, colWidths=[36 * mm, 28 * mm, 36 * mm, 28 * mm])
+        person_table_style = [
             ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+            ("FONTNAME", (3, 3), (3, 3), "Helvetica-Bold"),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
-            ("ALIGN", (1, 1), (1, -1), "RIGHT"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ]))
+            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ]
+        if tenant.other_adjustment_note:
+            note_row_index = len(breakdown_rows) - 1
+            person_table_style.extend([
+                ("SPAN", (1, note_row_index), (3, note_row_index)),
+                ("ALIGN", (1, note_row_index), (3, note_row_index), "LEFT"),
+            ])
+        person_table.setStyle(TableStyle(person_table_style))
         story.extend([Spacer(1, 1.5 * mm), person_table, Spacer(1, 2.5 * mm)])
 
     story.extend([
@@ -612,9 +715,11 @@ def _build_rent_statement_pdf(
     return buffer
 
 
-def _slugify_filename_part(value: str) -> str:
-    cleaned = "".join(char.lower() if char.isalnum() else "-" for char in value)
-    return "-".join(part for part in cleaned.split("-") if part) or "statement"
+def _format_rent_statement_filename(location_name: str, month_value: date) -> str:
+    export_date = date.today().strftime("%Y-%m-%d")
+    month_label = month_value.strftime("%Y-%b")
+    safe_location = "".join(char for char in location_name if char not in '<>:"/\\|?*').strip() or "Unknown"
+    return f"{export_date} - Rent Statement - {safe_location} - {month_label}.pdf"
 
 
 @router.get("/leases", response_model=List[api_schemas.RentLeaseSummary])
@@ -844,8 +949,8 @@ def export_rent_statement(
 ):
     lease = _get_owned_lease(db, current_user.id, lease_id)
     statement = _build_statement(db, lease, month)
-    pdf_buffer = _build_rent_statement_pdf(lease, statement)
-    filename = f"utilitymate-rent-{_slugify_filename_part(lease.location.name)}-{statement.month.strftime('%Y-%m')}.pdf"
+    pdf_buffer = _build_rent_statement_pdf(db, lease, statement)
+    filename = _format_rent_statement_filename(lease.location.name, statement.month)
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",

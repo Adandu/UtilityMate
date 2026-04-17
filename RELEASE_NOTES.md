@@ -1,13 +1,14 @@
-# UtilityMate v1.8.3
+# UtilityMate v1.9.0
 
 ## New Features
 
-- No new features in this release.
+- Added a redesigned landscape rent statement PDF export with recent 3-month trend charts for totals and utility costs.
 
 ## Improvements
 
-- Improved structured invoice reconciliation so invoices with parsed billing periods and meter indexes no longer fall back to loose issue-date matching once interval logic is available.
+- Improved the rent export summary and billing tables so they use the extra horizontal space from landscape layout more effectively.
+- Made the per-person breakdown section more compact while keeping the due and payment details readable.
 
 ## Bug Fixes
 
-- Fixed the latest Engie gas reading showing a previous invoice after the billed gas interval had already ended.
+- Fixed the portrait rent statement export feeling cramped once detailed tenant billing data was included.
