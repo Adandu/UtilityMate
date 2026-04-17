@@ -221,7 +221,7 @@ const Dashboard: React.FC = () => {
   };
 
   if (loading || !report) {
-    return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-surface md:ml-64"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
 
   const TrendIcon = trendDirection.icon;
@@ -245,7 +245,7 @@ const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="ml-64 min-h-screen bg-surface p-8 text-on-surface">
+    <div className="min-h-screen bg-surface px-4 pb-6 pt-20 text-on-surface sm:px-6 md:ml-64 md:p-8">
       <header className="mb-8 space-y-4">
         <div>
           <h2 className="font-headline text-3xl font-extrabold">Utility Trends Dashboard</h2>

@@ -255,11 +255,11 @@ const Invoices: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-surface md:ml-64"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
 
   return (
-    <div className="ml-64 min-h-screen bg-surface p-8 text-on-surface">
+    <div className="min-h-screen bg-surface px-4 pb-6 pt-20 text-on-surface sm:px-6 md:ml-64 md:p-8">
       <header className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="font-headline text-3xl font-extrabold">Invoice Review Desk</h2>
@@ -320,7 +320,73 @@ const Invoices: React.FC = () => {
       )}
 
       <div className="rounded-3xl border border-outline-variant bg-surface-container-low p-4">
-        <div className="overflow-x-auto">
+        <div className="space-y-4 lg:hidden">
+          {invoices.map((invoice) => (
+            <article key={invoice.id} className={`rounded-2xl border p-4 shadow-sm ${selectedIds.includes(invoice.id) ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-900/10' : 'border-outline-variant bg-white/70 dark:bg-slate-900/40'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] opacity-50">{invoice.invoice_date}{invoice.due_date ? ` • due ${invoice.due_date}` : ''}</p>
+                  <p className="mt-2 text-lg font-black">{invoice.provider?.name || 'Unknown provider'}</p>
+                  <p className="text-sm opacity-70">{invoice.location?.name || 'N/A'} • {invoice.provider?.category?.name || 'Unknown category'}</p>
+                </div>
+                <button onClick={() => toggleSelect(invoice.id)} className="rounded-lg border border-outline-variant p-2">
+                  {selectedIds.includes(invoice.id) ? <CheckSquare size={18} className="text-emerald-600" /> : <Square size={18} className="opacity-50" />}
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl bg-surface-container px-3 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-50">Amount</p>
+                  <p className="mt-1 font-black">{invoice.amount.toFixed(2)} {invoice.currency}</p>
+                </div>
+                <div className="rounded-xl bg-surface-container px-3 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-50">Consumption</p>
+                  <p className="mt-1 font-bold">
+                    {typeof invoice.consumption_value === 'number'
+                      ? `${invoice.consumption_value.toFixed(3)} ${invoice.provider?.category?.unit || ''}`.trim()
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${invoice.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : invoice.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                  {invoice.status}
+                </span>
+                <span className="flex items-center gap-2 rounded-full bg-surface-container px-3 py-1 text-xs font-bold">
+                  {invoice.needs_review ? <FileWarning size={14} className="text-amber-600" /> : <CheckCircle2 size={14} className="text-emerald-600" />}
+                  {Math.round(invoice.parse_confidence * 100)}% confidence
+                </span>
+                {invoice.payment_reference && <span className="rounded-full bg-surface-container px-3 py-1 text-xs font-bold">Ref: {invoice.payment_reference}</span>}
+              </div>
+
+              {invoice.review_notes && (
+                <div className="mt-4 rounded-xl bg-surface-container px-3 py-3 text-sm opacity-70">
+                  {invoice.review_notes}
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button onClick={() => viewPdf(invoice.id)} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black uppercase text-white">
+                  View PDF
+                </button>
+                <button onClick={() => openEdit(invoice)} className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-black uppercase text-white dark:bg-white dark:text-slate-900">
+                  Edit
+                </button>
+                <button onClick={() => deleteInvoice(invoice.id)} className="rounded-xl bg-red-600 px-4 py-2 text-xs font-black uppercase text-white">
+                  Delete
+                </button>
+              </div>
+            </article>
+          ))}
+          {invoices.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-outline-variant px-4 py-10 text-center text-sm font-bold opacity-60">
+              No invoices match the current filters.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto lg:block">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-outline-variant text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">

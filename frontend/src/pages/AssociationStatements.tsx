@@ -103,11 +103,11 @@ const AssociationStatements: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-surface md:ml-64"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
 
   return (
-    <div className="ml-64 min-h-screen bg-surface p-8 text-on-surface">
+    <div className="min-h-screen bg-surface px-4 pb-6 pt-20 text-on-surface sm:px-6 md:ml-64 md:p-8">
       <header className="mb-10">
         <div className="flex items-center gap-3">
           <FileStack className="text-teal-600" />

@@ -1,0 +1,5 @@
+{
+  "version": "1.7.13",
+  "title": "UtilityMate v1.7.13",
+  "body": "## New Features\n\n- Added a mobile navigation drawer so authenticated users can move through UtilityMate on phones without relying on the desktop sidebar.\n\n## Improvements\n\n- Page layouts now use mobile-first spacing and only apply the desktop sidebar offset on medium screens and above.\n- Invoice Review Desk now shows stacked mobile cards with touch-friendly actions instead of forcing the full desktop table on small screens.\n- Meter Readings now uses mobile cards for reading history and tighter filter/form layouts to reduce horizontal overflow.\n\n## Bug Fixes\n\n- Fixed a mobile layout bug where hidden desktop navigation still reserved `ml-64`, wasting a large portion of the viewport on phones.\n"
+}

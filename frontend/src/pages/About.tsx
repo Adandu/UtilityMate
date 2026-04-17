@@ -50,7 +50,7 @@ const About: React.FC = () => {
   ), [about]);
 
   if (loading || !about) {
-    return <div className="ml-64 flex min-h-screen items-center justify-center bg-surface"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
+    return <div className="flex min-h-screen items-center justify-center bg-surface md:ml-64"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
 
   const statCards = [
@@ -63,7 +63,7 @@ const About: React.FC = () => {
   ];
 
   return (
-    <div className="ml-64 min-h-screen bg-surface p-8 text-on-surface">
+    <div className="min-h-screen bg-surface px-4 pb-6 pt-20 text-on-surface sm:px-6 md:ml-64 md:p-8">
       <header className="mb-8 space-y-3">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-container text-emerald-600">

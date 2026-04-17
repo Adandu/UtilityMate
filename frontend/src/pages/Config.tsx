@@ -178,13 +178,13 @@ const Config: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="ml-64 flex items-center justify-center min-h-screen bg-surface">
+    <div className="flex min-h-screen items-center justify-center bg-surface md:ml-64">
       <Loader2 className="animate-spin text-emerald-500" size={48} />
     </div>
   );
 
   return (
-    <div className="ml-64 p-8 min-h-screen bg-surface transition-colors duration-300 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-surface px-4 pb-6 pt-20 transition-colors duration-300 animate-in fade-in sm:px-6 md:ml-64 md:p-8">
       <header className="mb-10 text-on-surface">
         <h2 className="font-headline text-3xl font-extrabold">System Parameters</h2>
         <p className="text-on-surface-variant font-medium opacity-70">Configure your providers, asset locations, and preferences.</p>
