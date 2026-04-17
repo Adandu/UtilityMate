@@ -77,6 +77,16 @@ def repair_pdf_invoice_data():
                 invoice.invoice_date = parsed_invoice_date
                 changed = True
 
+            parsed_period_start = parsed_data.get("billing_period_start")
+            if parsed_period_start != invoice.billing_period_start:
+                invoice.billing_period_start = parsed_period_start
+                changed = True
+
+            parsed_period_end = parsed_data.get("billing_period_end")
+            if parsed_period_end != invoice.billing_period_end:
+                invoice.billing_period_end = parsed_period_end
+                changed = True
+
             parsed_due_date = parsed_data.get("due_date")
             if parsed_due_date and parsed_due_date != invoice.due_date:
                 invoice.due_date = parsed_due_date
@@ -90,6 +100,16 @@ def repair_pdf_invoice_data():
             parsed_consumption = parsed_data.get("consumption_value")
             if parsed_consumption is not None and parsed_consumption > 0 and abs(parsed_consumption - (invoice.consumption_value or 0.0)) > 0.01:
                 invoice.consumption_value = parsed_consumption
+                changed = True
+
+            parsed_meter_index_old = parsed_data.get("meter_index_old")
+            if parsed_meter_index_old != invoice.meter_index_old:
+                invoice.meter_index_old = parsed_meter_index_old
+                changed = True
+
+            parsed_meter_index_new = parsed_data.get("meter_index_new")
+            if parsed_meter_index_new != invoice.meter_index_new:
+                invoice.meter_index_new = parsed_meter_index_new
                 changed = True
 
             if changed:
@@ -552,6 +572,8 @@ def verify_and_migrate_db():
                 pass
 
         invoice_columns = {
+            "billing_period_start": "ALTER TABLE invoices ADD COLUMN billing_period_start DATE",
+            "billing_period_end": "ALTER TABLE invoices ADD COLUMN billing_period_end DATE",
             "status": "ALTER TABLE invoices ADD COLUMN status VARCHAR DEFAULT 'received'",
             "paid_at": "ALTER TABLE invoices ADD COLUMN paid_at DATETIME",
             "payment_reference": "ALTER TABLE invoices ADD COLUMN payment_reference VARCHAR",
@@ -561,6 +583,8 @@ def verify_and_migrate_db():
             "source_type": "ALTER TABLE invoices ADD COLUMN source_type VARCHAR DEFAULT 'pdf'",
             "source_name": "ALTER TABLE invoices ADD COLUMN source_name VARCHAR",
             "processing_notes": "ALTER TABLE invoices ADD COLUMN processing_notes VARCHAR",
+            "meter_index_old": "ALTER TABLE invoices ADD COLUMN meter_index_old FLOAT",
+            "meter_index_new": "ALTER TABLE invoices ADD COLUMN meter_index_new FLOAT",
         }
         for column_name, statement in invoice_columns.items():
             columns = [c["name"] for c in inspector.get_columns("invoices")]

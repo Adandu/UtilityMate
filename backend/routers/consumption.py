@@ -65,14 +65,36 @@ def _load_candidate_invoices(
 def _find_linked_invoice(
     reading: database_models.ConsumptionIndex,
     invoice_lookup: Dict[Tuple[int, int], List[database_models.Invoice]],
+    previous_value: Optional[float] = None,
 ) -> Optional[database_models.Invoice]:
     candidates = invoice_lookup.get((reading.location_id, reading.category_id), [])
     if not candidates:
         return None
 
-    # Utility invoices are often issued after the meter reading date they bill.
-    # Prefer the first invoice on or after the reading date, then fall back to
-    # a recent prior invoice only when no forward invoice exists nearby.
+    interval_matches = [
+        invoice for invoice in candidates
+        if invoice.billing_period_start
+        and invoice.billing_period_end
+        and invoice.billing_period_start <= reading.reading_date <= invoice.billing_period_end
+    ]
+    if interval_matches:
+        return min(
+            interval_matches,
+            key=lambda invoice: (
+                0 if invoice.meter_index_new is not None and abs(invoice.meter_index_new - reading.value) < 0.001 else 1,
+                0 if previous_value is not None and invoice.meter_index_old is not None and abs(invoice.meter_index_old - previous_value) < 0.001 else 1,
+                (invoice.billing_period_end - reading.reading_date).days if invoice.billing_period_end else 9999,
+                abs((invoice.invoice_date - reading.reading_date).days),
+            ),
+        )
+
+    exact_index_matches = [
+        invoice for invoice in candidates
+        if invoice.meter_index_new is not None and abs(invoice.meter_index_new - reading.value) < 0.001
+    ]
+    if exact_index_matches:
+        return min(exact_index_matches, key=lambda invoice: abs((invoice.invoice_date - reading.reading_date).days))
+
     forward_matches = [
         invoice for invoice in candidates
         if 0 <= (invoice.invoice_date - reading.reading_date).days <= 45
@@ -102,7 +124,7 @@ def _serialize_readings(
         previous_value = previous_by_stream.get(stream)
         delta_value = None if previous_value is None else round(reading.value - previous_value, 3)
         previous_by_stream[stream] = reading.value
-        linked_invoice = _find_linked_invoice(reading, invoice_lookup)
+        linked_invoice = _find_linked_invoice(reading, invoice_lookup, previous_value)
 
         serialized[reading.id] = api_schemas.ConsumptionReading.model_validate(reading, from_attributes=True).model_copy(
             update={
@@ -209,7 +231,7 @@ def read_consumption_streams(
         summary.latest_reading_date = reading.reading_date
         summary.latest_value = reading.value
         summary.latest_delta = delta_value
-        linked_invoice = _find_linked_invoice(reading, invoice_lookup)
+        linked_invoice = _find_linked_invoice(reading, invoice_lookup, previous_value)
         summary.linked_invoice = api_schemas.ConsumptionLinkedInvoice.model_validate(linked_invoice, from_attributes=True) if linked_invoice else None
 
     ordered_streams = sorted(

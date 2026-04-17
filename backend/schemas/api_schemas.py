@@ -77,10 +77,14 @@ class InvoiceBase(BaseModel):
     location_id: int
     provider_id: int
     invoice_date: date
+    billing_period_start: Optional[date] = None
+    billing_period_end: Optional[date] = None
     due_date: Optional[date] = None
     amount: float
     currency: str = "RON"
     consumption_value: Optional[float] = None
+    meter_index_old: Optional[float] = None
+    meter_index_new: Optional[float] = None
 
     @field_validator("invoice_date")
     @classmethod
@@ -98,10 +102,14 @@ class InvoiceUpdate(BaseModel):
     location_id: Optional[Any] = None
     provider_id: Optional[Any] = None
     invoice_date: Optional[date] = None
+    billing_period_start: Optional[date] = None
+    billing_period_end: Optional[date] = None
     due_date: Optional[date] = None
     amount: Optional[float] = None
     currency: Optional[str] = None
     consumption_value: Optional[float] = None
+    meter_index_old: Optional[float] = None
+    meter_index_new: Optional[float] = None
     status: Optional[str] = None
     paid_at: Optional[datetime] = None
     payment_reference: Optional[str] = None

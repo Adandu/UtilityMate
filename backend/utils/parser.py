@@ -296,9 +296,13 @@ class InvoiceParser:
     def parse_pdf(text: str, provider_name: str, location_name: str = "") -> Dict[str, Any]:
         result = {
             "invoice_date": None,
+            "billing_period_start": None,
+            "billing_period_end": None,
             "due_date": None,
             "amount": 0.0,
             "consumption_value": 0.0,
+            "meter_index_old": None,
+            "meter_index_new": None,
             "currency": "RON",
         }
 
@@ -532,10 +536,108 @@ class InvoiceParser:
             return 0.0
 
     @staticmethod
+    def _parse_statement_date(value: str) -> Optional[date]:
+        candidate = value.strip()
+        for fmt in ("%d.%m.%Y", "%d.%m.%y"):
+            try:
+                return datetime.strptime(candidate, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    @staticmethod
+    def _parse_meter_index(value: str) -> Optional[float]:
+        digits_only = re.sub(r"[^\d]", "", value or "")
+        if not digits_only:
+            return None
+        return float(digits_only)
+
+    @staticmethod
+    def _extract_billing_period(text: str) -> Optional[tuple[date, date]]:
+        match = re.search(
+            r"Perioad[ăa]\s+de\s+facturare:\s*(\d{2}\.\d{2}\.\d{4})\s*-\s*(\d{2}\.\d{2}\.\d{4})",
+            text,
+            re.IGNORECASE,
+        )
+        if not match:
+            return None
+
+        start = InvoiceParser._parse_statement_date(match.group(1))
+        end = InvoiceParser._parse_statement_date(match.group(2))
+        if not start or not end:
+            return None
+        return (start, end)
+
+    @staticmethod
+    def _extract_hidroelectrica_meter_span(text: str) -> Optional[tuple[date, float, float, date]]:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        spans = []
+
+        for index, line in enumerate(lines):
+            if "EA kWh" not in line:
+                continue
+
+            previous_line = lines[index - 1] if index > 0 else ""
+            next_line = lines[index + 1] if index + 1 < len(lines) else ""
+            previous_match = re.search(r"(\d{2}\.\d{2}\.\d{2})\s*-\s*(\d+)\s+(\d+)", previous_line)
+            next_match = re.search(r"(\d{2}\.\d{2}\.\d{2})", next_line)
+            if not previous_match or not next_match:
+                continue
+
+            start = InvoiceParser._parse_statement_date(previous_match.group(1))
+            end = InvoiceParser._parse_statement_date(next_match.group(1))
+            old_index = InvoiceParser._parse_meter_index(previous_match.group(2))
+            new_index = InvoiceParser._parse_meter_index(previous_match.group(3))
+            if not start or not end or old_index is None or new_index is None:
+                continue
+            spans.append((start, old_index, new_index, end))
+
+        if not spans:
+            return None
+
+        first = spans[0]
+        last = spans[-1]
+        return (first[0], first[1], last[2], last[3])
+
+    @staticmethod
+    def _extract_engie_meter_span(text: str) -> Optional[tuple[date, float, float, date]]:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+
+        for index, line in enumerate(lines):
+            if "DGSR-" not in line:
+                continue
+
+            previous_line = lines[index - 1] if index > 0 else ""
+            next_line = lines[index + 1] if index + 1 < len(lines) else ""
+            previous_match = re.search(r"(\d{2}\.\d{2}\.\d{4})\s+([\d\.,]+)\s+([\d\.,]+)", previous_line)
+            next_match = re.search(r"(\d{2}\.\d{2}\.\d{4})", next_line)
+            if not previous_match or not next_match:
+                continue
+
+            start = InvoiceParser._parse_statement_date(previous_match.group(1))
+            end = InvoiceParser._parse_statement_date(next_match.group(1))
+            old_index = InvoiceParser._parse_meter_index(previous_match.group(2))
+            new_index = InvoiceParser._parse_meter_index(previous_match.group(3))
+            if not start or not end or old_index is None or new_index is None:
+                continue
+            return (start, old_index, new_index, end)
+
+        return None
+
+    @staticmethod
     def _parse_hidroelectrica(text: str, result: Dict[str, Any]):
         billing_match = re.search(r"(?:data\s+de|data\s+factur(?:[aă]rii|ii)[:\s]+)\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
             result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
+        billing_period = InvoiceParser._extract_billing_period(text)
+        if billing_period:
+            result["billing_period_start"], result["billing_period_end"] = billing_period
+        meter_span = InvoiceParser._extract_hidroelectrica_meter_span(text)
+        if meter_span:
+            result["billing_period_start"] = meter_span[0]
+            result["meter_index_old"] = meter_span[1]
+            result["meter_index_new"] = meter_span[2]
+            result["billing_period_end"] = meter_span[3]
         due_match = re.search(r"scaden[ţt][aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if due_match:
             result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
@@ -612,6 +714,15 @@ class InvoiceParser:
             billing_match = re.search(r"data\s+emiterii:\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if billing_match:
             result["invoice_date"] = datetime.strptime(billing_match.group(1), "%d.%m.%Y").date()
+        billing_period = InvoiceParser._extract_billing_period(text)
+        if billing_period:
+            result["billing_period_start"], result["billing_period_end"] = billing_period
+        meter_span = InvoiceParser._extract_engie_meter_span(text)
+        if meter_span:
+            result["billing_period_start"] = meter_span[0]
+            result["meter_index_old"] = meter_span[1]
+            result["meter_index_new"] = meter_span[2]
+            result["billing_period_end"] = meter_span[3]
         due_match = re.search(r"data\s+scadent[ăa]\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if not due_match:
             due_match = re.search(r"termen\s+de\s+plat[aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)

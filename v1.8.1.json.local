@@ -1,5 +1,0 @@
-{
-  "version": "1.8.1",
-  "title": "UtilityMate v1.8.1",
-  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Improved meter-to-invoice reconciliation so meter readings now prefer the next nearby invoice instead of the nearest prior invoice when suppliers issue bills after the reading date.\n\n## Bug Fixes\n\n- Fixed Hidroelectrica-style billing cycles where the Meter Readings page could link the latest reading to the previous invoice instead of the newly uploaded current invoice.\n"
-}
