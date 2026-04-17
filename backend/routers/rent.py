@@ -568,7 +568,7 @@ def _build_person_breakdown_card(
         f"<b>{tenant.tenant_name}</b>{f' • {tenant.room_name}' if tenant.room_name else ''}",
         styles["RentBody"],
     )
-    person_table = Table(breakdown_rows, colWidths=[31 * mm, 25 * mm, 26 * mm, 27 * mm])
+    person_table = Table(breakdown_rows, colWidths=[28 * mm, 25 * mm, 31 * mm, 25 * mm])
     person_table_style = [
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
@@ -610,14 +610,14 @@ def _build_rent_statement_pdf(
     styles.add(ParagraphStyle(name="RentHeading", parent=styles["Heading1"], fontSize=18, leading=22, textColor=colors.HexColor("#0f172a")))
     styles.add(ParagraphStyle(name="RentSubheading", parent=styles["Heading2"], fontSize=10.5, leading=13, textColor=colors.HexColor("#334155")))
     styles.add(ParagraphStyle(name="RentBody", parent=styles["BodyText"], fontSize=8.5, leading=11, textColor=colors.HexColor("#334155")))
-    styles.add(ParagraphStyle(name="RentMeta", parent=styles["BodyText"], fontSize=10, leading=13, textColor=colors.HexColor("#334155"), alignment=1))
+    styles.add(ParagraphStyle(name="RentMeta", parent=styles["BodyText"], fontSize=10, leading=13, textColor=colors.HexColor("#334155")))
 
     month_label = statement.month.strftime("%B %Y")
     header_cells = ["", Paragraph("UtilityMate Rent Statement", styles["RentHeading"]), ""]
     if os.path.exists(RENT_PDF_LOGO_PATH):
         header_cells[0] = Image(RENT_PDF_LOGO_PATH, width=16 * mm, height=16 * mm)
         header_cells[2] = Spacer(16 * mm, 1)
-    header_table = Table([header_cells], colWidths=[20 * mm, 227 * mm, 20 * mm])
+    header_table = Table([header_cells], colWidths=[25 * mm, 227 * mm, 25 * mm])
     header_table.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (0, 0), (0, 0), "LEFT"),

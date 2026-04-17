@@ -1,4 +1,4 @@
-# UtilityMate v1.9.5
+# UtilityMate v1.9.6
 
 ## New Features
 
@@ -6,8 +6,9 @@
 
 ## Improvements
 
-- Rebalanced the per-person breakdown card column widths so amount and label text fit cleanly inside the two-column layout.
+- Expanded the third column in the per-person breakdown cards so longer labels such as `Shared Utilities` stay inside their cell.
+- Restored the workspace, location, and month block to left alignment while keeping the header title independently centered.
 
 ## Bug Fixes
 
-- Fixed per-person breakdown values overlapping the cell boundaries when labels or amounts were wider than expected.
+- Fixed the rent statement title header not centering cleanly across the full landscape page width.
