@@ -1,15 +1,13 @@
-# UtilityMate v1.8.0
+# UtilityMate v1.8.1
 
 ## New Features
 
-- Added a mobile navigation drawer so authenticated users can move through UtilityMate on phones without relying on the desktop sidebar.
+- No new features in this release.
 
 ## Improvements
 
-- Page layouts now use mobile-first spacing and only apply the desktop sidebar offset on medium screens and above.
-- Invoice Review Desk now shows stacked mobile cards with touch-friendly actions instead of forcing the full desktop table on small screens.
-- Meter Readings now uses mobile cards for reading history and tighter filter/form layouts to reduce horizontal overflow.
+- Improved meter-to-invoice reconciliation so meter readings now prefer the next nearby invoice instead of the nearest prior invoice when suppliers issue bills after the reading date.
 
 ## Bug Fixes
 
-- Fixed a mobile layout bug where hidden desktop navigation still reserved `ml-64`, wasting a large portion of the viewport on phones.
+- Fixed Hidroelectrica-style billing cycles where the Meter Readings page could link the latest reading to the previous invoice instead of the newly uploaded current invoice.

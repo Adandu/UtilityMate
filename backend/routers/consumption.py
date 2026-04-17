@@ -70,19 +70,22 @@ def _find_linked_invoice(
     if not candidates:
         return None
 
-    same_month = [
+    # Utility invoices are often issued after the meter reading date they bill.
+    # Prefer the first invoice on or after the reading date, then fall back to
+    # a recent prior invoice only when no forward invoice exists nearby.
+    forward_matches = [
         invoice for invoice in candidates
-        if invoice.invoice_date.year == reading.reading_date.year and invoice.invoice_date.month == reading.reading_date.month
+        if 0 <= (invoice.invoice_date - reading.reading_date).days <= 45
     ]
-    if same_month:
-        return min(same_month, key=lambda invoice: abs((invoice.invoice_date - reading.reading_date).days))
+    if forward_matches:
+        return min(forward_matches, key=lambda invoice: (invoice.invoice_date - reading.reading_date).days)
 
-    nearby = [
+    backward_matches = [
         invoice for invoice in candidates
-        if abs((invoice.invoice_date - reading.reading_date).days) <= 45
+        if 0 < (reading.reading_date - invoice.invoice_date).days <= 45
     ]
-    if nearby:
-        return min(nearby, key=lambda invoice: abs((invoice.invoice_date - reading.reading_date).days))
+    if backward_matches:
+        return min(backward_matches, key=lambda invoice: (reading.reading_date - invoice.invoice_date).days)
 
     return None
 
