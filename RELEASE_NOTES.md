@@ -8,6 +8,7 @@
 
 - Improved the rent export summary and billing tables so they use the extra horizontal space from landscape layout more effectively.
 - Made the per-person breakdown section more compact while keeping the due and payment details readable.
+- Updated the rent PDF export filename to include the export date, apartment label, and rent month in a human-readable format.
 
 ## Bug Fixes
 

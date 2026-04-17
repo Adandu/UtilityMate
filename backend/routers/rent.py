@@ -717,8 +717,9 @@ def _build_rent_statement_pdf(
 
 def _format_rent_statement_filename(location_name: str, month_value: date) -> str:
     export_date = date.today().strftime("%Y-%m-%d")
-    month_label = month_value.strftime("%Y-%b")
-    safe_location = "".join(char for char in location_name if char not in '<>:"/\\|?*').strip() or "Unknown"
+    month_label = month_value.strftime("%Y-%B")
+    safe_location = "".join(char for char in location_name if char not in '<>:"/\\|?*')
+    safe_location = "".join(safe_location.split()) or "Unknown"
     return f"{export_date} - Rent Statement - {safe_location} - {month_label}.pdf"
 
 
