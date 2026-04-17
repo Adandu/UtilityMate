@@ -71,6 +71,14 @@ def _find_linked_invoice(
     if not candidates:
         return None
 
+    structured_candidates = [
+        invoice for invoice in candidates
+        if invoice.billing_period_start
+        or invoice.billing_period_end
+        or invoice.meter_index_old is not None
+        or invoice.meter_index_new is not None
+    ]
+
     interval_matches = [
         invoice for invoice in candidates
         if invoice.billing_period_start
@@ -94,6 +102,12 @@ def _find_linked_invoice(
     ]
     if exact_index_matches:
         return min(exact_index_matches, key=lambda invoice: abs((invoice.invoice_date - reading.reading_date).days))
+
+    # When invoices carry explicit billing periods or meter indexes, avoid
+    # falling back to loose issue-date matching. Otherwise a later reading can
+    # incorrectly inherit an already-consumed invoice after the billed period.
+    if structured_candidates:
+        return None
 
     forward_matches = [
         invoice for invoice in candidates

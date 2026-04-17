@@ -1,5 +1,0 @@
-{
-  "version": "1.8.2",
-  "title": "UtilityMate v1.8.2",
-  "body": "## New Features\n\n- No new features in this release.\n\n## Improvements\n\n- Improved invoice parsing for Hidroelectrica and Engie so UtilityMate now stores billing periods and old/new meter indexes alongside imported invoices.\n- Improved meter-to-invoice reconciliation so Meter Readings can link invoices using billing intervals instead of relying only on issue dates.\n\n## Bug Fixes\n\n- Fixed Hidroelectrica sequences where a reading could be linked to the invoice issued on the same day even though that invoice billed an earlier consumption period.\n- Fixed Engie gas linking so interval-based invoices continue to match the correct reading and do not attach to later readings after the billed period has ended.\n"
-}
