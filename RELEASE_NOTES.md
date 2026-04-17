@@ -1,15 +1,15 @@
-# UtilityMate v1.9.0
+# UtilityMate v1.9.1
 
 ## New Features
 
-- Added a redesigned landscape rent statement PDF export with recent 3-month trend charts for totals and utility costs.
+- No new features in this release.
 
 ## Improvements
 
-- Improved the rent export summary and billing tables so they use the extra horizontal space from landscape layout more effectively.
-- Made the per-person breakdown section more compact while keeping the due and payment details readable.
-- Updated the rent PDF export filename to include the export date, apartment label, and rent month in a human-readable format.
+- Moved the `What Each Person Has to Pay` section ahead of the trend charts so the current-month obligations appear first in the export.
+- Split the rent statement into dedicated pages for the billing table, graphs, and per-person breakdown.
+- Reworked the per-person breakdown into a two-column layout to use the landscape page more efficiently.
 
 ## Bug Fixes
 
-- Fixed the portrait rent statement export feeling cramped once detailed tenant billing data was included.
+- Fixed the rent statement flow feeling out of order once charts and detailed person breakdowns were added.

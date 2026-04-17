@@ -12,7 +12,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -499,6 +499,48 @@ def _build_recent_month_summaries(
     return [_build_statement(db, lease, month_value) for month_value in months]
 
 
+def _build_person_breakdown_card(
+    tenant: api_schemas.RentTenantStatement,
+    styles,
+) -> List:
+    breakdown_rows = [
+        ["Rent", f"{tenant.rent_amount:.2f} RON", "Electricity", f"{tenant.electricity_amount:.2f} RON"],
+        ["Shared Utilities", f"{tenant.shared_utilities_amount:.2f} RON", "Heating", f"{tenant.heating_amount:.2f} RON"],
+        ["Other", f"{tenant.other_adjustment:.2f} RON", "Previous", f"{tenant.previous_balance:.2f} RON"],
+        ["Payments", f"-{tenant.payments_in_month:.2f} RON", "Amount Due", f"{tenant.amount_due:.2f} RON"],
+    ]
+    if tenant.other_adjustment_note:
+        breakdown_rows.append(["Adjustment Note", tenant.other_adjustment_note, "", ""])
+
+    card_title = Paragraph(
+        f"<b>{tenant.tenant_name}</b>{f' • {tenant.room_name}' if tenant.room_name else ''}",
+        styles["RentBody"],
+    )
+    person_table = Table(breakdown_rows, colWidths=[27 * mm, 23 * mm, 27 * mm, 23 * mm])
+    person_table_style = [
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+        ("FONTNAME", (3, 3), (3, 3), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("ALIGN", (3, 0), (3, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+    ]
+    if tenant.other_adjustment_note:
+        note_row_index = len(breakdown_rows) - 1
+        person_table_style.extend([
+            ("SPAN", (1, note_row_index), (3, note_row_index)),
+            ("ALIGN", (1, note_row_index), (3, note_row_index), "LEFT"),
+        ])
+    person_table.setStyle(TableStyle(person_table_style))
+    return [card_title, Spacer(1, 1.5 * mm), person_table]
+
+
 def _build_rent_statement_pdf(
     db: Session,
     lease: database_models.RentLease,
@@ -554,60 +596,6 @@ def _build_rent_statement_pdf(
         ("TOPPADDING", (0, 0), (-1, -1), 6),
     ]))
     story.extend([summary_table, Spacer(1, 4 * mm)])
-
-    trend_labels = [item.month.strftime("%b %Y") for item in recent_statements]
-    totals_chart = _render_rent_chart_image(
-        "Recent 3-Month Rent Totals",
-        trend_labels,
-        [
-            ("Amount Due", [item.totals["amount_due_total"] for item in recent_statements], "#0f766e"),
-            ("Payments", [item.totals["payments_total"] for item in recent_statements], "#2563eb"),
-            ("Current Charges", [item.totals["current_total"] for item in recent_statements], "#f97316"),
-        ],
-        "RON",
-    )
-    utilities_chart = _render_rent_chart_image(
-        "Recent 3-Month Utility Costs",
-        trend_labels,
-        [
-            ("Electricity", [item.source_summary.electricity_total for item in recent_statements], "#7c3aed"),
-            ("Avizier", [item.source_summary.avizier_total for item in recent_statements], "#14b8a6"),
-            ("Heating", [item.source_summary.heating_total for item in recent_statements], "#ef4444"),
-        ],
-        "RON",
-    )
-    recent_rows = [["Month", "Current Charges", "Payments", "Amount Due", "Electricity", "Avizier", "Heating"]]
-    for item in recent_statements:
-        recent_rows.append([
-            item.month.strftime("%b %Y"),
-            f"{item.totals['current_total']:.2f}",
-            f"{item.totals['payments_total']:.2f}",
-            f"{item.totals['amount_due_total']:.2f}",
-            f"{item.source_summary.electricity_total:.2f}",
-            f"{item.source_summary.avizier_total:.2f}",
-            f"{item.source_summary.heating_total:.2f}",
-        ])
-    recent_table = Table(recent_rows, colWidths=[28 * mm, 31 * mm, 29 * mm, 29 * mm, 27 * mm, 27 * mm, 27 * mm], repeatRows=1)
-    recent_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
-        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
-        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story.extend([
-        Paragraph("Recent Trend Snapshot", styles["RentSubheading"]),
-        Spacer(1, 1.5 * mm),
-        Image(totals_chart, width=132 * mm, height=44 * mm),
-        Spacer(1, 2 * mm),
-        Image(utilities_chart, width=132 * mm, height=44 * mm),
-        Spacer(1, 2 * mm),
-        recent_table,
-        Spacer(1, 4 * mm),
-    ])
 
     if statement.notes:
         story.extend([
@@ -665,43 +653,87 @@ def _build_rent_statement_pdf(
     ]))
     story.extend([statement_table, Spacer(1, 4 * mm)])
 
+    trend_labels = [item.month.strftime("%b %Y") for item in recent_statements]
+    totals_chart = _render_rent_chart_image(
+        "Recent 3-Month Rent Totals",
+        trend_labels,
+        [
+            ("Amount Due", [item.totals["amount_due_total"] for item in recent_statements], "#0f766e"),
+            ("Payments", [item.totals["payments_total"] for item in recent_statements], "#2563eb"),
+            ("Current Charges", [item.totals["current_total"] for item in recent_statements], "#f97316"),
+        ],
+        "RON",
+    )
+    utilities_chart = _render_rent_chart_image(
+        "Recent 3-Month Utility Costs",
+        trend_labels,
+        [
+            ("Electricity", [item.source_summary.electricity_total for item in recent_statements], "#7c3aed"),
+            ("Avizier", [item.source_summary.avizier_total for item in recent_statements], "#14b8a6"),
+            ("Heating", [item.source_summary.heating_total for item in recent_statements], "#ef4444"),
+        ],
+        "RON",
+    )
+    recent_rows = [["Month", "Current Charges", "Payments", "Amount Due", "Electricity", "Avizier", "Heating"]]
+    for item in recent_statements:
+        recent_rows.append([
+            item.month.strftime("%b %Y"),
+            f"{item.totals['current_total']:.2f}",
+            f"{item.totals['payments_total']:.2f}",
+            f"{item.totals['amount_due_total']:.2f}",
+            f"{item.source_summary.electricity_total:.2f}",
+            f"{item.source_summary.avizier_total:.2f}",
+            f"{item.source_summary.heating_total:.2f}",
+        ])
+    recent_table = Table(recent_rows, colWidths=[28 * mm, 31 * mm, 29 * mm, 29 * mm, 27 * mm, 27 * mm, 27 * mm], repeatRows=1)
+    recent_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+    ]))
     story.extend([
+        PageBreak(),
+        Paragraph("Recent Trend Snapshot", styles["RentSubheading"]),
+        Spacer(1, 1.5 * mm),
+        Image(totals_chart, width=180 * mm, height=58 * mm),
+        Spacer(1, 3 * mm),
+        Image(utilities_chart, width=180 * mm, height=58 * mm),
+        Spacer(1, 3 * mm),
+        recent_table,
+        Spacer(1, 4 * mm),
+    ])
+
+    story.extend([
+        PageBreak(),
         Paragraph("Per-Person Breakdown", styles["RentSubheading"]),
         Spacer(1, 1.5 * mm),
     ])
-    for tenant in statement.tenant_statements:
-        breakdown_rows = [
-            ["Rent", f"{tenant.rent_amount:.2f} RON", "Electricity", f"{tenant.electricity_amount:.2f} RON"],
-            ["Shared Utilities", f"{tenant.shared_utilities_amount:.2f} RON", "Heating", f"{tenant.heating_amount:.2f} RON"],
-            ["Other", f"{tenant.other_adjustment:.2f} RON", "Previous", f"{tenant.previous_balance:.2f} RON"],
-            ["Payments", f"-{tenant.payments_in_month:.2f} RON", "Amount Due", f"{tenant.amount_due:.2f} RON"],
-        ]
-        if tenant.other_adjustment_note:
-            breakdown_rows.append(["Adjustment Note", tenant.other_adjustment_note, "", ""])
-        story.append(Paragraph(f"<b>{tenant.tenant_name}</b>{f' • {tenant.room_name}' if tenant.room_name else ''}", styles["RentBody"]))
-        person_table = Table(breakdown_rows, colWidths=[36 * mm, 28 * mm, 36 * mm, 28 * mm])
-        person_table_style = [
-            ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-            ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
-            ("FONTNAME", (3, 3), (3, 3), "Helvetica-Bold"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
-            ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-            ("ALIGN", (3, 0), (3, -1), "RIGHT"),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ]
-        if tenant.other_adjustment_note:
-            note_row_index = len(breakdown_rows) - 1
-            person_table_style.extend([
-                ("SPAN", (1, note_row_index), (3, note_row_index)),
-                ("ALIGN", (1, note_row_index), (3, note_row_index), "LEFT"),
-            ])
-        person_table.setStyle(TableStyle(person_table_style))
-        story.extend([Spacer(1, 1.5 * mm), person_table, Spacer(1, 2.5 * mm)])
+
+    person_cards = [_build_person_breakdown_card(tenant, styles) for tenant in statement.tenant_statements]
+    breakdown_grid_rows = []
+    for index in range(0, len(person_cards), 2):
+        left_card = person_cards[index]
+        right_card = person_cards[index + 1] if index + 1 < len(person_cards) else ""
+        breakdown_grid_rows.append([left_card, right_card])
+
+    breakdown_grid = Table(
+        breakdown_grid_rows or [[Paragraph("No tenant breakdown available.", styles["RentBody"]), ""]],
+        colWidths=[133 * mm, 133 * mm],
+        hAlign="LEFT",
+    )
+    breakdown_grid.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.extend([breakdown_grid, Spacer(1, 3 * mm)])
 
     story.extend([
         Paragraph(
