@@ -1,4 +1,4 @@
-# UtilityMate v1.9.9
+# UtilityMate v1.9.10
 
 ## New Features
 
@@ -6,7 +6,7 @@
 
 ## Improvements
 
-- Split the frontend bundle by route and major vendor groups so the initial Vite production bundle no longer ships the entire application in one chunk.
+- Widened the rent export per-person breakdown card table so long `Adjustment Note` content wraps cleanly without overlapping adjacent columns.
 
 ## Bug Fixes
 

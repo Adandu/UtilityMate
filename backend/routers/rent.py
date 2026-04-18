@@ -627,13 +627,18 @@ def _build_person_breakdown_card(
         ["Payments", f"{_display_amount(-tenant.payments_in_month)} RON", "Amount Due", f"{_display_amount(tenant.amount_due)} RON"],
     ]
     if tenant.other_adjustment_note:
-        breakdown_rows.append(["Adjustment Note", tenant.other_adjustment_note, "", ""])
+        breakdown_rows.append([
+            "Adjustment Note",
+            Paragraph(tenant.other_adjustment_note.replace("\n", "<br/>"), styles["RentBody"]),
+            "",
+            "",
+        ])
 
     card_title = Paragraph(
         f"<b>{tenant.tenant_name}</b>{f' • {tenant.room_name}' if tenant.room_name else ''}",
         styles["RentBody"],
     )
-    person_table = Table(breakdown_rows, colWidths=[28 * mm, 25 * mm, 31 * mm, 25 * mm])
+    person_table = Table(breakdown_rows, colWidths=[34 * mm, 29 * mm, 36 * mm, 29 * mm])
     person_table_style = [
         ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
@@ -652,6 +657,7 @@ def _build_person_breakdown_card(
         person_table_style.extend([
             ("SPAN", (1, note_row_index), (3, note_row_index)),
             ("ALIGN", (1, note_row_index), (3, note_row_index), "LEFT"),
+            ("VALIGN", (0, note_row_index), (-1, note_row_index), "TOP"),
         ])
     person_table.setStyle(TableStyle(person_table_style))
     return [card_title, Spacer(1, 1.5 * mm), person_table]
