@@ -7,7 +7,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -22,6 +22,7 @@ from ..models import database_models
 from ..schemas import api_schemas
 from ..utils import auth_utils
 from ..utils.domain_logic import build_forecast, compute_budget_statuses, generate_invoice_alerts
+from ..utils.rate_limiter import limiter
 
 router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -939,7 +940,9 @@ def dashboard_analytics(
 
 
 @router.get("/dashboard-export")
+@limiter.limit("10/minute")
 def dashboard_export(
+    request: Request,
     period: str = Query("last_6_months"),
     location_id: Optional[int] = Query(None),
     start_date: Optional[date] = Query(None),

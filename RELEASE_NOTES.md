@@ -1,4 +1,4 @@
-# UtilityMate v1.9.6
+# UtilityMate v1.9.7
 
 ## New Features
 
@@ -6,9 +6,10 @@
 
 ## Improvements
 
-- Expanded the third column in the per-person breakdown cards so longer labels such as `Shared Utilities` stay inside their cell.
-- Restored the workspace, location, and month block to left alignment while keeping the header title independently centered.
+- Added explicit rate limits to invoice upload/export, rent statement, statement export, association statement upload, and analytics PDF export routes to reduce abuse risk on expensive endpoints.
+- Reduced repeated database work when building rent statements by preloading monthly source summaries and payment totals across the requested lease history.
 
 ## Bug Fixes
 
-- Fixed the rent statement title header not centering cleanly across the full landscape page width.
+- Stopped invoice list and review queue `GET` endpoints from committing backfill changes during read requests.
+- Sanitized invoice upload processing errors so raw backend exception details are no longer returned to clients.

@@ -3,7 +3,7 @@ import os
 import re
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Request
 from fastapi.responses import FileResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
@@ -13,6 +13,7 @@ from ..models import database_models
 from ..schemas import api_schemas
 from ..utils import auth_utils, parser
 from ..utils.logging_config import logger
+from ..utils.rate_limiter import limiter
 
 router = APIRouter()
 
@@ -89,7 +90,9 @@ def download_association_statement_pdf(
 
 
 @router.post("/upload", response_model=List[api_schemas.AssociationStatementUploadResult])
+@limiter.limit("5/minute")
 async def upload_association_statements(
+    request: Request,
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
     current_user: database_models.User = Depends(auth_utils.get_current_user),

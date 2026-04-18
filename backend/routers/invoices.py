@@ -5,8 +5,9 @@ import io
 import os
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse, StreamingResponse
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -16,6 +17,7 @@ from ..schemas import api_schemas
 from ..utils import auth_utils, parser
 from ..utils.domain_logic import create_alert
 from ..utils.logging_config import logger
+from ..utils.rate_limiter import limiter
 
 router = APIRouter()
 
@@ -56,8 +58,7 @@ def infer_review_state(invoice: database_models.Invoice):
     return confidence, needs_review
 
 
-def backfill_invoice_review_state(db: Session, invoices: List[database_models.Invoice]):
-    updated = False
+def backfill_invoice_review_state(invoices: List[database_models.Invoice]):
     for invoice in invoices:
         if invoice.parse_confidence in (None, 0, 0.0):
             confidence, needs_review = infer_review_state(invoice)
@@ -68,9 +69,6 @@ def backfill_invoice_review_state(db: Session, invoices: List[database_models.In
                 invoice.needs_review = False
             else:
                 invoice.needs_review = needs_review
-            updated = True
-    if updated:
-        db.commit()
 
 
 def validate_invoice_relationships(
@@ -128,7 +126,7 @@ def read_invoices(
         query = query.filter(database_models.Invoice.provider_id == provider_id)
     total = query.count()
     invoices = query.order_by(database_models.Invoice.invoice_date.desc(), database_models.Invoice.id.desc()).offset(skip).limit(limit).all()
-    backfill_invoice_review_state(db, invoices)
+    backfill_invoice_review_state(invoices)
     return api_schemas.InvoiceListResponse(
         items=invoices,
         total=total,
@@ -145,12 +143,14 @@ def review_queue(
     invoices = invoice_query(db, current_user).filter(
         database_models.Invoice.needs_review == True
     ).order_by(database_models.Invoice.created_at.desc()).all()
-    backfill_invoice_review_state(db, invoices)
+    backfill_invoice_review_state(invoices)
     return invoices
 
 
 @router.get("/export")
+@limiter.limit("10/minute")
 def export_invoices(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: database_models.User = Depends(auth_utils.get_current_user),
 ):
@@ -211,7 +211,9 @@ def download_invoice(
 
 
 @router.post("/upload")
+@limiter.limit("5/minute")
 async def upload_invoices(
+    request: Request,
     location_id: int = Form(...),
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
@@ -329,7 +331,12 @@ async def upload_invoices(
                     os.remove(file_path)
                 except Exception:
                     pass
-            results.append({"filename": file.filename, "status": "error", "detail": f"Processing error: {str(e)}"})
+            error_detail = "Processing error. Please verify the PDF contents and try again."
+            if isinstance(e, HTTPException):
+                error_detail = str(e.detail)
+            elif isinstance(e, RateLimitExceeded):
+                error_detail = "Upload rate limit exceeded. Please wait before trying again."
+            results.append({"filename": file.filename, "status": "error", "detail": error_detail})
 
     return results
 

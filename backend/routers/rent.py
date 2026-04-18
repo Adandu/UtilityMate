@@ -4,7 +4,7 @@ from io import BytesIO
 import os
 from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
@@ -18,6 +18,7 @@ from ..database.session import get_db
 from ..models import database_models
 from ..schemas import api_schemas
 from ..utils import auth_utils
+from ..utils.rate_limiter import limiter
 
 router = APIRouter()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -253,6 +254,78 @@ def _calculate_source_summary(db: Session, lease: database_models.RentLease, mon
     )
 
 
+def _build_source_summary_map(
+    db: Session,
+    lease: database_models.RentLease,
+    months: List[date],
+) -> Dict[date, api_schemas.RentSourceSummary]:
+    if not months:
+        return {}
+
+    month_set = {_month_start(month) for month in months}
+    earliest_month = min(month_set)
+    latest_month = _next_month(max(month_set))
+
+    electricity_query = db.query(database_models.Invoice).filter(
+        database_models.Invoice.location_id == lease.location_id,
+        database_models.Invoice.invoice_date >= earliest_month,
+        database_models.Invoice.invoice_date < latest_month,
+    )
+    if lease.electricity_provider_id:
+        electricity_query = electricity_query.filter(database_models.Invoice.provider_id == lease.electricity_provider_id)
+    else:
+        electricity_query = electricity_query.join(
+            database_models.Provider, database_models.Provider.id == database_models.Invoice.provider_id
+        ).join(
+            database_models.Category, database_models.Category.id == database_models.Provider.category_id
+        ).filter(database_models.Category.name == "Energy")
+
+    electricity_by_month: Dict[date, Dict[str, float]] = defaultdict(lambda: {"amount": 0.0, "consumption": 0.0})
+    for invoice in electricity_query.all():
+        invoice_month = _month_start(invoice.invoice_date)
+        if invoice_month not in month_set:
+            continue
+        electricity_by_month[invoice_month]["amount"] += float(invoice.amount or 0.0)
+        electricity_by_month[invoice_month]["consumption"] += float(invoice.consumption_value or 0.0)
+
+    statement_totals_by_month: Dict[date, Dict[str, float]] = defaultdict(lambda: {"avizier": 0.0, "heating": 0.0})
+    raw_statement_lines = db.query(
+        database_models.AssociationStatementLine,
+        database_models.AssociationStatement,
+    ).join(
+        database_models.AssociationStatement,
+        database_models.AssociationStatement.id == database_models.AssociationStatementLine.statement_id,
+    ).filter(
+        database_models.AssociationStatementLine.location_id == lease.location_id,
+        database_models.AssociationStatement.statement_month >= earliest_month,
+        database_models.AssociationStatement.statement_month < latest_month,
+    ).all()
+
+    for line, statement in raw_statement_lines:
+        effective_month = _statement_effective_month(statement)
+        if effective_month not in month_set:
+            continue
+        if line.line_kind == "statement_total" and line.normalized_label == "Avizier Total":
+            statement_totals_by_month[effective_month]["avizier"] += float(line.amount or 0.0)
+        if line.normalized_label == "Heating":
+            statement_totals_by_month[effective_month]["heating"] += float(line.amount or 0.0)
+
+    summary_map: Dict[date, api_schemas.RentSourceSummary] = {}
+    for month in month_set:
+        electricity = electricity_by_month[month]
+        statement_totals = statement_totals_by_month[month]
+        avizier_total = statement_totals["avizier"]
+        heating_total = statement_totals["heating"]
+        summary_map[month] = api_schemas.RentSourceSummary(
+            electricity_total=float(electricity["amount"]),
+            electricity_consumption_total=float(electricity["consumption"]),
+            avizier_total=float(avizier_total),
+            heating_total=float(heating_total),
+            non_heating_utilities_total=float(max(avizier_total - heating_total, 0.0)),
+        )
+    return summary_map
+
+
 def _build_room_tenant_map(tenant_configs: List[api_schemas.RentTenantMonthConfig]) -> Dict[int, List[int]]:
     room_tenant_map: Dict[int, List[int]] = defaultdict(list)
     for config in tenant_configs:
@@ -416,74 +489,59 @@ def _build_statement(
         database_models.RentPayment.month == month_value,
     ).order_by(database_models.RentPayment.payment_date.asc()).all()
 
-    source_summary = _calculate_source_summary(db, lease, month_value)
+    ordered_months = sorted(set(months_by_key.keys()) | {month_value})
+    source_summaries = _build_source_summary_map(db, lease, ordered_months)
+    source_summary = source_summaries.get(month_value) or _calculate_source_summary(db, lease, month_value)
     utility_payers = [config for config in tenant_configs if config.is_active and config.pays_utilities]
     utility_payer_count = len(utility_payers)
-    shared_utilities_per_payer = (source_summary.non_heating_utilities_total / utility_payer_count) if utility_payer_count else 0.0
+    payment_rows = db.query(database_models.RentPayment).filter(
+        database_models.RentPayment.lease_id == lease.id,
+        database_models.RentPayment.month.in_(ordered_months),
+    ).all()
+    payment_totals_by_month: Dict[date, Dict[int, float]] = defaultdict(lambda: defaultdict(float))
+    for payment in payment_rows:
+        payment_month = _month_start(payment.month)
+        payment_totals_by_month[payment_month][payment.tenant_id] += float(payment.amount or 0.0)
 
-    room_tenant_map = _build_room_tenant_map(tenant_configs)
-    electricity_by_tenant, electricity_mode = _calculate_electricity_distribution(
-        source_summary.electricity_total,
-        source_summary.electricity_consumption_total,
-        utility_payers,
-        room_energy_usages,
-        room_tenant_map,
-    )
-    electricity_usage_by_tenant = _calculate_electricity_usage_distribution(
-        source_summary.electricity_consumption_total,
-        utility_payers,
-        room_energy_usages,
-        room_tenant_map,
-    )
-    heating_by_tenant, heating_mode = _calculate_heating_distribution(
-        source_summary.heating_total,
-        utility_payers,
-        room_usages,
-        room_tenant_map,
-    )
-    heating_usage_by_tenant = _calculate_heating_usage_distribution(
-        utility_payers,
-        room_usages,
-        room_tenant_map,
-    )
-
-    payment_totals = defaultdict(float)
-    for payment in payments:
-        payment_totals[payment.tenant_id] += float(payment.amount or 0.0)
-
-    ordered_months = sorted(set(months_by_key.keys()) | {month_value})
+    payment_totals = payment_totals_by_month.get(month_value, defaultdict(float))
     balances: Dict[int, float] = defaultdict(float)
     statement_rows: List[api_schemas.RentTenantStatement] = []
+    electricity_mode = "equal"
+    heating_mode = "equal"
 
     for current_month in ordered_months:
         _, current_configs, current_room_usages, current_room_energy_usages = _get_or_build_month(lease, current_month, months_by_key.get(current_month))
-        current_sources = _calculate_source_summary(db, lease, current_month)
+        current_sources = source_summaries.get(current_month) or _calculate_source_summary(db, lease, current_month)
         current_utility_payers = [config for config in current_configs if config.is_active and config.pays_utilities]
         current_utility_payer_count = len(current_utility_payers)
         current_shared_per_payer = (current_sources.non_heating_utilities_total / current_utility_payer_count) if current_utility_payer_count else 0.0
 
         current_room_tenant_map = _build_room_tenant_map(current_configs)
-        current_electricity_by_tenant, _ = _calculate_electricity_distribution(
+        current_electricity_by_tenant, current_electricity_mode = _calculate_electricity_distribution(
             current_sources.electricity_total,
             current_sources.electricity_consumption_total,
             current_utility_payers,
             current_room_energy_usages,
             current_room_tenant_map,
         )
-        current_heating_by_tenant, _ = _calculate_heating_distribution(
+        current_electricity_usage_by_tenant = _calculate_electricity_usage_distribution(
+            current_sources.electricity_consumption_total,
+            current_utility_payers,
+            current_room_energy_usages,
+            current_room_tenant_map,
+        )
+        current_heating_by_tenant, current_heating_mode = _calculate_heating_distribution(
             current_sources.heating_total,
             current_utility_payers,
             current_room_usages,
             current_room_tenant_map,
         )
-
-        current_payment_rows = db.query(database_models.RentPayment).filter(
-            database_models.RentPayment.lease_id == lease.id,
-            database_models.RentPayment.month == current_month,
-        ).all()
-        current_payment_totals = defaultdict(float)
-        for payment in current_payment_rows:
-            current_payment_totals[payment.tenant_id] += float(payment.amount or 0.0)
+        current_heating_usage_by_tenant = _calculate_heating_usage_distribution(
+            current_utility_payers,
+            current_room_usages,
+            current_room_tenant_map,
+        )
+        current_payment_totals = payment_totals_by_month.get(current_month, defaultdict(float))
 
         current_rows: List[api_schemas.RentTenantStatement] = []
         for config in current_configs:
@@ -504,10 +562,10 @@ def _build_statement(
                 pays_rent=config.pays_rent,
                 pays_utilities=config.pays_utilities,
                 rent_amount=float(config.rent_amount if config.pays_rent else 0.0),
-                electricity_usage_kwh=float(electricity_usage_by_tenant.get(config.tenant_id, 0.0) if (config.is_active and config.pays_utilities) else 0.0),
+                electricity_usage_kwh=float(current_electricity_usage_by_tenant.get(config.tenant_id, 0.0) if (config.is_active and config.pays_utilities) else 0.0),
                 electricity_amount=float(electricity_amount),
                 shared_utilities_amount=float(shared_utilities_amount),
-                heating_usage_value=float(heating_usage_by_tenant.get(config.tenant_id, 0.0) if (config.is_active and config.pays_utilities) else 0.0),
+                heating_usage_value=float(current_heating_usage_by_tenant.get(config.tenant_id, 0.0) if (config.is_active and config.pays_utilities) else 0.0),
                 heating_amount=float(heating_amount),
                 utilities_amount=float(utilities_amount),
                 other_adjustment=float(config.other_adjustment),
@@ -521,6 +579,8 @@ def _build_statement(
             balances[config.tenant_id] = amount_due
 
         if current_month == month_value:
+            electricity_mode = current_electricity_mode
+            heating_mode = current_heating_mode
             statement_rows = current_rows
 
     total_rent = sum(row.rent_amount for row in statement_rows)
@@ -974,7 +1034,9 @@ def delete_rent_tenant(
 
 
 @router.get("/leases/{lease_id}/statement", response_model=api_schemas.RentMonthStatement)
+@limiter.limit("20/minute")
 def get_rent_statement(
+    request: Request,
     lease_id: int,
     month: date = Query(...),
     db: Session = Depends(get_db),
@@ -985,7 +1047,9 @@ def get_rent_statement(
 
 
 @router.get("/leases/{lease_id}/statement-export")
+@limiter.limit("10/minute")
 def export_rent_statement(
+    request: Request,
     lease_id: int,
     month: date = Query(...),
     db: Session = Depends(get_db),
