@@ -58,17 +58,22 @@ def infer_review_state(invoice: database_models.Invoice):
     return confidence, needs_review
 
 
-def backfill_invoice_review_state(invoices: List[database_models.Invoice]):
-    for invoice in invoices:
-        if invoice.parse_confidence in (None, 0, 0.0):
-            confidence, needs_review = infer_review_state(invoice)
-            invoice.parse_confidence = confidence
-            if invoice.review_notes and invoice.review_notes.strip():
-                invoice.needs_review = False
-            elif invoice.status in {"reviewed", "paid"}:
-                invoice.needs_review = False
-            else:
-                invoice.needs_review = needs_review
+def invoice_response(invoice: database_models.Invoice) -> api_schemas.Invoice:
+    serialized = api_schemas.Invoice.model_validate(invoice, from_attributes=True)
+    if invoice.parse_confidence not in (None, 0, 0.0):
+        return serialized
+
+    confidence, needs_review = infer_review_state(invoice)
+    if invoice.review_notes and invoice.review_notes.strip():
+        needs_review = False
+    elif invoice.status in {"reviewed", "paid"}:
+        needs_review = False
+    return serialized.model_copy(
+        update={
+            "parse_confidence": confidence,
+            "needs_review": needs_review,
+        }
+    )
 
 
 def validate_invoice_relationships(
@@ -126,9 +131,9 @@ def read_invoices(
         query = query.filter(database_models.Invoice.provider_id == provider_id)
     total = query.count()
     invoices = query.order_by(database_models.Invoice.invoice_date.desc(), database_models.Invoice.id.desc()).offset(skip).limit(limit).all()
-    backfill_invoice_review_state(invoices)
+    response_items = [invoice_response(invoice) for invoice in invoices]
     return api_schemas.InvoiceListResponse(
-        items=invoices,
+        items=response_items,
         total=total,
         skip=skip,
         limit=limit,
@@ -143,8 +148,7 @@ def review_queue(
     invoices = invoice_query(db, current_user).filter(
         database_models.Invoice.needs_review == True
     ).order_by(database_models.Invoice.created_at.desc()).all()
-    backfill_invoice_review_state(invoices)
-    return invoices
+    return [invoice_response(invoice) for invoice in invoices]
 
 
 @router.get("/export")

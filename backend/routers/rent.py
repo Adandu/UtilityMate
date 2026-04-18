@@ -33,6 +33,10 @@ def _next_month(value: date) -> date:
     return date(value.year + (1 if value.month == 12 else 0), 1 if value.month == 12 else value.month + 1, 1)
 
 
+def _previous_month(value: date) -> date:
+    return date(value.year - (1 if value.month == 1 else 0), 12 if value.month == 1 else value.month - 1, 1)
+
+
 def _display_amount(value: float) -> str:
     normalized = 0.0 if abs(float(value)) < 0.005 else float(value)
     return f"{normalized:.2f}"
@@ -265,6 +269,7 @@ def _build_source_summary_map(
     month_set = {_month_start(month) for month in months}
     earliest_month = min(month_set)
     latest_month = _next_month(max(month_set))
+    earliest_statement_month = _previous_month(earliest_month)
 
     electricity_query = db.query(database_models.Invoice).filter(
         database_models.Invoice.location_id == lease.location_id,
@@ -297,7 +302,7 @@ def _build_source_summary_map(
         database_models.AssociationStatement.id == database_models.AssociationStatementLine.statement_id,
     ).filter(
         database_models.AssociationStatementLine.location_id == lease.location_id,
-        database_models.AssociationStatement.statement_month >= earliest_month,
+        database_models.AssociationStatement.statement_month >= earliest_statement_month,
         database_models.AssociationStatement.statement_month < latest_month,
     ).all()
 
@@ -491,7 +496,7 @@ def _build_statement(
 
     ordered_months = sorted(set(months_by_key.keys()) | {month_value})
     source_summaries = _build_source_summary_map(db, lease, ordered_months)
-    source_summary = source_summaries.get(month_value) or _calculate_source_summary(db, lease, month_value)
+    source_summary = source_summaries[month_value]
     utility_payers = [config for config in tenant_configs if config.is_active and config.pays_utilities]
     utility_payer_count = len(utility_payers)
     payment_rows = db.query(database_models.RentPayment).filter(
@@ -511,7 +516,7 @@ def _build_statement(
 
     for current_month in ordered_months:
         _, current_configs, current_room_usages, current_room_energy_usages = _get_or_build_month(lease, current_month, months_by_key.get(current_month))
-        current_sources = source_summaries.get(current_month) or _calculate_source_summary(db, lease, current_month)
+        current_sources = source_summaries[current_month]
         current_utility_payers = [config for config in current_configs if config.is_active and config.pays_utilities]
         current_utility_payer_count = len(current_utility_payers)
         current_shared_per_payer = (current_sources.non_heating_utilities_total / current_utility_payer_count) if current_utility_payer_count else 0.0

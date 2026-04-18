@@ -1,4 +1,4 @@
-# UtilityMate v1.9.7
+# UtilityMate v1.9.8
 
 ## New Features
 
@@ -6,10 +6,9 @@
 
 ## Improvements
 
-- Added explicit rate limits to invoice upload/export, rent statement, statement export, association statement upload, and analytics PDF export routes to reduce abuse risk on expensive endpoints.
-- Reduced repeated database work when building rent statements by preloading monthly source summaries and payment totals across the requested lease history.
+- No new improvements in this release.
 
 ## Bug Fixes
 
-- Stopped invoice list and review queue `GET` endpoints from committing backfill changes during read requests.
-- Sanitized invoice upload processing errors so raw backend exception details are no longer returned to clients.
+- Stopped invoice list and review queue responses from mutating invoice ORM rows while backfilling derived review state for API output.
+- Fixed rent statement source-summary preloading so association statements remain included when `posted_date` shifts the effective month across a statement-month boundary.
