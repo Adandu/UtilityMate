@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import api from '../utils/api';
 import { ArrowRight, Loader2, UserPlus } from 'lucide-react';
 
@@ -29,14 +30,18 @@ const Register: React.FC = () => {
     try {
       await api.post('/auth/register', { email, password });
       navigate('/login');
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      if (typeof detail === 'string') {
-        setError(detail);
-      } else if (Array.isArray(detail)) {
-        setError(detail[0]?.msg || 'Validation error');
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const detail = err.response?.data?.detail;
+        if (typeof detail === 'string') {
+          setError(detail);
+        } else if (Array.isArray(detail)) {
+          setError(detail[0]?.msg || 'Validation error');
+        } else {
+          setError('Registration failed. Please check your data.');
+        }
       } else {
-        setError('Registration failed. Please check your data.');
+        setError('An unexpected error occurred.');
       }
     } finally {
       setLoading(false);

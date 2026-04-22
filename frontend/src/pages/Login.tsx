@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import api from '../utils/api';
 import { Shield, ArrowRight, Loader2 } from 'lucide-react';
 
@@ -30,8 +31,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       
       onLogin(response.data.access_token);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Invalid credentials. Access denied.');
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || 'Invalid credentials. Access denied.');
+      } else {
+        setError('An unexpected error occurred.');
+      }
     } finally {
       setLoading(false);
     }

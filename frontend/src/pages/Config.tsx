@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Building2, Moon, Sun, Plus, Shield, Zap, Droplets, Flame, Loader2, X, Tag, Trash2, Home } from 'lucide-react';
+import axios from 'axios';
 import api from '../utils/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -119,8 +120,12 @@ const Config: React.FC = () => {
     try {
       await api.delete(`/locations/${id}`);
       setLocations(locations.filter(l => l.id !== id));
-    } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to delete location');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.detail || 'Failed to delete location');
+      } else {
+        alert('An unexpected error occurred.');
+      }
     }
   };
 
@@ -143,8 +148,12 @@ const Config: React.FC = () => {
     try {
       await api.delete(`/categories/${id}`);
       setCategories(categories.filter(c => c.id !== id));
-    } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to delete category');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.detail || 'Failed to delete category');
+      } else {
+        alert('An unexpected error occurred.');
+      }
     }
   };
 
@@ -172,8 +181,12 @@ const Config: React.FC = () => {
     try {
       await api.delete(`/providers/${id}`);
       setProviders(providers.filter(p => p.id !== id));
-    } catch (error: any) {
-      alert(error.response?.data?.detail || 'Failed to delete provider');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.detail || 'Failed to delete provider');
+      } else {
+        alert('An unexpected error occurred.');
+      }
     }
   };
 
