@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, ChevronRight, Gauge, Loader2, Pencil, Plus, Receipt, Save, Trash2, X } from 'lucide-react';
+import axios from 'axios';
 import api from '../utils/api';
 
 interface Category {
@@ -204,8 +205,12 @@ const MeterReadings: React.FC = () => {
       setSelectedStreamKey(nextStreamKey);
       resetForm();
       await fetchBaseData();
-    } catch (error: any) {
-      setPageError(error?.response?.data?.detail || 'Meter reading could not be saved.');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setPageError(error?.response?.data?.detail || 'Meter reading could not be saved.');
+      } else {
+        setPageError('An unexpected error occurred.');
+      }
     } finally {
       setSaving(false);
     }
@@ -243,8 +248,12 @@ const MeterReadings: React.FC = () => {
       }
       cancelEdit();
       await fetchBaseData();
-    } catch (error: any) {
-      setPageError(error?.response?.data?.detail || 'Meter reading could not be updated.');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setPageError(error?.response?.data?.detail || 'Meter reading could not be updated.');
+      } else {
+        setPageError('An unexpected error occurred.');
+      }
     } finally {
       setSaving(false);
     }
@@ -258,8 +267,12 @@ const MeterReadings: React.FC = () => {
       await api.delete(`/consumption/${readingId}`);
       if (editId === readingId) cancelEdit();
       await fetchBaseData();
-    } catch (error: any) {
-      setPageError(error?.response?.data?.detail || 'Meter reading could not be deleted.');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        setPageError(error?.response?.data?.detail || 'Meter reading could not be deleted.');
+      } else {
+        setPageError('An unexpected error occurred.');
+      }
     } finally {
       setSaving(false);
     }
