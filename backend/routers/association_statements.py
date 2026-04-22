@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..database.session import get_db
 from ..models import database_models
 from ..schemas import api_schemas
-from ..utils import auth_utils, parser
+from ..utils import auth_utils, parser, file_utils
 from ..utils.logging_config import logger
 from ..utils.rate_limiter import limiter
 
@@ -110,7 +110,8 @@ async def upload_association_statements(
     for file in files:
         file_path = ""
         try:
-            ext = os.path.splitext(file.filename)[1].lower()
+            safe_filename = file_utils.secure_filename(file.filename)
+            ext = os.path.splitext(safe_filename)[1].lower()
             if ext != ".pdf":
                 results.append(api_schemas.AssociationStatementUploadResult(filename=file.filename, status="error", detail="Only PDF files are supported"))
                 continue
