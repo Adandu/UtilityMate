@@ -1,4 +1,4 @@
-# UtilityMate v1.9.11
+# UtilityMate v1.9.12
 
 ## New Features
 
@@ -6,8 +6,8 @@
 
 ## Improvements
 
-- Hardened Avizier parsing for the March 2026 BlocManager statement export by supporting the latest statement profile and split amount tokens such as `1 640,49` and `- 106,90`.
+- Made Avizier profile detection header-aware so unknown future months can reuse the correct known BlocManager column layout without requiring another month-specific parser update.
 
 ## Bug Fixes
 
-- Restored association statement imports for `2026-04-23 - Avizier Martie 2026.pdf` and similar Avizier PDFs that split negative or four-digit totals across multiple extracted tokens.
+- Preserved compatibility with older Avizier PDFs that end rows with trailing apartment-and-balance tokens such as `1 280,00` while keeping support for split values like `1 640,49` and `- 106,90`.

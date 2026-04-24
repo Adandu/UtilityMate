@@ -19,6 +19,23 @@ ROMANIAN_MONTHS = {
     "decembrie": "12",
 }
 
+ROMANIAN_CHAR_MAP = str.maketrans({
+    "ă": "a",
+    "â": "a",
+    "î": "i",
+    "ș": "s",
+    "ş": "s",
+    "ț": "t",
+    "ţ": "t",
+    "Ă": "a",
+    "Â": "a",
+    "Î": "i",
+    "Ș": "s",
+    "Ş": "s",
+    "Ț": "t",
+    "Ţ": "t",
+})
+
 
 def _metered_segment(
     raw_label: str,
@@ -366,11 +383,17 @@ class InvoiceParser:
         posted_date = InvoiceParser._parse_romanian_date_from_text(text, r"data\s+afi[şs][aă]rii[:\s]+(\d{1,2})\s+([A-Za-zăâîşțţ]+)\s+(\d{4})")
         due_date = InvoiceParser._parse_romanian_date_from_text(text, r"data\s+scadent[ăa][:\s]+(\d{1,2})\s+([A-Za-zăâîşțţ]+)\s+(\d{4})")
 
+        lines = text.splitlines()
         row_lines = []
-        for line in text.splitlines():
+        first_row_index: Optional[int] = None
+        for index, line in enumerate(lines):
             normalized_line = " ".join(line.split())
             if InvoiceParser._looks_like_avizier_row(normalized_line):
+                if first_row_index is None:
+                    first_row_index = index
                 row_lines.append(normalized_line)
+
+        header_text = "\n".join(lines[:first_row_index]) if first_row_index is not None else text
 
         sample_length = None
         for row_line in row_lines:
@@ -379,7 +402,7 @@ class InvoiceParser:
                 sample_length = len(trimmed)
                 break
 
-        profile = InvoiceParser._detect_avizier_profile(display_month, sample_length)
+        profile = InvoiceParser._detect_avizier_profile(display_month, sample_length, header_text)
         apartments: List[Dict[str, Any]] = []
         if not profile:
             return {
@@ -437,17 +460,122 @@ class InvoiceParser:
         return datetime.strptime(f"{day.zfill(2)}.{month}.{year}", "%d.%m.%Y").date()
 
     @staticmethod
-    def _detect_avizier_profile(display_month: str, sample_length: Optional[int]) -> Optional[Dict[str, Any]]:
+    def _normalize_romanian_text(value: str) -> str:
+        normalized = (value or "").translate(ROMANIAN_CHAR_MAP).lower()
+        normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
+        return " ".join(normalized.split())
+
+    @staticmethod
+    def _tokenize_avizier_header_text(header_text: str) -> set[str]:
+        tokens: set[str] = set()
+        for raw_token in re.findall(r"[A-Za-zĂÂÎȘŞȚŢăâîșşțţ]+", header_text or ""):
+            normalized = InvoiceParser._normalize_romanian_text(raw_token)
+            if normalized:
+                tokens.add(normalized)
+
+            reversed_normalized = InvoiceParser._normalize_romanian_text(raw_token[::-1])
+            if reversed_normalized:
+                tokens.add(reversed_normalized)
+        return tokens
+
+    @staticmethod
+    def _label_is_present_in_header(label: str, header_tokens: set[str]) -> bool:
+        label_tokens = [token for token in InvoiceParser._normalize_romanian_text(label).split() if token]
+        if not label_tokens:
+            return False
+
+        alias_groups = {
+            "citire lista": [{"citire", "lista"}, {"citire", "ista"}],
+            "servicii curatenie": [{"servicii", "curatenie"}],
+            "servicii administrare": [{"servicii", "administrare"}],
+            "cheltuieli administrative": [{"cheltuieli", "administrative"}],
+            "mentenanta gaze": [{"mentenanta", "gaze"}],
+            "fond de rulment": [{"fond", "rulment"}],
+        }
+        for alias in alias_groups.get(" ".join(label_tokens), [set(label_tokens)]):
+            if alias.issubset(header_tokens):
+                return True
+        return False
+
+    @staticmethod
+    def _profile_header_signature(profile: Dict[str, Any]) -> List[str]:
+        signature_labels: List[str] = []
+        ignored_labels = {
+            "apa rece",
+            "apa calda",
+            "apa parti comune",
+            "energie electrica",
+            "salubritate",
+            "diverse",
+            "cheltuieli administrative",
+            "servicii curatenie",
+            "total luna",
+            "restanta fonduri",
+            "restanta intretinere",
+            "restanta penalizare",
+            "penalizari",
+            "total de plata",
+        }
+
+        for segment in profile["segments"]:
+            if segment["type"] == "summary":
+                continue
+            if segment["type"] == "dual_charge":
+                for item in segment["items"]:
+                    normalized_label = InvoiceParser._normalize_romanian_text(item["raw_label"])
+                    if normalized_label not in ignored_labels:
+                        signature_labels.append(item["raw_label"])
+                continue
+
+            normalized_label = InvoiceParser._normalize_romanian_text(segment["raw_label"])
+            if normalized_label not in ignored_labels:
+                signature_labels.append(segment["raw_label"])
+
+        return signature_labels
+
+    @staticmethod
+    def _detect_avizier_profile(display_month: str, sample_length: Optional[int], header_text: str = "") -> Optional[Dict[str, Any]]:
         if display_month:
             profile = AVIZIER_PROFILES.get(display_month.lower())
             if profile:
                 return profile
+
+        header_tokens = InvoiceParser._tokenize_avizier_header_text(header_text)
         if sample_length is None:
             return None
-        for profile in AVIZIER_PROFILES.values():
-            if InvoiceParser._count_profile_values(profile) == sample_length:
-                return profile
-        return None
+
+        matching_profiles = [
+            profile
+            for profile in AVIZIER_PROFILES.values()
+            if InvoiceParser._count_profile_values(profile) == sample_length
+        ]
+        if not matching_profiles:
+            return None
+        if len(matching_profiles) == 1:
+            return matching_profiles[0]
+
+        best_profile = None
+        best_score = float("-inf")
+        for profile in matching_profiles:
+            score = 0
+            for label in InvoiceParser._profile_header_signature(profile):
+                if InvoiceParser._label_is_present_in_header(label, header_tokens):
+                    score += 2
+                else:
+                    score -= 1
+
+            if (
+                score > best_score
+                or (
+                    score == best_score
+                    and best_profile is not None
+                    and profile["name"] > best_profile["name"]
+                )
+            ):
+                best_score = score
+                best_profile = profile
+
+        return best_profile
 
     @staticmethod
     def _count_profile_values(profile: Dict[str, Any]) -> int:
@@ -466,7 +594,7 @@ class InvoiceParser:
         return bool(re.fullmatch(r"-|[-]?[\d\.,]+", value or ""))
 
     @staticmethod
-    def _normalize_avizier_row_parts(parts: List[str]) -> List[str]:
+    def _normalize_avizier_row_parts(parts: List[str], apartment_number: Optional[str] = None) -> List[str]:
         normalized: List[str] = []
         index = 0
         while index < len(parts):
@@ -482,6 +610,11 @@ class InvoiceParser:
                 next_part
                 and re.fullmatch(r"\d{1,3}", current)
                 and re.fullmatch(r"\d{3},\d{2}", next_part)
+                and not (
+                    apartment_number
+                    and current == apartment_number
+                    and index >= len(parts) - 2
+                )
             ):
                 normalized.append(f"{current}{next_part}")
                 index += 2
@@ -509,7 +642,7 @@ class InvoiceParser:
         if len(parts) < 6:
             return []
         apartment_number = parts[0]
-        trimmed = InvoiceParser._normalize_avizier_row_parts(parts[3:])
+        trimmed = InvoiceParser._normalize_avizier_row_parts(parts[3:], apartment_number=apartment_number)
         for index in range(len(trimmed) - 1, max(len(trimmed) - 5, -1), -1):
             if trimmed[index] != apartment_number:
                 continue
