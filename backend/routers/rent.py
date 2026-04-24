@@ -339,6 +339,17 @@ def _build_room_tenant_map(tenant_configs: List[api_schemas.RentTenantMonthConfi
     return room_tenant_map
 
 
+def _room_tenant_ids_or_all_payers(
+    room_id: int,
+    room_tenant_map: Dict[int, List[int]],
+    utility_payers: List[api_schemas.RentTenantMonthConfig],
+) -> List[int]:
+    tenant_ids = room_tenant_map.get(room_id, [])
+    if tenant_ids:
+        return tenant_ids
+    return [config.tenant_id for config in utility_payers]
+
+
 def _calculate_heating_distribution(
     heating_total: float,
     utility_payers: List[api_schemas.RentTenantMonthConfig],
@@ -354,7 +365,7 @@ def _calculate_heating_distribution(
             usage_value = float(usage.usage_value)
             if usage_value <= 0:
                 continue
-            tenant_ids = room_tenant_map.get(usage.room_id, [])
+            tenant_ids = _room_tenant_ids_or_all_payers(usage.room_id, room_tenant_map, utility_payers)
             if not tenant_ids:
                 continue
             room_share = heating_total * (usage_value / total_usage)
@@ -390,7 +401,7 @@ def _calculate_electricity_distribution(
         usage_kwh = max(float(usage.usage_kwh), 0.0)
         if usage_kwh <= 0:
             continue
-        tenant_ids = room_tenant_map.get(usage.room_id, [])
+        tenant_ids = _room_tenant_ids_or_all_payers(usage.room_id, room_tenant_map, utility_payers)
         if not tenant_ids:
             continue
         assigned_kwh += usage_kwh
@@ -425,7 +436,7 @@ def _calculate_electricity_usage_distribution(
         usage_kwh = max(float(usage.usage_kwh), 0.0)
         if usage_kwh <= 0:
             continue
-        tenant_ids = room_tenant_map.get(usage.room_id, [])
+        tenant_ids = _room_tenant_ids_or_all_payers(usage.room_id, room_tenant_map, utility_payers)
         if not tenant_ids:
             continue
         assigned_kwh += usage_kwh
@@ -457,7 +468,7 @@ def _calculate_heating_usage_distribution(
             usage_value = max(float(usage.usage_value), 0.0)
             if usage_value <= 0:
                 continue
-            tenant_ids = room_tenant_map.get(usage.room_id, [])
+            tenant_ids = _room_tenant_ids_or_all_payers(usage.room_id, room_tenant_map, utility_payers)
             if not tenant_ids:
                 continue
             per_tenant_usage = usage_value / len(tenant_ids)

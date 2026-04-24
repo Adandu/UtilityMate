@@ -1,4 +1,4 @@
-# UtilityMate v1.9.12
+# UtilityMate v1.9.13
 
 ## New Features
 
@@ -6,8 +6,8 @@
 
 ## Improvements
 
-- Made Avizier profile detection header-aware so unknown future months can reuse the correct known BlocManager column layout without requiring another month-specific parser update.
+- No general improvements in this release.
 
 ## Bug Fixes
 
-- Preserved compatibility with older Avizier PDFs that end rows with trailing apartment-and-balance tokens such as `1 280,00` while keeping support for split values like `1 640,49` and `- 106,90`.
+- Fixed rent-page utility allocation so heating and electricity usage entered for an unassigned room is split equally across all utility-paying tenants instead of being skipped or left implicit.

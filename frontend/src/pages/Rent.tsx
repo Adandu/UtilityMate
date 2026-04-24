@@ -630,7 +630,7 @@ const Rent: React.FC = () => {
                     <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
                       <div className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
                         <h4 className="mb-4 font-headline text-lg font-black">Room Energy Usage</h4>
-                        <p className="mb-4 text-sm opacity-65">Enter room kWh for the Hidroelectrica invoice only. Any invoice kWh left over after the room entries is split equally across all utility-paying tenants.</p>
+                        <p className="mb-4 text-sm opacity-65">Enter room kWh for the Hidroelectrica invoice only. Any invoice kWh left over after the room entries, plus usage entered for an unassigned room, is split equally across all utility-paying tenants.</p>
                         <div className="space-y-3">
                           {draftRoomEnergyUsages.map((usage) => (
                             <label key={usage.room_id} className="flex items-center justify-between gap-4">
@@ -656,6 +656,7 @@ const Rent: React.FC = () => {
 
                       <div className="rounded-2xl border border-outline-variant bg-white/70 p-4 dark:bg-slate-900/40">
                         <h4 className="mb-4 font-headline text-lg font-black">Room Heating Usage</h4>
+                        <p className="mb-4 text-sm opacity-65">Heating usage follows the room entries. If a room has no assigned tenant for that month, that room's heating usage is split equally across all utility-paying tenants.</p>
                         <div className="space-y-3">
                           {draftRoomUsages.map((usage) => (
                             <label key={usage.room_id} className="flex items-center justify-between gap-4">
