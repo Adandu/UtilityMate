@@ -253,6 +253,32 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
             _summary_segment("Total de plata"),
         ],
     },
+    "martie 2026": {
+        "name": "blocmanagernet_2026_03",
+        "segments": [
+            _metered_segment("Apa rece", "Cold Water", "m3"),
+            _metered_segment("Apa calda", "Hot Water", "m3"),
+            _metered_segment("Apa parti comune", "Shared Water", "m3"),
+            _dual_charge_segment("Gaze naturale", "Gas", "Caldura", "Heating"),
+            _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
+            _charge_segment("Salubritate"),
+            _charge_segment("Salarii asociatie"),
+            _charge_segment("Diverse"),
+            _charge_segment("Citire lista"),
+            _charge_segment("Cheltuieli administrative"),
+            _charge_segment("Servicii curatenie"),
+            _charge_segment("Servicii administrare"),
+            _charge_segment("Mentenanta gaze"),
+            _charge_segment("Citire repartitoare"),
+            _charge_segment("Citire apometre"),
+            _summary_segment("Total luna"),
+            _charge_segment("Restanta fonduri", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta intretinere", line_kind="arrears", include_in_overall=False),
+            _charge_segment("Restanta penalizare", line_kind="penalty", include_in_overall=False),
+            _charge_segment("Penalizari", line_kind="penalty", include_in_overall=False),
+            _summary_segment("Total de plata"),
+        ],
+    },
 }
 
 
@@ -343,7 +369,7 @@ class InvoiceParser:
         row_lines = []
         for line in text.splitlines():
             normalized_line = " ".join(line.split())
-            if re.match(r"^\d+\s+\d+\s+\d,\d{3}\s", normalized_line):
+            if InvoiceParser._looks_like_avizier_row(normalized_line):
                 row_lines.append(normalized_line)
 
         sample_length = None
@@ -436,15 +462,61 @@ class InvoiceParser:
         return count
 
     @staticmethod
+    def _is_avizier_numeric_token(value: str) -> bool:
+        return bool(re.fullmatch(r"-|[-]?[\d\.,]+", value or ""))
+
+    @staticmethod
+    def _normalize_avizier_row_parts(parts: List[str]) -> List[str]:
+        normalized: List[str] = []
+        index = 0
+        while index < len(parts):
+            current = parts[index]
+            next_part = parts[index + 1] if index + 1 < len(parts) else None
+
+            if current == "-" and next_part and InvoiceParser._is_avizier_numeric_token(next_part):
+                normalized.append(f"-{next_part}")
+                index += 2
+                continue
+
+            if (
+                next_part
+                and re.fullmatch(r"\d{1,3}", current)
+                and re.fullmatch(r"\d{3},\d{2}", next_part)
+            ):
+                normalized.append(f"{current}{next_part}")
+                index += 2
+                continue
+
+            normalized.append(current)
+            index += 1
+
+        return normalized
+
+    @staticmethod
+    def _looks_like_avizier_row(line: str) -> bool:
+        parts = InvoiceParser._normalize_avizier_row_parts(line.split())
+        if len(parts) < 8:
+            return False
+        if not parts[0].isdigit() or not parts[1].isdigit():
+            return False
+        if not InvoiceParser._is_avizier_numeric_token(parts[2]):
+            return False
+        numeric_tail_tokens = sum(1 for part in parts[3:] if InvoiceParser._is_avizier_numeric_token(part))
+        return numeric_tail_tokens >= max(6, len(parts[3:]) - 2)
+
+    @staticmethod
     def _trim_avizier_row_tokens(parts: List[str]) -> List[str]:
         if len(parts) < 6:
             return []
         apartment_number = parts[0]
-        trimmed = parts[3:]
-        if len(trimmed) >= 2 and trimmed[-1] == apartment_number:
-            trimmed = trimmed[:-1]
-        elif len(trimmed) >= 2 and trimmed[-2] == apartment_number:
-            trimmed = trimmed[:-2]
+        trimmed = InvoiceParser._normalize_avizier_row_parts(parts[3:])
+        for index in range(len(trimmed) - 1, max(len(trimmed) - 5, -1), -1):
+            if trimmed[index] != apartment_number:
+                continue
+            trailing_tokens = trimmed[index + 1:]
+            if all(InvoiceParser._is_avizier_numeric_token(token) for token in trailing_tokens):
+                trimmed = trimmed[:index]
+                break
         return trimmed
 
     @staticmethod
