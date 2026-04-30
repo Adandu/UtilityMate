@@ -2,12 +2,12 @@
 FROM node:20-slim AS build-stage
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
 # Stage 2: Final Multi-Service Image
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Install Nginx and system dependencies
 RUN apt-get update && apt-get install -y \
@@ -54,8 +54,8 @@ RUN useradd -u 1000 appuser && \
 EXPOSE 80
 
 # Environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
 CMD ["./entrypoint.sh"]

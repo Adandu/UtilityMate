@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { CalendarDays, ChevronRight, Gauge, Loader2, Pencil, Plus, Receipt, Save, Trash2, X } from 'lucide-react';
 import axios from 'axios';
 import api from '../utils/api';
@@ -98,7 +98,7 @@ const MeterReadings: React.FC = () => {
   const [editMeterLabel, setEditMeterLabel] = useState('');
   const [editNotes, setEditNotes] = useState('');
 
-  const fetchBaseData = async () => {
+  const fetchBaseData = useCallback(async () => {
     setLoading(true);
     setPageError('');
     try {
@@ -117,20 +117,22 @@ const MeterReadings: React.FC = () => {
       setLocations(locationResponse.data);
       setCategories(categoryResponse.data);
 
-      if (streamResponse.data.items.length === 0) {
-        setSelectedStreamKey('');
-      } else if (!streamResponse.data.items.some((stream) => streamKey(stream.location_id, stream.category_id, stream.meter_label) === selectedStreamKey)) {
+      setSelectedStreamKey((current) => {
+        if (streamResponse.data.items.length === 0) return '';
+        if (streamResponse.data.items.some((stream) => streamKey(stream.location_id, stream.category_id, stream.meter_label) === current)) {
+          return current;
+        }
         const first = streamResponse.data.items[0];
-        setSelectedStreamKey(streamKey(first.location_id, first.category_id, first.meter_label));
-      }
-    } catch (error) {
+        return streamKey(first.location_id, first.category_id, first.meter_label);
+      });
+    } catch {
       setPageError('Meter streams could not be loaded.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoryFilter, locationFilter]);
 
-  const fetchReadings = async () => {
+  const fetchReadings = useCallback(async () => {
     if (!selectedStreamKey) {
       setReadings([]);
       return;
@@ -152,18 +154,18 @@ const MeterReadings: React.FC = () => {
         },
       });
       setReadings(response.data.items);
-    } catch (error) {
+    } catch {
       setPageError('Meter reading history could not be loaded.');
     }
-  };
+  }, [selectedStreamKey, streams]);
 
   useEffect(() => {
     fetchBaseData();
-  }, [locationFilter, categoryFilter]);
+  }, [fetchBaseData]);
 
   useEffect(() => {
     fetchReadings();
-  }, [selectedStreamKey, streams]);
+  }, [fetchReadings]);
 
   const selectedStream = streams.find((stream) => streamKey(stream.location_id, stream.category_id, stream.meter_label) === selectedStreamKey) || null;
   const selectedCategory = categories.find((category) => category.id === Number(formCategory));

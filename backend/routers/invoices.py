@@ -246,10 +246,7 @@ async def upload_invoices(
                 results.append({"filename": file.filename, "status": "error", "detail": "Only PDF files are allowed"})
                 continue
 
-            content = await file.read()
-            if len(content) > MAX_FILE_SIZE:
-                results.append({"filename": file.filename, "status": "error", "detail": f"File too large ({len(content) // 1024}KB). Max 50MB."})
-                continue
+            content = await file_utils.read_upload_file_limited(file, MAX_FILE_SIZE)
 
             if not content.startswith(b"%PDF"):
                 results.append({"filename": file.filename, "status": "error", "detail": "Invalid PDF file content"})

@@ -110,7 +110,7 @@ const Config: React.FC = () => {
     try {
       const response = await api.post('/locations/', { name, address: '' });
       setLocations([...locations, response.data]);
-    } catch (error) {
+    } catch {
       alert('Failed to add location.');
     }
   };
@@ -138,7 +138,7 @@ const Config: React.FC = () => {
     try {
       const response = await api.post('/categories/', { name, unit });
       setCategories([...categories, response.data]);
-    } catch (error) {
+    } catch {
       alert('Failed to add category');
     }
   };
@@ -171,7 +171,7 @@ const Config: React.FC = () => {
       setShowAddProvider(false);
       setNewProviderName('');
       setSelectedCategoryId('');
-    } catch (error) {
+    } catch {
       alert('Failed to register provider');
     }
   };

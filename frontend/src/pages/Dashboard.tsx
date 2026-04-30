@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -137,7 +137,7 @@ const Dashboard: React.FC = () => {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string> = { period: selectedPeriod };
@@ -156,14 +156,14 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [customEnd, customStart, selectedLocation, selectedPeriod]);
 
   useEffect(() => {
     if (selectedPeriod === 'custom' && (!customStart || !customEnd)) {
       return;
     }
     fetchDashboard();
-  }, [selectedLocation, selectedPeriod, customStart, customEnd]);
+  }, [fetchDashboard, customEnd, customStart, selectedPeriod]);
 
   const trendDirection = useMemo(() => {
     if (!report) return { icon: Sparkles, label: 'Stable period', tone: 'text-slate-600' };

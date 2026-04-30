@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 from typing import List, Optional, Any
 from datetime import date, datetime
 
@@ -16,8 +16,7 @@ class Category(CategoryBase):
     id: int
     user_id: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProviderBase(BaseModel):
@@ -34,8 +33,7 @@ class Provider(ProviderBase):
     id: int
     user_id: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LocationBase(BaseModel):
@@ -52,8 +50,7 @@ class Location(LocationBase):
     id: int
     user_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProviderSimple(BaseModel):
@@ -61,16 +58,14 @@ class ProviderSimple(BaseModel):
     name: str
     category: Category
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LocationSimple(BaseModel):
     id: int
     name: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InvoiceBase(BaseModel):
@@ -156,7 +151,6 @@ class InvoiceBulkUpdate(BaseModel):
 class Invoice(InvoiceBase):
     id: int
     user_id: int
-    pdf_path: Optional[str] = None
     status: str
     paid_at: Optional[datetime] = None
     payment_reference: Optional[str] = None
@@ -170,8 +164,7 @@ class Invoice(InvoiceBase):
     provider: Optional[ProviderSimple] = None
     location: Optional[LocationSimple] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InvoiceListResponse(BaseModel):
@@ -229,8 +222,7 @@ class ConsumptionIndex(ConsumptionIndexBase):
     photo_path: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConsumptionLinkedInvoice(BaseModel):
@@ -241,8 +233,7 @@ class ConsumptionLinkedInvoice(BaseModel):
     status: str
     provider: Optional[ProviderSimple] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConsumptionReading(ConsumptionIndex):
@@ -300,8 +291,7 @@ class HouseholdMember(HouseholdMemberBase):
     household_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Household(HouseholdBase):
@@ -310,8 +300,7 @@ class Household(HouseholdBase):
     created_at: datetime
     members: List[HouseholdMember] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BudgetBase(BaseModel):
@@ -343,8 +332,7 @@ class Budget(BudgetBase):
     category: Optional[Category] = None
     location: Optional[LocationSimple] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BudgetStatus(BaseModel):
@@ -373,8 +361,7 @@ class Alert(AlertBase):
     is_read: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -395,8 +382,7 @@ class User(UserBase):
     theme_pref: str
     dashboard_config: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Token(BaseModel):
@@ -524,8 +510,7 @@ class AssociationStatementLine(BaseModel):
     location: Optional[LocationSimple] = None
     category: Optional[Category] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssociationStatement(BaseModel):
@@ -535,14 +520,12 @@ class AssociationStatement(BaseModel):
     posted_date: Optional[date] = None
     due_date: Optional[date] = None
     source_name: Optional[str] = None
-    pdf_path: Optional[str] = None
     total_payable: Optional[float] = None
     parsing_profile: Optional[str] = None
     created_at: datetime
     lines: List[AssociationStatementLine] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssociationStatementUploadResult(BaseModel):
@@ -573,8 +556,7 @@ class RentRoom(RentRoomBase):
     id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RentTenantBase(BaseModel):
@@ -606,8 +588,7 @@ class RentTenant(RentTenantBase):
     created_at: datetime
     default_room: Optional[RentRoom] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RentLeaseBase(BaseModel):
@@ -637,8 +618,7 @@ class RentLeaseSummary(BaseModel):
     created_at: datetime
     location: LocationSimple
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RentMonthTenantConfigInput(BaseModel):
@@ -688,8 +668,7 @@ class RentPayment(BaseModel):
     created_at: datetime
     tenant: Optional[RentTenant] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RentTenantMonthConfig(BaseModel):
@@ -775,5 +754,4 @@ class RentLeaseDetail(BaseModel):
     available_statement_months: List[date] = []
     configured_months: List[date] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

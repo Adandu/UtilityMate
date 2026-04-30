@@ -9,24 +9,26 @@ export const useSortableData = <T,>(items: T[], config: SortConfig = null) => {
   const [sortConfig, setSortConfig] = useState<SortConfig>(config);
 
   const sortedItems = useMemo(() => {
-    let sortableItems = [...items];
+    const sortableItems = [...items];
     if (sortConfig !== null) {
-      sortableItems.sort((a: any, b: any) => {
+      sortableItems.sort((a, b) => {
         // Handle nested properties (e.g. 'provider.name')
-        const getNestedValue = (obj: any, path: string) => {
-          return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+        const getNestedValue = (obj: T, path: string): unknown => {
+          return path.split('.').reduce<unknown>((acc, part) => {
+            if (acc && typeof acc === 'object' && part in acc) {
+              return (acc as Record<string, unknown>)[part];
+            }
+            return undefined;
+          }, obj);
         };
 
-        let aValue = getNestedValue(a, sortConfig.key);
-        let bValue = getNestedValue(b, sortConfig.key);
+        const aValue = getNestedValue(a, sortConfig.key) ?? '';
+        const bValue = getNestedValue(b, sortConfig.key) ?? '';
 
-        if (aValue === undefined) aValue = '';
-        if (bValue === undefined) bValue = '';
-
-        if (aValue < bValue) {
+        if (String(aValue) < String(bValue)) {
           return sortConfig.direction === 'ascending' ? -1 : 1;
         }
-        if (aValue > bValue) {
+        if (String(aValue) > String(bValue)) {
           return sortConfig.direction === 'ascending' ? 1 : -1;
         }
         return 0;

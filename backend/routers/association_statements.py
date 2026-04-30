@@ -20,6 +20,9 @@ router = APIRouter()
 UPLOAD_DIR = os.getenv("ASSOCIATION_STATEMENT_UPLOAD_DIR", "data/association-statements")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+ALLOWED_EXTENSIONS = {".pdf"}
+MAX_FILE_SIZE = 50 * 1024 * 1024
+
 
 def get_file_hash(file_content: bytes):
     return hashlib.sha256(file_content).hexdigest()
@@ -112,11 +115,11 @@ async def upload_association_statements(
         try:
             safe_filename = file_utils.secure_filename(file.filename)
             ext = os.path.splitext(safe_filename)[1].lower()
-            if ext != ".pdf":
+            if ext not in ALLOWED_EXTENSIONS:
                 results.append(api_schemas.AssociationStatementUploadResult(filename=file.filename, status="error", detail="Only PDF files are supported"))
                 continue
 
-            content = await file.read()
+            content = await file_utils.read_upload_file_limited(file, MAX_FILE_SIZE)
             if not content.startswith(b"%PDF"):
                 results.append(api_schemas.AssociationStatementUploadResult(filename=file.filename, status="error", detail="Invalid PDF file content"))
                 continue
@@ -247,7 +250,8 @@ async def upload_association_statements(
                     os.remove(file_path)
                 except Exception:
                     pass
-            results.append(api_schemas.AssociationStatementUploadResult(filename=file.filename, status="error", detail=f"Import failed: {exc}"))
+            error_detail = str(exc.detail) if isinstance(exc, HTTPException) else "Import failed. Please verify the PDF contents and try again."
+            results.append(api_schemas.AssociationStatementUploadResult(filename=file.filename, status="error", detail=error_detail))
 
     return results
 

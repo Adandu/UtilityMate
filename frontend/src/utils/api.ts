@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAuthToken, getAuthToken } from './authToken';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -7,7 +8,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = getAuthToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -21,7 +22,7 @@ api.interceptors.response.use(
     const isAuthRoute = url.includes('/auth/login') || url.includes('/auth/register');
     
     if (error.response?.status === 401 && !isAuthRoute) {
-      localStorage.removeItem('token');
+      clearAuthToken();
       window.location.href = '/login';
     } else if (!error.response) {
       console.error('Network Error: Please check your internet connection.');

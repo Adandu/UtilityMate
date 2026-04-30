@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import { clearAuthToken, getAuthToken, setAuthToken } from './utils/authToken';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Invoices = lazy(() => import('./pages/Invoices'));
@@ -24,7 +25,7 @@ const RouteFallback: React.FC = () => (
 );
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem('token'));
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!getAuthToken());
 
   useEffect(() => {
     const theme = localStorage.getItem('theme') || 'light';
@@ -36,12 +37,12 @@ const App: React.FC = () => {
   }, []);
 
   const login = (token: string) => {
-    localStorage.setItem('token', token);
+    setAuthToken(token);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    clearAuthToken();
     setIsAuthenticated(false);
   };
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Home, Loader2, Plus, ReceiptText, Trash2, Users, BedDouble, CreditCard, Save, Download, Pencil } from 'lucide-react';
 import api from '../utils/api';
 
@@ -133,7 +133,7 @@ const Rent: React.FC = () => {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
 
-  const fetchBaseData = async () => {
+  const fetchBaseData = useCallback(async () => {
     const [leasesResponse, locationsResponse, providersResponse] = await Promise.all([
       api.get<RentLeaseSummary[]>('/rent/leases'),
       api.get<LocationOption[]>('/locations/'),
@@ -142,10 +142,8 @@ const Rent: React.FC = () => {
     setLeases(leasesResponse.data);
     setLocations(locationsResponse.data);
     setProviders(providersResponse.data);
-    if (!selectedLeaseId && leasesResponse.data.length > 0) {
-      setSelectedLeaseId(leasesResponse.data[0].id);
-    }
-  };
+    setSelectedLeaseId((current) => current || leasesResponse.data[0]?.id || null);
+  }, []);
 
   const fetchLeaseDetail = async (leaseId: number) => {
     const response = await api.get<RentLeaseDetail>(`/rent/leases/${leaseId}`);
@@ -174,7 +172,7 @@ const Rent: React.FC = () => {
       }
     };
     load();
-  }, []);
+  }, [fetchBaseData]);
 
   useEffect(() => {
     if (!selectedLeaseId) {

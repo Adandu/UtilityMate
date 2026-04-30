@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../utils/api';
+import { clearAuthToken, getAuthToken } from '../utils/authToken';
 
 export interface User {
   id: number;
@@ -15,7 +16,7 @@ export const useAuth = () => {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const token = localStorage.getItem('token');
+      const token = getAuthToken();
       if (!token) {
         setLoading(false);
         return;
@@ -24,8 +25,8 @@ export const useAuth = () => {
       try {
         const response = await api.get('/auth/me');
         setUser(response.data);
-      } catch (error) {
-        localStorage.removeItem('token');
+      } catch {
+        clearAuthToken();
         setUser(null);
       } finally {
         setLoading(false);

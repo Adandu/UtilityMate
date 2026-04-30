@@ -1,10 +1,15 @@
 import sys
 import os
+import asyncio
+import io
 
 # Add the root directory to sys.path so we can import backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from backend.utils.file_utils import secure_filename
+from fastapi import HTTPException, UploadFile
+
+from backend.schemas import api_schemas
+from backend.utils.file_utils import read_upload_file_limited, secure_filename
 
 def test_secure_filename():
     test_cases = [
@@ -33,6 +38,22 @@ def test_secure_filename():
     else:
         print("\nSome secure_filename tests failed.")
         sys.exit(1)
+
+
+def test_read_upload_file_limited_rejects_oversized_upload():
+    upload = UploadFile(filename="large.pdf", file=io.BytesIO(b"%PDF" + b"x" * 20))
+
+    try:
+        asyncio.run(read_upload_file_limited(upload, 8))
+    except HTTPException as exc:
+        assert exc.status_code == 413
+    else:
+        raise AssertionError("Oversized upload was accepted")
+
+
+def test_api_schemas_do_not_expose_internal_pdf_paths():
+    assert "pdf_path" not in api_schemas.Invoice.model_fields
+    assert "pdf_path" not in api_schemas.AssociationStatement.model_fields
 
 def verify_integration():
     print("\nVerifying integration in routers (via grep)...")

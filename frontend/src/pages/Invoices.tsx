@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Edit3, Eye, FileWarning, Loader2, Square, CheckSquare, Trash2, Upload, X } from 'lucide-react';
 import api from '../utils/api';
 
@@ -96,7 +96,7 @@ const Invoices: React.FC = () => {
   const visibleRangeStart = totalInvoices === 0 ? 0 : (page - 1) * pageSize + 1;
   const visibleRangeEnd = totalInvoices === 0 ? 0 : Math.min(page * pageSize, totalInvoices);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params: Record<string, string | number> = {
@@ -132,11 +132,11 @@ const Invoices: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterLocationId, filterProviderId, filterStatus, page, pageSize]);
 
   useEffect(() => {
     fetchData();
-  }, [page, pageSize, filterLocationId, filterProviderId, filterStatus]);
+  }, [fetchData]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();

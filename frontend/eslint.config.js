@@ -19,5 +19,9 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Data-loading effects intentionally set page state after API calls.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])
