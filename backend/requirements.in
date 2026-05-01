@@ -5,7 +5,7 @@ psycopg2-binary
 pydantic[email]
 pydantic-settings
 python-multipart
-python-jose[cryptography]
+PyJWT
 passlib[bcrypt]
 alembic
 pdfplumber

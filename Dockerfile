@@ -9,13 +9,10 @@ RUN npm run build
 # Stage 2: Final Multi-Service Image
 FROM python:3.12-slim
 
-# Install Nginx and system dependencies
-RUN apt-get update && apt-get install -y \
+# Install runtime system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     nginx \
-    libpq-dev \
-    gcc \
     gosu \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -57,5 +54,6 @@ EXPOSE 80
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
+ENV MPLCONFIGDIR=/tmp/matplotlib
 
 CMD ["./entrypoint.sh"]

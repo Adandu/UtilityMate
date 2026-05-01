@@ -56,7 +56,17 @@ for ((i=1; i<=MAX_RETRIES; i++)); do
         exit 1
     fi
 
-    if curl -s http://127.0.0.1:8000/ > /dev/null; then
+    if python - <<'PY'
+import sys
+from urllib.request import urlopen
+
+try:
+    with urlopen("http://127.0.0.1:8000/", timeout=1):
+        pass
+except Exception:
+    sys.exit(1)
+PY
+    then
         echo "Backend is up!"
         break
     fi
