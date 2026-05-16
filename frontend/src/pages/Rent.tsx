@@ -715,7 +715,7 @@ const Rent: React.FC = () => {
                             <th className="px-3 py-2">Shared Utilities</th>
                             <th className="px-3 py-2">Heating</th>
                             <th className="px-3 py-2">Other</th>
-                            <th className="px-3 py-2">Previous</th>
+                            <th className="px-3 py-2">Previous Month</th>
                             <th className="px-3 py-2">Payments</th>
                             <th className="px-3 py-2">Due</th>
                           </tr>

@@ -634,7 +634,7 @@ def _build_person_breakdown_card(
         ["Rent", f"{_display_amount(tenant.rent_amount)} RON", "Electricity", f"{_display_amount(tenant.electricity_amount)} RON"],
         ["Energy Usage", f"{_display_amount(tenant.electricity_usage_kwh)} kWh", "Heating", f"{_display_amount(tenant.heating_amount)} RON"],
         ["Heating Usage", _display_amount(tenant.heating_usage_value), "Shared Utilities", f"{_display_amount(tenant.shared_utilities_amount)} RON"],
-        ["Other", f"{_display_amount(tenant.other_adjustment)} RON", "Previous", f"{_display_amount(tenant.previous_balance)} RON"],
+        ["Other", f"{_display_amount(tenant.other_adjustment)} RON", "Previous Month", f"{_display_amount(tenant.previous_balance)} RON"],
         ["Payments", f"{_display_amount(-tenant.payments_in_month)} RON", "Amount Due", f"{_display_amount(tenant.amount_due)} RON"],
     ]
     if tenant.other_adjustment_note:
@@ -765,7 +765,7 @@ def _build_rent_statement_pdf(
         "Shared Utilities",
         "Heating",
         "Other",
-        "Previous",
+        "Previous Month",
         "Payments",
         "Amount Due",
     ]]
