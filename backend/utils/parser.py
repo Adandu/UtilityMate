@@ -130,14 +130,26 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
         "segments": [
             _metered_segment("Apa rece", "Cold Water", "m3"),
             _metered_segment("Apa calda", "Hot Water", "m3"),
+            # This used to be followed by a second, separate "Apa meteorica"
+            # metered segment. That was the same double-water-column bug
+            # fixed in AVIZIER_COLUMN_CATALOG below: verified against the
+            # real Septembrie 2025 statement's own row data, there is only
+            # one shared/common-area water column here, not two. This
+            # profile's real Septembrie 2025 row also genuinely includes
+            # "Salarii asociatie" and "Servicii administrare" columns (added
+            # below) that were previously missing -- their absence was
+            # silently offset by the phantom "Apa meteorica" column keeping
+            # the total column count numerically matching by coincidence,
+            # even though every downstream label was shifted.
             _metered_segment("Apa parti comune", "Shared Water", "m3"),
-            _metered_segment("Apa meteorica", "Storm Water", "m3"),
             _charge_segment("Gaze naturale", category_name="Gas", line_kind="utility", include_in_category=True),
             _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True),
             _charge_segment("Salubritate"),
+            _charge_segment("Salarii asociatie"),
             _charge_segment("Diverse"),
             _charge_segment("Cheltuieli administrative"),
             _charge_segment("Servicii curatenie"),
+            _charge_segment("Servicii administrare"),
             _charge_segment("Corectii"),
             _summary_segment("Total luna"),
             _charge_segment("Fond de rulment", line_kind="fund", include_in_overall=False),
@@ -321,8 +333,19 @@ def _avizier_catalog_entry(key: str, signal_words: set, builder):
 AVIZIER_COLUMN_CATALOG: List[Dict[str, Any]] = [
     _avizier_catalog_entry("apa_rece", {"rece"}, lambda: _metered_segment("Apa rece", "Cold Water", "m3")),
     _avizier_catalog_entry("apa_calda", {"calda"}, lambda: _metered_segment("Apa calda", "Hot Water", "m3")),
-    _avizier_catalog_entry("apa_parti_comune", {"comune"}, lambda: _metered_segment("Apa parti comune", "Shared Water", "m3")),
-    _avizier_catalog_entry("apa_meteorica", {"meteorica"}, lambda: _metered_segment("Apa meteorica", "Storm Water", "m3")),
+    # "Apa parti comune" and "Apa meteorica" are NOT two separate physical
+    # columns -- BlocManagerNET renders one shared/common-area water column
+    # whose full label ("Apa parti comune (meteorica)") gets inconsistently
+    # word-wrapped/split across months. Some months show "comune"/"parti" and
+    # "meteorica" together on the same line, some split them across header
+    # lines, and April shows "meteorica" alone with no "comune"/"parti" text
+    # at all -- but in every real statement observed there is still only one
+    # extra 2-value (amount + consumption) water segment in the actual row
+    # data beyond "Apa rece"/"Apa calda". Treat any of these signal words as
+    # triggering exactly one segment, under the historically-canonical
+    # "Apa parti comune" / "Shared Water" label already used everywhere else
+    # in AVIZIER_PROFILES and already shown correctly in the app's UI.
+    _avizier_catalog_entry("apa_parti_comune", {"comune", "parti", "meteorica"}, lambda: _metered_segment("Apa parti comune", "Shared Water", "m3")),
     _avizier_catalog_entry("gaze_naturale", {"naturale"}, lambda: _charge_segment("Gaze naturale", category_name="Gas", line_kind="utility", include_in_category=True)),
     _avizier_catalog_entry("caldura", {"caldura"}, lambda: _charge_segment("Caldura", category_name="Heating", line_kind="utility", include_in_category=True)),
     _avizier_catalog_entry("energie_electrica", {"electrica"}, lambda: _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True)),
@@ -334,6 +357,12 @@ AVIZIER_COLUMN_CATALOG: List[Dict[str, Any]] = [
     _avizier_catalog_entry("servicii_curatenie", {"curatenie"}, lambda: _charge_segment("Servicii curatenie")),
     _avizier_catalog_entry("servicii_administrare", {"administrare"}, lambda: _charge_segment("Servicii administrare")),
     _avizier_catalog_entry("mentenanta_gaze", {"mentenanta"}, lambda: _charge_segment("Mentenanta gaze")),
+    # One-off fire-prevention-system fee column, confirmed present only in the
+    # real Noiembrie 2025 statement (immediately after "Mentenanta gaze" and
+    # before "Total luna" in that month's own row data). Scoped to the
+    # distinctive "preventie" signal word so it stays dormant for every other
+    # month that doesn't have this charge.
+    _avizier_catalog_entry("sistem_preventie", {"preventie"}, lambda: _charge_segment("Sistem preventie")),
     # Reading-fee columns: historically single, but the export template has
     # been observed to duplicate the "apometre" reading-fee column instead of
     # keeping one "repartitoare" + one "apometre" column (see the multiplicity
@@ -606,10 +635,34 @@ class InvoiceParser:
         column). Detecting that requires counting occurrences rather than
         just presence, so it is scoped to the header's own
         "Mentenanta gaze ... Citire apometre" zone (bounded by the
-        "mentenanta" and "luna" anchors) to avoid confusing a real repeated
+        "administrare" and "luna" anchors) to avoid confusing a real repeated
         column with unrelated echoes of the same words elsewhere in the
-        header.
+        header -- e.g. a "Citire lista" label a few words earlier can leave
+        an unrelated stray "repartitoare"-shaped echo in the extracted text.
+        There are never more than 2 real reading-fee columns in this zone
+        (either one "repartitoare" + one "apometre", or two "apometre"), and
+        they always sit immediately before "Total luna", so scanning
+        backward from "luna" and stopping once 2 have been collected finds
+        the real pair even when -- as verified against the real Mai 2026
+        statement -- the extraction quirk places one of the two duplicated
+        "apometre" tokens before "mentenanta" instead of after it (unlike
+        the real Aprilie 2026 statement, where the token in that same
+        position is the unrelated echo and must NOT be counted).
+
+        Every statement also carries a fixed boilerplate title line ("Lista
+        de plată pe luna <month> <year>") ahead of the real column-header
+        line. That boilerplate's literal word "Lista" collides with the
+        distinct "Citire lista" reading-fee column's "lista"/"ista" signal
+        words, producing a false-positive "citire_lista" match on statements
+        that don't actually have that column (confirmed against the real
+        Septembrie 2025 statement). Strip it before tokenizing.
         """
+        header_text = re.sub(
+            r"lista\s+de\s+plat[ăa]\s+pe\s+luna\s+[A-Za-zăâîşțţ]+\s+\d{4}",
+            " ",
+            header_text or "",
+            flags=re.IGNORECASE,
+        )
         tokens = re.findall(r"[A-Za-zĂÂÎȘŞȚŢăâîșşțţ]+", header_text or "")
         if not tokens:
             return None
@@ -630,16 +683,33 @@ class InvoiceParser:
         window_start: Optional[int] = None
         window_end = len(decoded)
         for index, forms in enumerate(decoded):
-            if window_start is None and "mentenanta" in forms:
+            if "administrare" in forms:
                 window_start = index
-            elif window_start is not None and "luna" in forms:
+                break
+        for index, forms in enumerate(decoded):
+            if "luna" in forms and (window_start is None or index > window_start):
                 window_end = index
                 break
 
+        reading_fee_counts = {"repartitoare": 0, "apometre": 0}
+        collected = 0
+        scan_from = window_end - 1
+        scan_to = window_start if window_start is not None else 0
+        for index in range(scan_from, scan_to - 1, -1):
+            if collected >= 2:
+                break
+            forms = decoded[index]
+            if "repartitoare" in forms:
+                reading_fee_counts["repartitoare"] += 1
+                collected += 1
+            elif "apometre" in forms:
+                reading_fee_counts["apometre"] += 1
+                collected += 1
+
         def windowed_count(signal_word: str) -> int:
-            if window_start is None:
-                return 1 if signal_word in all_words else 0
-            return sum(1 for forms in decoded[window_start:window_end] if signal_word in forms)
+            if signal_word in reading_fee_counts:
+                return reading_fee_counts[signal_word]
+            return 1 if signal_word in all_words else 0
 
         segments: List[Dict[str, Any]] = []
         recognized_keys: List[str] = []

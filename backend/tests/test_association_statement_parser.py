@@ -57,7 +57,14 @@ CM
     assert structured["display_month"] == "Aprilie 2026"
     assert structured["posted_date"] == date(2026, 5, 22)
     assert structured["due_date"] == date(2026, 6, 20)
-    assert structured["parsing_profile"] == "blocmanagernet_2026_03"
+    # This header/row now self-describes confidently (its own recognized
+    # column count matches its own row's real value count exactly), so it no
+    # longer needs to fall back to guessing the closest historical profile by
+    # count. This became possible once the double-water-column bug (this
+    # header's "comune"/"parti" + "meteorica" words used to wrongly fire two
+    # separate metered segments instead of one) was fixed.
+    assert structured["parsing_profile"] == "header_detected_20cols"
+    assert structured["needs_review"] is False
     assert len(structured["apartments"]) == 1
     assert structured["apartments"][0]["apartment_number"] == "4"
     assert structured["apartments"][0]["monthly_total"] == 715.54

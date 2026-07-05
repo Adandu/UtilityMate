@@ -1,3 +1,9 @@
+# UtilityMate v1.10.2
+
+## Fixes
+
+- Corrected a bug in v1.10.1's association statement column detection: a shared/common-area water column was being counted twice (once as "Apă părți comune" and once as a phantom "Apă meteorică" column) whenever both label fragments appeared in a statement's header, which over-counted the real column total and forced most statements — including the specific month the fix targeted — back into the old borrowed-profile guessing it was meant to replace. Verified against all 9 real imported statements: every one now detects its own columns confidently, with no borrowed profile and no false review flags.
+
 # UtilityMate v1.10.1
 
 ## Fixes

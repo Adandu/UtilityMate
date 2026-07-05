@@ -37,6 +37,26 @@ MAY_ROW_12 = (
     "2,32 36,06 32,45 270,00 15,00 6,82 767,34 0,00 0,00 0,00 0,00 767,34 12"
 )
 
+# Real, raw pdfplumber-extracted header/row text for three more real
+# production association statements (Septembrie 2025, Noiembrie 2025 --
+# apartment 1) used to confirm the water-column merge fix and two other
+# real, month-specific fragments ("Corectii"/"Fond de rulment" for Sept,
+# "Sistem preventie" for Nov) don't regress or need a historical-profile
+# fallback anymore.
+SEPT_HEADER = "Cheltuieli pe index contoare individuale .pa .rN .srep .rN etrap atoC ecer ăpA APA CM ECER ădlac ăpA APA CM ADLAC iţrăp ăpA enumoc ăciroetem ăpA elarutan ezaG ăcirtcele eigrenE etatirbulaS Salarii esreviD ileiutlehC evitartsinimda IICIVRES EINETARUC iicivreS erartsinimda iiţceroC eriţrăpmî ănul latoT tnemlur ed dnoF /ăţnatseR SNAVA ereniţertnî irudnof ăţnatseR ăţnatseR erazilanep irăzilaneP ătalp ed latoT .TPA .RN ed dnoF dloS tnemlur"
+
+SEPT_ROW_1 = (
+    "1 0 1,891 0,00 0,00 0,00 0,00 0,12 1,08 0,00 0,00 0,00 19,40 0,27 2,97 "
+    "37,82 30,26 0,01 91,93 0,00 - 4,54 0,00 0,00 0,00 87,39 1 280,00"
+)
+
+NOV_HEADER = "Cheltuieli pe index contoare individuale .pa .rN .srep .rN etrap atoC ecer ăpA APA CM ECER ădlac ăpA APA CM ADLAC iţrăp ăpA enumoc ăciroetem ăpA elarutan ezaG ărudlăC ăcirtcele eigrenE etatirbulaS Salarii esreviD atsI eritiC ileiutlehC evitartsinimda IICIVRES EINETARUC iicivreS erartsinimda METSIS EITNEVERP ATNANETNEM EZAG ănul latoT /ăţnatseR SNAVA ereniţertnî irudnof ăţnatseR ăţnatseR erazilanep irăzilaneP ătalp ed latoT .TPA .RN"
+
+NOV_ROW_1 = (
+    "1 0 1,891 0,00 0,00 0,00 0,00 0,44 1,26 0,00 77,45 0,00 0,00 19,40 0,13 "
+    "19,60 2,30 37,82 30,26 20,00 15,00 223,66 0,00 0,00 0,00 0,00 223,66 1"
+)
+
 
 def _raw_labels(profile):
     return [segment.get("raw_label") for segment in profile["segments"]]
@@ -135,10 +155,33 @@ def test_march_row_values_map_to_plausible_water_labels_via_fallback_profile():
 
 
 def test_parse_association_statement_flags_needs_review_when_header_and_row_length_disagree():
-    # March's own header, on its own, reconstructs more columns than its real
-    # rows actually contain (a handful of stray/duplicated header tokens
-    # can't be perfectly disambiguated from text alone) -- this must be
-    # surfaced as needs_review rather than silently trusted.
+    # A genuine header/row mismatch (the row is missing a value the header
+    # otherwise confidently promises) must still be surfaced as needs_review
+    # rather than silently trusted, even though March's own real header/row
+    # pair no longer hits this path (see
+    # test_march_header_and_row_now_agree_without_needing_review below --
+    # March used to land here only because of the double-water-column bug,
+    # now fixed).
+    truncated_march_row = MARCH_ROW_12.rsplit(" ", 2)[0]  # drop the last value
+    text = (
+        "Asociatia de Proprietari Bl. A4 generat cu BlocManagerNET\n"
+        "Lista de plată pe luna Martie 2026\n"
+        f"{MARCH_HEADER}\n"
+        f"{truncated_march_row}\n"
+    )
+
+    structured = InvoiceParser.parse_association_statement(text)
+
+    assert structured["needs_review"] is True
+    assert structured["parsing_notes"]
+
+
+def test_march_header_and_row_now_agree_without_needing_review():
+    # Regression guard: March's own header and its own real row used to
+    # disagree by exactly one column because the header's "Apa parti comune"
+    # + "Apa meteorica" words wrongly fired as two separate metered water
+    # segments instead of one. Fixed, they now agree exactly and no longer
+    # need the historical-profile fallback.
     text = (
         "Asociatia de Proprietari Bl. A4 generat cu BlocManagerNET\n"
         "Lista de plată pe luna Martie 2026\n"
@@ -148,8 +191,36 @@ def test_parse_association_statement_flags_needs_review_when_header_and_row_leng
 
     structured = InvoiceParser.parse_association_statement(text)
 
-    assert structured["needs_review"] is True
-    assert structured["parsing_notes"]
+    assert structured["needs_review"] is False
+    assert structured["parsing_notes"] is None
+    assert structured["parsing_profile"] == "header_detected_20cols"
+
+
+def test_meteorica_alone_and_meteorica_with_comune_both_yield_one_water_segment():
+    # "Apa parti comune" and "Apa meteorica" are the same physical shared
+    # water column, rendered with inconsistent word-wrapping across months.
+    # Neither spelling variant may ever produce two separate metered water
+    # segments.
+    meteorica_alone = "Gaze naturale Apa meteorica Energie electrica"
+    meteorica_with_comune = "Gaze naturale Apa parti comune Apa meteorica Energie electrica"
+
+    profile_alone = InvoiceParser._detect_avizier_columns_from_header(
+        f"{meteorica_alone} Salubritate Salarii Diverse Cheltuieli administrative "
+        "Servicii curatenie Servicii administrare Total luna Total de plata"
+    )
+    profile_both = InvoiceParser._detect_avizier_columns_from_header(
+        f"{meteorica_with_comune} Salubritate Salarii Diverse Cheltuieli administrative "
+        "Servicii curatenie Servicii administrare Total luna Total de plata"
+    )
+
+    assert profile_alone is not None
+    assert profile_both is not None
+    assert profile_alone["recognized_keys"].count("apa_parti_comune") == 1
+    assert profile_both["recognized_keys"].count("apa_parti_comune") == 1
+    assert _raw_labels(profile_alone).count("Apa parti comune") == 1
+    assert _raw_labels(profile_both).count("Apa parti comune") == 1
+    assert "Apa meteorica" not in _raw_labels(profile_alone)
+    assert "Apa meteorica" not in _raw_labels(profile_both)
 
 
 def test_parse_association_statement_no_review_needed_when_header_matches_row_length():
@@ -165,3 +236,71 @@ def test_parse_association_statement_no_review_needed_when_header_matches_row_le
     assert structured["needs_review"] is False
     assert structured["parsing_notes"] is None
     assert structured["parsing_profile"] == "header_detected_20cols"
+
+
+def test_may_no_longer_borrows_januarys_profile():
+    # This was the original reported regression: Mai 2026's own header used
+    # to under-recognize its own reading-fee column (the extraction quirk
+    # places one of its two duplicated "Citire apometre" tokens *before* the
+    # "mentenanta" anchor instead of after it), so it silently fell back to
+    # and borrowed Ianuarie 2026's historical profile. It must now resolve
+    # confidently from its own header instead.
+    text = (
+        "Asociatia de Proprietari Bl. A4 generat cu BlocManagerNET\n"
+        "Lista de plată pe luna Mai 2026\n"
+        f"{MAY_HEADER}\n"
+        f"{MAY_ROW_12}\n"
+    )
+
+    structured = InvoiceParser.parse_association_statement(text)
+
+    assert structured["needs_review"] is False
+    assert structured["parsing_notes"] is None
+    assert structured["parsing_profile"] != "blocmanagernet_2026_01"
+    assert structured["parsing_profile"].startswith("header_detected_")
+
+    may_profile = InvoiceParser._detect_avizier_columns_from_header(MAY_HEADER)
+    assert may_profile["recognized_keys"].count("citire_apometre") == 2
+
+
+def test_september_corectii_and_fond_de_rulment_recognized_without_review():
+    # Septembrie 2025's real header carries "Corectii" and "Fond de rulment"
+    # as genuine one-off columns ahead of "Total luna" for that month, and
+    # its "Lista de plata pe luna Septembrie 2025" boilerplate title must not
+    # be mistaken for a real "Citire lista" column it doesn't have.
+    text = (
+        "Asociatia de Proprietari Bl. A4 generat cu BlocManagerNET\n"
+        "Lista de plată pe luna Septembrie 2025\n"
+        f"{SEPT_HEADER}\n"
+        f"{SEPT_ROW_1}\n"
+    )
+
+    structured = InvoiceParser.parse_association_statement(text)
+
+    assert structured["needs_review"] is False
+    assert structured["parsing_notes"] is None
+
+    sept_profile = InvoiceParser._detect_avizier_columns_from_header(SEPT_HEADER)
+    assert "corectii" in sept_profile["recognized_keys"]
+    assert "fond_de_rulment" in sept_profile["recognized_keys"]
+    assert "citire_lista" not in sept_profile["recognized_keys"]
+
+
+def test_november_sistem_preventie_recognized_as_one_off_column():
+    # Noiembrie 2025's real header carries a one-off "Sistem preventie"
+    # (fire-prevention-system fee) column between "Mentenanta gaze" and
+    # "Total luna" that no other real statement has.
+    text = (
+        "Asociatia de Proprietari Bl. A4 generat cu BlocManagerNET\n"
+        "Lista de plată pe luna Noiembrie 2025\n"
+        f"{NOV_HEADER}\n"
+        f"{NOV_ROW_1}\n"
+    )
+
+    structured = InvoiceParser.parse_association_statement(text)
+
+    assert structured["needs_review"] is False
+    assert structured["parsing_notes"] is None
+
+    nov_profile = InvoiceParser._detect_avizier_columns_from_header(NOV_HEADER)
+    assert "sistem_preventie" in nov_profile["recognized_keys"]
