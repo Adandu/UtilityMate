@@ -301,6 +301,68 @@ AVIZIER_PROFILES: Dict[str, Dict[str, Any]] = {
 }
 
 
+def _avizier_catalog_entry(key: str, signal_words: set, builder):
+    return {"key": key, "signal_words": set(signal_words), "builder": builder}
+
+
+# Canonical vocabulary of recognizable avizier column labels, built from the
+# union of every segment already defined across AVIZIER_PROFILES above (the
+# same `_metered_segment`/`_charge_segment` builders are reused, so this is
+# not new business data — just metadata describing how to recognize each
+# label from a document's own header text).
+#
+# The BlocManagerNET export template only ever changes by *adding or removing*
+# columns over time; the relative left-to-right order of the columns it has
+# used historically is stable. So instead of guessing a whole historical
+# profile, we detect *which* of these known columns are present in a given
+# statement's own header text (order-independent — see
+# `_detect_avizier_columns_from_header` for why), and emit them in this
+# well-established order.
+AVIZIER_COLUMN_CATALOG: List[Dict[str, Any]] = [
+    _avizier_catalog_entry("apa_rece", {"rece"}, lambda: _metered_segment("Apa rece", "Cold Water", "m3")),
+    _avizier_catalog_entry("apa_calda", {"calda"}, lambda: _metered_segment("Apa calda", "Hot Water", "m3")),
+    _avizier_catalog_entry("apa_parti_comune", {"comune"}, lambda: _metered_segment("Apa parti comune", "Shared Water", "m3")),
+    _avizier_catalog_entry("apa_meteorica", {"meteorica"}, lambda: _metered_segment("Apa meteorica", "Storm Water", "m3")),
+    _avizier_catalog_entry("gaze_naturale", {"naturale"}, lambda: _charge_segment("Gaze naturale", category_name="Gas", line_kind="utility", include_in_category=True)),
+    _avizier_catalog_entry("caldura", {"caldura"}, lambda: _charge_segment("Caldura", category_name="Heating", line_kind="utility", include_in_category=True)),
+    _avizier_catalog_entry("energie_electrica", {"electrica"}, lambda: _charge_segment("Energie electrica", category_name="Energy", line_kind="utility", include_in_category=True)),
+    _avizier_catalog_entry("salubritate", {"salubritate"}, lambda: _charge_segment("Salubritate")),
+    _avizier_catalog_entry("salarii_asociatie", {"salarii"}, lambda: _charge_segment("Salarii asociatie")),
+    _avizier_catalog_entry("diverse", {"diverse"}, lambda: _charge_segment("Diverse")),
+    _avizier_catalog_entry("citire_lista", {"lista", "ista"}, lambda: _charge_segment("Citire lista")),
+    _avizier_catalog_entry("cheltuieli_administrative", {"administrative"}, lambda: _charge_segment("Cheltuieli administrative")),
+    _avizier_catalog_entry("servicii_curatenie", {"curatenie"}, lambda: _charge_segment("Servicii curatenie")),
+    _avizier_catalog_entry("servicii_administrare", {"administrare"}, lambda: _charge_segment("Servicii administrare")),
+    _avizier_catalog_entry("mentenanta_gaze", {"mentenanta"}, lambda: _charge_segment("Mentenanta gaze")),
+    # Reading-fee columns: historically single, but the export template has
+    # been observed to duplicate the "apometre" reading-fee column instead of
+    # keeping one "repartitoare" + one "apometre" column (see the multiplicity
+    # detection in `_detect_avizier_columns_from_header`), so these two are
+    # handled with counted repetition rather than plain presence.
+    _avizier_catalog_entry("citire_repartitoare", {"repartitoare"}, lambda: _charge_segment("Citire repartitoare")),
+    _avizier_catalog_entry("citire_apometre", {"apometre"}, lambda: _charge_segment("Citire apometre")),
+    _avizier_catalog_entry("corectii", {"corectii"}, lambda: _charge_segment("Corectii")),
+    _avizier_catalog_entry("fond_de_rulment", {"rulment"}, lambda: _charge_segment("Fond de rulment", line_kind="fund", include_in_overall=False)),
+]
+
+# Columns that always appear after "Total luna" and before "Total de plata".
+AVIZIER_TAIL_CATALOG: List[Dict[str, Any]] = [
+    _avizier_catalog_entry("restanta_fonduri", {"fonduri"}, lambda: _charge_segment("Restanta fonduri", line_kind="arrears", include_in_overall=False)),
+    _avizier_catalog_entry("restanta_intretinere", {"intretinere"}, lambda: _charge_segment("Restanta intretinere", line_kind="arrears", include_in_overall=False)),
+    _avizier_catalog_entry("restanta_penalizare", {"penalizare"}, lambda: _charge_segment("Restanta penalizare", line_kind="penalty", include_in_overall=False)),
+    _avizier_catalog_entry("penalizari", {"penalizari"}, lambda: _charge_segment("Penalizari", line_kind="penalty", include_in_overall=False)),
+]
+
+# Reading-fee columns whose real-world multiplicity is counted rather than
+# just detected as present/absent (see _detect_avizier_columns_from_header).
+_AVIZIER_MULTI_COUNT_KEYS = {"citire_repartitoare", "citire_apometre"}
+
+# Minimum number of distinct columns that must be recognized from a
+# document's own header before we trust it over the historical-profile
+# fallback.
+_AVIZIER_MIN_RECOGNIZED_COLUMNS = 5
+
+
 class InvoiceParser:
     @staticmethod
     def _parse_number(value: str) -> float:
@@ -416,6 +478,8 @@ class InvoiceParser:
                 "posted_date": None,
                 "due_date": None,
                 "parsing_profile": None,
+                "needs_review": True,
+                "parsing_notes": "No text could be extracted from this PDF.",
                 "apartments": [],
             }
 
@@ -443,7 +507,9 @@ class InvoiceParser:
                 sample_length = len(trimmed)
                 break
 
-        profile = InvoiceParser._detect_avizier_profile(display_month, sample_length, header_text)
+        profile, needs_review, parsing_notes = InvoiceParser._resolve_avizier_profile(
+            display_month, sample_length, header_text,
+        )
         apartments: List[Dict[str, Any]] = []
         if not profile:
             return {
@@ -452,6 +518,8 @@ class InvoiceParser:
                 "posted_date": posted_date,
                 "due_date": due_date,
                 "parsing_profile": None,
+                "needs_review": True,
+                "parsing_notes": parsing_notes or "Unable to detect a column layout for this statement.",
                 "apartments": apartments,
             }
 
@@ -469,7 +537,138 @@ class InvoiceParser:
             "posted_date": posted_date,
             "due_date": due_date,
             "parsing_profile": profile["name"],
+            "needs_review": needs_review,
+            "parsing_notes": parsing_notes,
             "apartments": apartments,
+        }
+
+    @staticmethod
+    def _resolve_avizier_profile(
+        display_month: str,
+        sample_length: Optional[int],
+        header_text: str,
+    ) -> "tuple[Optional[Dict[str, Any]], bool, Optional[str]]":
+        """Pick the column layout to use for a statement.
+
+        Prefers reading the document's own header (see
+        `_detect_avizier_columns_from_header`) over guessing a historical
+        `AVIZIER_PROFILES` entry. Only falls back to a historical profile —
+        and flags the statement for manual review — when header recognition
+        genuinely fails or the recognized column count doesn't match the
+        row's actual numeric value count.
+        """
+        header_profile = InvoiceParser._detect_avizier_columns_from_header(header_text)
+        if header_profile is not None:
+            header_slots = InvoiceParser._count_profile_values(header_profile)
+            if sample_length is not None and header_slots == sample_length:
+                return header_profile, False, None
+            parsing_notes = (
+                f"This statement's header suggested {header_slots} columns but its "
+                f"rows have {sample_length if sample_length is not None else 'an unknown number of'} "
+                "values; fell back to the closest known historical column layout. "
+                "Please verify the imported amounts manually."
+            )
+        else:
+            parsing_notes = (
+                "Could not confidently recognize this statement's own column "
+                "headers; fell back to the closest known historical column layout. "
+                "Please verify the imported amounts manually."
+            )
+
+        fallback_profile = InvoiceParser._detect_avizier_profile(display_month, sample_length, header_text)
+        if fallback_profile is not None:
+            return fallback_profile, True, parsing_notes
+        return None, True, parsing_notes
+
+    @staticmethod
+    def _detect_avizier_columns_from_header(header_text: str) -> Optional[Dict[str, Any]]:
+        """Build a column layout ("profile") by reading a statement's own
+        header row, instead of matching it against a fixed historical
+        profile.
+
+        BlocManagerNET's export template is hand-edited every so often, so
+        the set of columns (and occasionally their count) drifts from month
+        to month. Rather than guessing which historical month a new
+        statement "looks like", this recognizes each column directly from
+        the header text of *this* document.
+
+        The header text pdfplumber extracts for these PDFs frequently comes
+        out with individual words character-reversed (and sometimes
+        duplicated, e.g. a secondary ALL-CAPS recap line), so detection is
+        deliberately order-independent: each catalog label is recognized by
+        a small set of "signal words", checked in both their normal and
+        reversed-and-normalized spelling, anywhere in the header text.
+
+        The two reading-fee columns ("Citire repartitoare" / "Citire
+        apometre") are the one part of the template that has been observed
+        to *duplicate* rather than simply appear/disappear (e.g. two
+        "apometre" columns replacing one "repartitoare" + one "apometre"
+        column). Detecting that requires counting occurrences rather than
+        just presence, so it is scoped to the header's own
+        "Mentenanta gaze ... Citire apometre" zone (bounded by the
+        "mentenanta" and "luna" anchors) to avoid confusing a real repeated
+        column with unrelated echoes of the same words elsewhere in the
+        header.
+        """
+        tokens = re.findall(r"[A-Za-zĂÂÎȘŞȚŢăâîșşțţ]+", header_text or "")
+        if not tokens:
+            return None
+
+        decoded: List[set] = []
+        for token in tokens:
+            forms = {
+                InvoiceParser._normalize_romanian_text(token),
+                InvoiceParser._normalize_romanian_text(token[::-1]),
+            }
+            forms.discard("")
+            decoded.append(forms)
+
+        all_words: set = set()
+        for forms in decoded:
+            all_words |= forms
+
+        window_start: Optional[int] = None
+        window_end = len(decoded)
+        for index, forms in enumerate(decoded):
+            if window_start is None and "mentenanta" in forms:
+                window_start = index
+            elif window_start is not None and "luna" in forms:
+                window_end = index
+                break
+
+        def windowed_count(signal_word: str) -> int:
+            if window_start is None:
+                return 1 if signal_word in all_words else 0
+            return sum(1 for forms in decoded[window_start:window_end] if signal_word in forms)
+
+        segments: List[Dict[str, Any]] = []
+        recognized_keys: List[str] = []
+        for entry in AVIZIER_COLUMN_CATALOG:
+            if entry["key"] in _AVIZIER_MULTI_COUNT_KEYS:
+                signal_word = next(iter(entry["signal_words"]))
+                repeat = windowed_count(signal_word)
+            else:
+                repeat = 1 if entry["signal_words"] & all_words else 0
+            for _ in range(repeat):
+                segments.append(entry["builder"]())
+                recognized_keys.append(entry["key"])
+
+        if len(recognized_keys) < _AVIZIER_MIN_RECOGNIZED_COLUMNS:
+            return None
+
+        segments.append(_summary_segment("Total luna"))
+
+        for entry in AVIZIER_TAIL_CATALOG:
+            if entry["signal_words"] & all_words:
+                segments.append(entry["builder"]())
+                recognized_keys.append(entry["key"])
+
+        segments.append(_summary_segment("Total de plata"))
+
+        return {
+            "name": f"header_detected_{len(recognized_keys)}cols",
+            "segments": segments,
+            "recognized_keys": recognized_keys,
         }
 
     @staticmethod
@@ -896,7 +1095,13 @@ class InvoiceParser:
             result["meter_index_old"] = meter_span[1]
             result["meter_index_new"] = meter_span[2]
             result["billing_period_end"] = meter_span[3]
-        due_match = re.search(r"scaden[ţt][aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        # Hidroelectrica's PDF layout often interleaves an unrelated
+        # column/row of text between the "Data scadenta:" label and its
+        # actual value (e.g. a VAT breakdown line), so the date isn't
+        # always immediately adjacent to the label in the extracted text.
+        # Search (non-greedily) for the next date after the label instead
+        # of requiring strict adjacency.
+        due_match = re.search(r"scaden[ţtț][aă][:\s]*.*?(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE | re.DOTALL)
         if due_match:
             result["due_date"] = datetime.strptime(due_match.group(1), "%d.%m.%Y").date()
 
@@ -981,7 +1186,11 @@ class InvoiceParser:
             result["meter_index_old"] = meter_span[1]
             result["meter_index_new"] = meter_span[2]
             result["billing_period_end"] = meter_span[3]
-        due_match = re.search(r"data\s+scadent[ăa]\s*(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
+        # Engie's summary table often prints a row of unrelated numbers
+        # (consumption/amount) between the "DATA SCADENTA" header and the
+        # actual due date, so require the label first but allow a short gap
+        # before the next date rather than strict adjacency.
+        due_match = re.search(r"data\s+scadent[ăa]\s*.*?(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE | re.DOTALL)
         if not due_match:
             due_match = re.search(r"termen\s+de\s+plat[aă][:\s]+(\d{2}\.\d{2}\.\d{4})", text, re.IGNORECASE)
         if due_match:

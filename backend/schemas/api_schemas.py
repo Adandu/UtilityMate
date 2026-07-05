@@ -522,6 +522,8 @@ class AssociationStatement(BaseModel):
     source_name: Optional[str] = None
     total_payable: Optional[float] = None
     parsing_profile: Optional[str] = None
+    needs_review: bool = False
+    parsing_notes: Optional[str] = None
     created_at: datetime
     lines: List[AssociationStatementLine] = []
 
@@ -536,6 +538,8 @@ class AssociationStatementUploadResult(BaseModel):
     display_month: Optional[str] = None
     imported_locations: List[str] = []
     imported_lines: int = 0
+    needs_review: bool = False
+    parsing_notes: Optional[str] = None
 
 
 class RentRoomBase(BaseModel):

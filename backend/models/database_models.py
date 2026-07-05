@@ -116,6 +116,8 @@ class AssociationStatement(Base):
     pdf_path = Column(String, nullable=True)
     total_payable = Column(Float, nullable=True)
     parsing_profile = Column(String, nullable=True)
+    needs_review = Column(Boolean, default=False)
+    parsing_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     owner = relationship("User")

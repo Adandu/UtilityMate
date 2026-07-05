@@ -420,6 +420,7 @@ def repair_association_statement_utility_cost_pairs():
 
 def rebuild_association_statement_lines():
     rebuilt_count = 0
+    updated_any = False
     db = SessionLocal()
     try:
         statements = db.query(database_models.AssociationStatement).options(
@@ -449,6 +450,13 @@ def rebuild_association_statement_lines():
 
             structured = InvoiceParser.parse_association_statement(pdf_text)
             apartments = structured.get("apartments", [])
+
+            statement.parsing_profile = structured.get("parsing_profile") or statement.parsing_profile
+            statement.needs_review = bool(structured.get("needs_review"))
+            statement.parsing_notes = structured.get("parsing_notes")
+            db.add(statement)
+            updated_any = True
+
             if not apartments:
                 continue
 
@@ -515,9 +523,10 @@ def rebuild_association_statement_lines():
             if imported_lines:
                 rebuilt_count += 1
 
-        if rebuilt_count:
+        if rebuilt_count or updated_any:
             db.commit()
-            logger.info("Rebuilt parsed lines for %s association statements.", rebuilt_count)
+            if rebuilt_count:
+                logger.info("Rebuilt parsed lines for %s association statements.", rebuilt_count)
         else:
             db.rollback()
     except Exception as exc:
@@ -635,12 +644,27 @@ def verify_and_migrate_db():
                     pdf_path VARCHAR,
                     total_payable FLOAT,
                     parsing_profile VARCHAR,
+                    needs_review BOOLEAN DEFAULT 0,
+                    parsing_notes TEXT,
                     created_at DATETIME
                 )
             """))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statements_id ON association_statements (id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statements_user_id ON association_statements (user_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_association_statements_statement_month ON association_statements (statement_month)"))
+
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        if "association_statements" in tables:
+            association_statement_columns = {
+                "needs_review": "ALTER TABLE association_statements ADD COLUMN needs_review BOOLEAN DEFAULT 0",
+                "parsing_notes": "ALTER TABLE association_statements ADD COLUMN parsing_notes TEXT",
+            }
+            for column_name, statement in association_statement_columns.items():
+                columns = [c["name"] for c in inspector.get_columns("association_statements")]
+                if column_name not in columns:
+                    logger.info("Migration: Adding %s to association_statements", column_name)
+                    conn.execute(text(statement))
 
         inspector = inspect(engine)
         tables = inspector.get_table_names()

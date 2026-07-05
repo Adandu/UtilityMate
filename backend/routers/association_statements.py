@@ -154,6 +154,8 @@ async def upload_association_statements(
                 pdf_path=file_path,
                 total_payable=sum(apartment.get("total_payable", 0.0) for apartment in apartments),
                 parsing_profile=structured.get("parsing_profile"),
+                needs_review=bool(structured.get("needs_review")),
+                parsing_notes=structured.get("parsing_notes"),
             )
             db.add(statement)
             db.flush()
@@ -232,6 +234,8 @@ async def upload_association_statements(
                 display_month=statement.display_month,
                 imported_locations=sorted(set(imported_locations)),
                 imported_lines=imported_lines,
+                needs_review=bool(structured.get("needs_review")),
+                parsing_notes=structured.get("parsing_notes"),
             ))
         except Exception as exc:
             logger.error("Association statement import failed for %s: %s", file.filename, exc)

@@ -1,3 +1,12 @@
+# UtilityMate v1.10.1
+
+## Fixes
+
+- Association statement (avizier) imports no longer guess a column layout by borrowing a different month's profile when the export template changes. Each statement's own header row is now read directly to detect its actual columns, including when a reading-fee column is duplicated instead of replaced (a real drift we found affecting recent imports, where amounts landed under the wrong charge category from one month to the next).
+- Association statements now carry a `needs_review` flag and an explanatory note whenever the parser can't confidently match a statement's header to its own row data, instead of silently trusting a fallback guess.
+- Existing imported statements are automatically re-parsed and corrected on the next app restart using this improved detection, with no manual data fix needed.
+- Fixed a due-date extraction bug on Hidroelectrica and Engie invoices where an unrelated line of text between the "due date" label and its value could prevent the date from being found at all.
+
 # UtilityMate v1.10.0
 
 ## Security
