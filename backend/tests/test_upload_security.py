@@ -66,11 +66,13 @@ def verify_integration():
     ]
 
     for filepath in files_to_check:
-        result = subprocess.run(['grep', 'file_utils.secure_filename', filepath], capture_output=True)
+        # secure_filename is invoked indirectly via the shared
+        # file_utils.save_and_validate_upload() helper rather than directly.
+        result = subprocess.run(['grep', 'file_utils.save_and_validate_upload', filepath], capture_output=True)
         if result.returncode == 0:
-            print(f"[PASS] secure_filename usage found in {filepath}")
+            print(f"[PASS] save_and_validate_upload usage found in {filepath}")
         else:
-            print(f"[FAIL] secure_filename usage NOT found in {filepath}")
+            print(f"[FAIL] save_and_validate_upload usage NOT found in {filepath}")
             sys.exit(1)
 
 if __name__ == "__main__":

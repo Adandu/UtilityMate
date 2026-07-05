@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
+import asyncio
 import csv
-import hashlib
 import io
 import os
 from typing import List, Optional
@@ -28,8 +28,33 @@ ALLOWED_EXTENSIONS = {".pdf"}
 MAX_FILE_SIZE = 50 * 1024 * 1024
 
 
-def get_file_hash(file_content: bytes):
-    return hashlib.sha256(file_content).hexdigest()
+# Sane bounds used purely to flag parsed data for review, not to reject an upload.
+# Household utility bills in this app are RON-denominated; 100,000 RON is generously
+# above the scale of any real invoice while still catching obvious parse errors
+# (e.g. a meter serial number or misplaced digit group being read as the amount).
+MAX_PLAUSIBLE_AMOUNT = 100_000
+MAX_INVOICE_AGE_DAYS = 365 * 2
+
+
+def check_parsed_data_plausibility(parsed_data: dict) -> List[str]:
+    """Return human-readable notes for parsed fields that are out of a sane range.
+
+    This never raises/blocks the upload - it only signals that the field should be
+    reviewed manually before being trusted.
+    """
+    notes: List[str] = []
+
+    amount = parsed_data.get("amount")
+    if amount is not None and (amount < 0 or amount > MAX_PLAUSIBLE_AMOUNT):
+        notes.append("parsed amount out of expected range — please verify")
+
+    invoice_date = parsed_data.get("invoice_date")
+    if invoice_date is not None:
+        today = datetime.now(timezone.utc).date()
+        if invoice_date > today or (today - invoice_date).days > MAX_INVOICE_AGE_DAYS:
+            notes.append("parsed invoice date out of expected range — please verify")
+
+    return notes
 
 
 def detect_review_state(parsed_data: dict):
@@ -42,7 +67,19 @@ def detect_review_state(parsed_data: dict):
         confidence += 0.1
     confidence = min(confidence, 0.99)
     needs_review = confidence < 0.75 or parsed_data.get("amount", 0) <= 0
-    return confidence, needs_review
+
+    # A missing invoice_date always defaults to "today" downstream; that default
+    # must never be silently trusted, so force review explicitly rather than
+    # relying only on the confidence formula above.
+    if not parsed_data.get("invoice_date"):
+        needs_review = True
+
+    plausibility_notes = check_parsed_data_plausibility(parsed_data)
+    if plausibility_notes:
+        needs_review = True
+        confidence = min(confidence, 0.4)
+
+    return confidence, needs_review, plausibility_notes
 
 
 def infer_review_state(invoice: database_models.Invoice):
@@ -51,7 +88,7 @@ def infer_review_state(invoice: database_models.Invoice):
         "amount": invoice.amount,
         "consumption_value": invoice.consumption_value,
     }
-    confidence, needs_review = detect_review_state(parsed_data)
+    confidence, needs_review, _plausibility_notes = detect_review_state(parsed_data)
     if invoice.status in {"reviewed", "paid"}:
         needs_review = False
         confidence = max(confidence, 0.9)
@@ -240,33 +277,27 @@ async def upload_invoices(
     for file in files:
         file_path = ""
         try:
-            safe_filename = file_utils.secure_filename(file.filename)
-            ext = os.path.splitext(safe_filename)[1].lower()
-            if ext not in ALLOWED_EXTENSIONS:
-                results.append({"filename": file.filename, "status": "error", "detail": "Only PDF files are allowed"})
-                continue
-
-            content = await file_utils.read_upload_file_limited(file, MAX_FILE_SIZE)
-
-            if not content.startswith(b"%PDF"):
-                results.append({"filename": file.filename, "status": "error", "detail": "Invalid PDF file content"})
-                continue
-
-            file_hash = get_file_hash(content)
-            unique_filename = f"{current_user.id}_{location_id}_{file_hash}{ext}"
-            file_path = os.path.join(UPLOAD_DIR, unique_filename)
+            saved_path, _content, _file_hash = await file_utils.save_and_validate_upload(
+                file,
+                UPLOAD_DIR,
+                ALLOWED_EXTENSIONS,
+                MAX_FILE_SIZE,
+                filename_builder=lambda h, e: f"{current_user.id}_{location_id}_{h}{e}",
+                invalid_extension_detail="Only PDF files are allowed",
+                invalid_content_detail="Invalid PDF file content",
+            )
+            file_path = str(saved_path)
 
             existing_invoice = db.query(database_models.Invoice).filter(
                 database_models.Invoice.pdf_path == file_path
             ).first()
             if existing_invoice:
+                os.remove(file_path)
+                file_path = ""
                 results.append({"filename": file.filename, "status": "error", "detail": "Invoice already exists in database"})
                 continue
 
-            with open(file_path, "wb") as buffer:
-                buffer.write(content)
-
-            pdf_text = parser.InvoiceParser.get_pdf_text(file_path)
+            pdf_text = await asyncio.to_thread(parser.InvoiceParser.get_pdf_text, file_path)
             if not pdf_text:
                 os.remove(file_path)
                 results.append({"filename": file.filename, "status": "error", "detail": "Could not extract text from this PDF. Please upload a machine-readable PDF."})
@@ -278,8 +309,9 @@ async def upload_invoices(
                 results.append({"filename": file.filename, "status": "error", "detail": "Could not identify utility provider. Please add the provider to your config first."})
                 continue
 
-            parsed_data = parser.InvoiceParser.parse_pdf(pdf_text, provider.name, location.name)
-            confidence, needs_review = detect_review_state(parsed_data)
+            parsed_data = await asyncio.to_thread(parser.InvoiceParser.parse_pdf, pdf_text, provider.name, location.name)
+            confidence, needs_review, plausibility_notes = detect_review_state(parsed_data)
+            review_notes = "; ".join(plausibility_notes) if plausibility_notes else None
 
             new_invoice = database_models.Invoice(
                 user_id=current_user.id,
@@ -297,6 +329,7 @@ async def upload_invoices(
                 due_date=parsed_data.get("due_date"),
                 parse_confidence=confidence,
                 needs_review=needs_review,
+                review_notes=review_notes,
                 source_type="pdf",
                 source_name=file.filename,
                 processing_notes="Review recommended" if needs_review else "Parsed automatically",
@@ -324,7 +357,9 @@ async def upload_invoices(
                 "currency": new_invoice.currency,
                 "parse_confidence": confidence,
                 "needs_review": needs_review,
-                "detail": "Imported successfully" if not needs_review else "Imported and queued for review",
+                "detail": "; ".join(plausibility_notes) if plausibility_notes else (
+                    "Imported successfully" if not needs_review else "Imported and queued for review"
+                ),
             })
         except Exception as e:
             logger.error("Error processing %s: %s", file.filename, str(e))

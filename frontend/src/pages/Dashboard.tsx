@@ -15,7 +15,9 @@ import {
   YAxis,
 } from 'recharts';
 import { BarChart3, ChevronDown, Download, Filter, Loader2, MapPinned, Sparkles, TrendingDown, TrendingUp } from 'lucide-react';
+import axios from 'axios';
 import api from '../utils/api';
+import { filenameFromContentDisposition, triggerBlobDownload } from '../utils/download';
 
 interface LocationOption {
   id: number;
@@ -136,9 +138,11 @@ const Dashboard: React.FC = () => {
   const [customEnd, setCustomEnd] = useState('');
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState('');
 
-  const fetchDashboard = useCallback(async () => {
+  const fetchDashboard = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
+    setLoadError('');
     try {
       const params: Record<string, string> = { period: selectedPeriod };
       if (selectedLocation !== 'all') {
@@ -148,13 +152,20 @@ const Dashboard: React.FC = () => {
         if (customStart) params.start_date = customStart;
         if (customEnd) params.end_date = customEnd;
       }
-      const response = await api.get<DashboardResponse>('/analytics/dashboard', { params });
+      const response = await api.get<DashboardResponse>('/analytics/dashboard', { params, signal });
       setReport(response.data);
       if (selectedLocation === 'all' && response.data.selected_location_id) {
         setSelectedLocation(String(response.data.selected_location_id));
       }
+    } catch (error) {
+      if (axios.isCancel(error)) return;
+      if (axios.isAxiosError(error)) {
+        setLoadError(error.response?.data?.detail || 'Dashboard data could not be loaded.');
+      } else {
+        setLoadError('Dashboard data could not be loaded.');
+      }
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [customEnd, customStart, selectedLocation, selectedPeriod]);
 
@@ -162,7 +173,9 @@ const Dashboard: React.FC = () => {
     if (selectedPeriod === 'custom' && (!customStart || !customEnd)) {
       return;
     }
-    fetchDashboard();
+    const controller = new AbortController();
+    fetchDashboard(controller.signal);
+    return () => controller.abort();
   }, [fetchDashboard, customEnd, customStart, selectedPeriod]);
 
   const trendDirection = useMemo(() => {
@@ -199,18 +212,11 @@ const Dashboard: React.FC = () => {
         params,
         responseType: 'blob',
       });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const objectUrl = window.URL.createObjectURL(blob);
-      const contentDisposition = response.headers['content-disposition'] as string | undefined;
-      const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
-      const filename = match?.[1] || `utilitymate-dashboard-${selectedLocationName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${selectedPeriodLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`;
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(objectUrl);
+      const filename = filenameFromContentDisposition(
+        response.headers['content-disposition'],
+        `utilitymate-dashboard-${selectedLocationName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${selectedPeriodLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
+      );
+      triggerBlobDownload(response.data, filename, 'application/pdf');
       setExportMessage('Dashboard PDF export is ready.');
     } catch (error) {
       console.error('Dashboard PDF export failed', error);
@@ -221,6 +227,15 @@ const Dashboard: React.FC = () => {
   };
 
   if (loading || !report) {
+    if (loadError && !loading) {
+      return (
+        <div className="min-h-screen bg-surface px-4 pb-6 pt-20 text-on-surface sm:px-6 md:ml-64 md:p-8">
+          <div className="rounded-2xl border border-red-300/50 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-100">
+            {loadError}
+          </div>
+        </div>
+      );
+    }
     return <div className="flex min-h-screen items-center justify-center bg-surface md:ml-64"><Loader2 className="animate-spin text-emerald-500" size={48} /></div>;
   }
 
@@ -246,6 +261,11 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface px-4 pb-6 pt-20 text-on-surface sm:px-6 md:ml-64 md:p-8">
+      {loadError && (
+        <div className="mb-6 rounded-2xl border border-red-300/50 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-100">
+          {loadError}
+        </div>
+      )}
       <header className="mb-8 space-y-4">
         <div>
           <h2 className="font-headline text-3xl font-extrabold">Utility Trends Dashboard</h2>

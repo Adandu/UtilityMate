@@ -1,22 +1,27 @@
-# UtilityMate v1.9.15
+# UtilityMate v1.10.0
 
 ## Security
 
-- Replaced `python-jose` with `PyJWT` for HS256 token handling, removing the unused transitive ECDSA dependency flagged by CVE scanning.
-- Slimmed Docker runtime package installs by removing compiler, development library, curl, and recommended package installs from production images.
-- Removed unused transitive crypto packages from the backend lockfile, including `ecdsa`, `rsa`, and `pyasn1`.
-- Reduced the main Docker image OS package footprint from 167 scanned packages to 104 scanned packages.
+- Fixed a cross-tenant data leak: creating or updating a budget no longer accepts a `location_id`/`household_id` that doesn't belong to the current user.
+- Rate limiting now sees the real client IP instead of the internal nginx address, so login/register/upload throttling applies per client again instead of sharing one global bucket.
+- Added rate limiting to the change-password endpoint.
+- Adding a household member now validates the referenced user exists before creating the membership.
+- Bumped `pyjwt`, `python-multipart`, and `starlette` to versions with known CVEs patched.
 
 ## Improvements
 
-- Kept JWT behavior compatible with the existing `HS256` access-token flow.
-- Replaced the container startup health probe with Python standard library HTTP checks so `curl` is no longer required at runtime.
-- Added a writable Matplotlib cache directory for the container runtime to avoid startup cache warnings.
+- Invoice and association-statement number parsing now correctly detects US vs. European decimal/thousands separators instead of assuming European formatting whenever both `,` and `.` appear.
+- Meter-index parsing no longer strips the decimal point, fixing a 100x error on non-integer readings.
+- Generic-provider invoice parsing requires a plausible amount label/currency anchor instead of matching the first number near the word "total".
+- Parsed invoices with an implausible amount or date are now flagged for review with an explanation instead of being silently accepted.
+- PDF parsing for invoices and association statements now runs off the request thread so large uploads no longer block the API.
+- PDF text extraction failures (encrypted, corrupted, or genuinely scanned files) are now logged with the actual cause instead of failing silently.
+- Association statement imports now show a review screen listing every parsed line item after import.
+- The invoice edit screen can now correct amount, invoice date, consumption value, provider, and location — not just status and notes.
+- Invoice and association statement uploads now time out and can be cancelled instead of leaving the modal stuck on a hung request; error messages now show the actual backend reason.
+- Fixed a memory leak where exported file downloads on the raw data and operations pages never released their object URLs.
 
 ## Verification
 
-- CVE MCP backend dependency scan: no known vulnerabilities found across 59 scanned Python packages.
-- CVE MCP main image package scan: reduced findings from 14 vulnerable package groups to 10 vulnerable package groups.
-- Backend tests passed: 7 tests.
+- Backend test suite (18 tests, including new locale/decimal-parsing regression tests) passed inside the production container image against the updated source.
 - Frontend TypeScript and production build checks passed.
-- Main and backend Docker images built successfully.

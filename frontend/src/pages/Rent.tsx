@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
 import { Home, Loader2, Plus, ReceiptText, Trash2, Users, BedDouble, CreditCard, Save, Download, Pencil } from 'lucide-react';
 import api from '../utils/api';
+import { filenameFromContentDisposition, triggerBlobDownload } from '../utils/download';
 
 interface LocationOption { id: number; name: string; }
 interface ProviderOption { id: number; name: string; }
@@ -132,6 +134,7 @@ const Rent: React.FC = () => {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [pageError, setPageError] = useState('');
 
   const fetchBaseData = useCallback(async () => {
     const [leasesResponse, locationsResponse, providersResponse] = await Promise.all([
@@ -163,15 +166,25 @@ const Rent: React.FC = () => {
   };
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       setLoading(true);
+      setPageError('');
       try {
         await fetchBaseData();
+      } catch (error) {
+        if (cancelled) return;
+        if (axios.isAxiosError(error)) {
+          setPageError(error.response?.data?.detail || 'Rent workspaces could not be loaded.');
+        } else {
+          setPageError('Rent workspaces could not be loaded.');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     load();
+    return () => { cancelled = true; };
   }, [fetchBaseData]);
 
   useEffect(() => {
@@ -180,16 +193,26 @@ const Rent: React.FC = () => {
       setStatement(null);
       return;
     }
+    let cancelled = false;
     const loadLease = async () => {
       setLoading(true);
+      setPageError('');
       try {
         await fetchLeaseDetail(selectedLeaseId);
         await fetchStatement(selectedLeaseId, selectedMonth);
+      } catch (error) {
+        if (cancelled) return;
+        if (axios.isAxiosError(error)) {
+          setPageError(error.response?.data?.detail || 'Rent workspace details could not be loaded.');
+        } else {
+          setPageError('Rent workspace details could not be loaded.');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     loadLease();
+    return () => { cancelled = true; };
   }, [selectedLeaseId, selectedMonth]);
 
   useEffect(() => {
@@ -389,19 +412,9 @@ const Rent: React.FC = () => {
         params: { month: monthInputToApi(selectedMonth) },
         responseType: 'blob',
       });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const objectUrl = window.URL.createObjectURL(blob);
-      const contentDisposition = response.headers['content-disposition'] as string | undefined;
-      const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
       const fallbackName = `utilitymate-rent-${leaseDetail.location.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${selectedMonth}.pdf`;
-      const filename = match?.[1] || fallbackName;
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(objectUrl);
+      const filename = filenameFromContentDisposition(response.headers['content-disposition'], fallbackName);
+      triggerBlobDownload(response.data, filename, 'application/pdf');
     } catch (error) {
       console.error('Rent statement export failed', error);
       window.alert('Rent statement export failed. Please try again in a few seconds.');
@@ -416,6 +429,11 @@ const Rent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface px-4 pb-6 pt-20 text-on-surface sm:px-6 md:ml-64 md:p-8">
+      {pageError && (
+        <div className="mb-6 rounded-2xl border border-red-300/50 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-100">
+          {pageError}
+        </div>
+      )}
       <header className="mb-8 flex flex-col gap-3">
         <h2 className="font-headline text-3xl font-extrabold">Rent</h2>
         <p className="max-w-4xl text-on-surface-variant opacity-75">Separate monthly rent accounting for shared apartments. Rent stays manual per person, electricity and shared avizier charges can be split automatically, heating can be allocated by room usage, and payments stay tracked per tenant.</p>

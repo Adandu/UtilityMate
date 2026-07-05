@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Eye, FileStack, Loader2, Trash2, Upload } from 'lucide-react';
+import axios from 'axios';
+import { Eye, FileStack, Loader2, Trash2, Upload, X } from 'lucide-react';
 import api from '../utils/api';
+import { openBlobInNewTab } from '../utils/download';
+
+const UPLOAD_TIMEOUT_MS = 90000;
 
 interface Location {
   id: number;
@@ -40,10 +44,13 @@ interface AssociationStatementUploadResult {
 const AssociationStatements: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [uploadingStatements, setUploadingStatements] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [associationStatements, setAssociationStatements] = useState<AssociationStatement[]>([]);
   const [statementUploadResults, setStatementUploadResults] = useState<AssociationStatementUploadResult[]>([]);
   const [pageError, setPageError] = useState('');
+  const [reviewStatementIds, setReviewStatementIds] = useState<number[]>([]);
   const statementFileInputRef = useRef<HTMLInputElement>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
 
   const fetchStatements = async () => {
     setLoading(true);
@@ -62,6 +69,15 @@ const AssociationStatements: React.FC = () => {
     fetchStatements();
   }, []);
 
+  useEffect(() => {
+    if (reviewStatementIds.length === 0) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setReviewStatementIds([]);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [reviewStatementIds]);
+
   const uploadAssociationStatements = async (e: React.FormEvent) => {
     e.preventDefault();
     const files = statementFileInputRef.current?.files;
@@ -69,26 +85,52 @@ const AssociationStatements: React.FC = () => {
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append('files', file));
     setUploadingStatements(true);
+    setUploadProgress(0);
     setStatementUploadResults([]);
     setPageError('');
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
     try {
       const response = await api.post<AssociationStatementUploadResult[]>('/association-statements/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: UPLOAD_TIMEOUT_MS,
+        signal: controller.signal,
+        onUploadProgress: (event) => {
+          if (!event.total) return;
+          setUploadProgress(Math.round((event.loaded / event.total) * 100));
+        },
       });
       setStatementUploadResults(response.data);
       if (statementFileInputRef.current) statementFileInputRef.current.value = '';
       await fetchStatements();
-    } catch {
-      setPageError('Association statements could not be imported.');
+      const importedIds = response.data
+        .filter((result) => result.status === 'success' && typeof result.statement_id === 'number')
+        .map((result) => result.statement_id as number);
+      if (importedIds.length > 0) {
+        setReviewStatementIds(importedIds);
+      }
+    } catch (error) {
+      if (axios.isCancel(error)) {
+        setPageError('Association statement import was cancelled.');
+      } else if (axios.isAxiosError(error)) {
+        setPageError(error.response?.data?.detail || (error.code === 'ECONNABORTED' ? 'Import timed out. Please try again with fewer or smaller files.' : 'Association statements could not be imported.'));
+      } else {
+        setPageError('Association statements could not be imported.');
+      }
     } finally {
       setUploadingStatements(false);
+      setUploadProgress(0);
+      uploadAbortRef.current = null;
     }
+  };
+
+  const cancelStatementUpload = () => {
+    uploadAbortRef.current?.abort();
   };
 
   const openAssociationStatementPdf = async (statementId: number) => {
     const response = await api.get(`/association-statements/${statementId}/pdf`, { responseType: 'blob' });
-    const blobUrl = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    openBlobInNewTab(response.data, 'application/pdf');
   };
 
   const deleteAssociationStatement = async (statementId: number) => {
@@ -133,10 +175,30 @@ const AssociationStatements: React.FC = () => {
           <p className="mb-4 text-sm opacity-70">Upload one or more monthly avizier PDFs. UtilityMate maps rows like `Ap 12` and `Ap 15` into normalized line items for dashboard and household reporting.</p>
           <form onSubmit={uploadAssociationStatements} className="space-y-3">
             <input ref={statementFileInputRef} type="file" accept=".pdf" multiple className="w-full rounded-xl border border-outline-variant bg-surface-container p-3" />
-            <button type="submit" disabled={uploadingStatements} className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 font-bold text-white disabled:opacity-60">
-              {uploadingStatements ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-              {uploadingStatements ? 'Importing Statements...' : 'Import Avizier PDFs'}
-            </button>
+            {uploadingStatements && (
+              <div className="rounded-2xl border border-outline-variant bg-slate-50 p-4 dark:bg-slate-900/40">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-slate-900 dark:text-white">
+                    {uploadProgress >= 100 ? 'Upload complete. Parsing statements...' : 'Uploading PDFs...'}
+                  </p>
+                  <Loader2 className="animate-spin text-teal-600" size={18} />
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                  <div className="h-full rounded-full bg-teal-600 transition-all duration-300" style={{ width: `${Math.max(uploadProgress, 8)}%` }} />
+                </div>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button type="submit" disabled={uploadingStatements} className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 font-bold text-white disabled:opacity-60">
+                {uploadingStatements ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+                {uploadingStatements ? 'Importing Statements...' : 'Import Avizier PDFs'}
+              </button>
+              {uploadingStatements && (
+                <button type="button" onClick={cancelStatementUpload} className="rounded-xl border border-outline-variant px-4 py-3 font-bold">
+                  Cancel
+                </button>
+              )}
+            </div>
           </form>
 
           {statementUploadResults.length > 0 && (
@@ -179,6 +241,9 @@ const AssociationStatements: React.FC = () => {
                     {typeof statement.total_payable === 'number' && <p className="mt-2 text-sm font-bold">Imported total payable: {statement.total_payable.toFixed(2)} RON</p>}
                   </div>
                   <div className="flex items-center gap-2">
+                    <button onClick={() => setReviewStatementIds([statement.id])} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black uppercase text-white dark:bg-white dark:text-slate-900">
+                      Review Lines
+                    </button>
                     <button onClick={() => openAssociationStatementPdf(statement.id)} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black uppercase text-white">
                       <Eye size={14} />
                     </button>
@@ -192,6 +257,56 @@ const AssociationStatements: React.FC = () => {
           </div>
         </section>
       </div>
+
+      {reviewStatementIds.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-outline-variant bg-white p-8 dark:bg-slate-800">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="font-headline text-xl font-black">Review Parsed Line Items</h3>
+              <button onClick={() => setReviewStatementIds([])}><X size={22} /></button>
+            </div>
+            <p className="mb-6 text-sm opacity-70">
+              These line items were parsed and imported automatically. Line-item editing isn't available yet from this screen
+              — delete and re-import the statement if a value needs correcting.
+            </p>
+            <div className="space-y-6">
+              {associationStatements.filter((statement) => reviewStatementIds.includes(statement.id)).map((statement) => (
+                <div key={statement.id}>
+                  <p className="mb-2 font-black">{statement.display_month} — {statement.source_name || 'Imported avizier PDF'}</p>
+                  <div className="overflow-x-auto rounded-2xl border border-outline-variant">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-outline-variant bg-surface-container text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant">
+                          <th className="px-4 py-3">Location</th>
+                          <th className="px-4 py-3">Label</th>
+                          <th className="px-4 py-3">Normalized Label</th>
+                          <th className="px-4 py-3 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant/30">
+                        {statement.lines.map((line) => (
+                          <tr key={line.id}>
+                            <td className="px-4 py-3 font-bold">{line.location?.name || 'Unmatched'}</td>
+                            <td className="px-4 py-3">{line.raw_label}</td>
+                            <td className="px-4 py-3">{line.normalized_label}</td>
+                            <td className="px-4 py-3 text-right font-black">{line.amount.toFixed(2)} RON</td>
+                          </tr>
+                        ))}
+                        {statement.lines.length === 0 && (
+                          <tr><td colSpan={4} className="px-4 py-6 text-center opacity-60">No line items were parsed for this statement.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setReviewStatementIds([])} className="mt-6 w-full rounded-xl bg-teal-600 py-4 font-black text-white">
+              Close Review
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

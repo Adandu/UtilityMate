@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import axios from 'axios';
 import { AlertCircle, CheckCircle2, Edit3, Eye, FileWarning, Loader2, Square, CheckSquare, Trash2, Upload, X } from 'lucide-react';
 import api from '../utils/api';
+import { openBlobInNewTab } from '../utils/download';
+
+const UPLOAD_TIMEOUT_MS = 90000;
 
 interface Invoice {
   id: number;
@@ -61,6 +65,7 @@ const Invoices: React.FC = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [showUpload, setShowUpload] = useState(false);
@@ -73,6 +78,12 @@ const Invoices: React.FC = () => {
   const [editPaymentReference, setEditPaymentReference] = useState('');
   const [editReviewNotes, setEditReviewNotes] = useState('');
   const [editNeedsReview, setEditNeedsReview] = useState(false);
+  const [editAmount, setEditAmount] = useState('');
+  const [editInvoiceDate, setEditInvoiceDate] = useState('');
+  const [editConsumptionValue, setEditConsumptionValue] = useState('');
+  const [editProviderId, setEditProviderId] = useState('');
+  const [editLocationId, setEditLocationId] = useState('');
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkStatus, setBulkStatus] = useState('reviewed');
   const [filterLocationId, setFilterLocationId] = useState('all');
@@ -96,8 +107,9 @@ const Invoices: React.FC = () => {
   const visibleRangeStart = totalInvoices === 0 ? 0 : (page - 1) * pageSize + 1;
   const visibleRangeEnd = totalInvoices === 0 ? 0 : Math.min(page * pageSize, totalInvoices);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
+    setLoadError('');
     try {
       const params: Record<string, string | number> = {
         skip: (page - 1) * pageSize,
@@ -114,9 +126,9 @@ const Invoices: React.FC = () => {
       }
 
       const [invoiceRes, locationRes, providerRes] = await Promise.all([
-        api.get<InvoiceListResponse>('/invoices/', { params }),
-        api.get<Location[]>('/locations/'),
-        api.get<Provider[]>('/providers/'),
+        api.get<InvoiceListResponse>('/invoices/', { params, signal }),
+        api.get<Location[]>('/locations/', { signal }),
+        api.get<Provider[]>('/providers/', { signal }),
       ]);
 
       const maxPage = Math.max(1, Math.ceil(invoiceRes.data.total / pageSize));
@@ -129,13 +141,22 @@ const Invoices: React.FC = () => {
       setTotalInvoices(invoiceRes.data.total);
       setLocations(locationRes.data);
       setProviders(providerRes.data);
+    } catch (error) {
+      if (axios.isCancel(error)) return;
+      if (axios.isAxiosError(error)) {
+        setLoadError(error.response?.data?.detail || 'Invoices could not be loaded.');
+      } else {
+        setLoadError('Invoices could not be loaded.');
+      }
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [filterLocationId, filterProviderId, filterStatus, page, pageSize]);
 
   useEffect(() => {
-    fetchData();
+    const controller = new AbortController();
+    fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   const handleUpload = async (e: React.FormEvent) => {
@@ -151,9 +172,13 @@ const Invoices: React.FC = () => {
     setUploadProgress(0);
     setUploadPhase('uploading');
     setUploadResults([]);
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
     try {
       const response = await api.post<UploadResult[]>('/invoices/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: UPLOAD_TIMEOUT_MS,
+        signal: controller.signal,
         onUploadProgress: (event) => {
           if (!event.total) return;
           const progress = Math.round((event.loaded / event.total) * 100);
@@ -166,16 +191,32 @@ const Invoices: React.FC = () => {
       setUploadResults(response.data);
       if (fileInputRef.current) fileInputRef.current.value = '';
       await fetchData();
-    } catch {
+    } catch (error) {
+      if (axios.isCancel(error)) {
+        setUploadPhase('idle');
+        setUploadResults([]);
+        return;
+      }
       setUploadPhase('complete');
-      setUploadResults([{ filename: 'Bulk upload', status: 'error', detail: 'Upload failed before the server could finish processing the files.' }]);
+      let detail = 'Upload failed before the server could finish processing the files.';
+      if (axios.isAxiosError(error)) {
+        detail = error.response?.data?.detail || (error.code === 'ECONNABORTED' ? 'Upload timed out. Please try again with fewer or smaller files.' : detail);
+      }
+      setUploadResults([{ filename: 'Bulk upload', status: 'error', detail }]);
     } finally {
       setUploading(false);
+      uploadAbortRef.current = null;
     }
   };
 
+  const cancelUpload = () => {
+    uploadAbortRef.current?.abort();
+  };
+
   const closeUploadModal = () => {
-    if (uploading) return;
+    if (uploading) {
+      cancelUpload();
+    }
     setShowUpload(false);
     setSelectedLocation('');
     setUploadProgress(0);
@@ -191,6 +232,11 @@ const Invoices: React.FC = () => {
     setEditPaymentReference(invoice.payment_reference || '');
     setEditReviewNotes(invoice.review_notes || '');
     setEditNeedsReview(invoice.needs_review);
+    setEditAmount(String(invoice.amount));
+    setEditInvoiceDate(invoice.invoice_date || '');
+    setEditConsumptionValue(invoice.consumption_value != null ? String(invoice.consumption_value) : '');
+    setEditProviderId(String(invoice.provider_id));
+    setEditLocationId(String(invoice.location_id));
   };
 
   const saveEdit = async (e: React.FormEvent) => {
@@ -202,6 +248,11 @@ const Invoices: React.FC = () => {
       payment_reference: editPaymentReference || null,
       review_notes: editReviewNotes || null,
       needs_review: editNeedsReview,
+      amount: editAmount !== '' ? Number(editAmount) : undefined,
+      invoice_date: editInvoiceDate || undefined,
+      consumption_value: editConsumptionValue !== '' ? Number(editConsumptionValue) : null,
+      provider_id: editProviderId ? Number(editProviderId) : undefined,
+      location_id: editLocationId ? Number(editLocationId) : undefined,
     });
     setEditing(null);
     await fetchData();
@@ -209,8 +260,7 @@ const Invoices: React.FC = () => {
 
   const viewPdf = async (invoiceId: number) => {
     const response = await api.get(`/invoices/${invoiceId}/pdf`, { responseType: 'blob' });
-    const blobUrl = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    openBlobInNewTab(response.data, 'application/pdf');
   };
 
   const toggleSelect = (invoiceId: number) => {
@@ -260,6 +310,11 @@ const Invoices: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface px-4 pb-6 pt-20 text-on-surface sm:px-6 md:ml-64 md:p-8">
+      {loadError && (
+        <div className="mb-6 rounded-2xl border border-red-300/50 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-100">
+          {loadError}
+        </div>
+      )}
       <header className="mb-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="font-headline text-3xl font-extrabold">Invoice Review Desk</h2>
@@ -556,9 +611,16 @@ const Invoices: React.FC = () => {
                   </div>
                 </div>
               )}
-              <button disabled={uploading} className="w-full rounded-xl bg-emerald-600 py-4 font-black text-white">
-                {uploading ? 'Uploading...' : uploadResults.length > 0 ? 'Import More PDFs' : 'Import PDFs'}
-              </button>
+              <div className="flex gap-3">
+                <button disabled={uploading} className="w-full rounded-xl bg-emerald-600 py-4 font-black text-white disabled:opacity-60">
+                  {uploading ? 'Uploading...' : uploadResults.length > 0 ? 'Import More PDFs' : 'Import PDFs'}
+                </button>
+                {uploading && (
+                  <button type="button" onClick={cancelUpload} className="rounded-xl border border-outline-variant px-6 py-4 font-black">
+                    Cancel
+                  </button>
+                )}
+              </div>
             </form>
           </div>
         </div>
@@ -568,21 +630,54 @@ const Invoices: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
           <div className="w-full max-w-xl rounded-[2rem] border border-outline-variant bg-white p-8 dark:bg-slate-800">
             <div className="mb-6 flex items-center justify-between">
-              <h3 className="font-headline text-xl font-black">Update Invoice Workflow</h3>
+              <h3 className="font-headline text-xl font-black">Edit Invoice</h3>
               <button onClick={() => setEditing(null)}><X size={22} /></button>
             </div>
             <form onSubmit={saveEdit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1">
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Provider</span>
+                  <select value={editProviderId} onChange={(e) => setEditProviderId(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4">
+                    {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Location</span>
+                  <select value={editLocationId} onChange={(e) => setEditLocationId(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4">
+                    {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1">
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Invoice Date</span>
+                  <input type="date" value={editInvoiceDate} onChange={(e) => setEditInvoiceDate(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Due Date</span>
+                  <input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1">
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Amount</span>
+                  <input type="number" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-xs font-black uppercase tracking-[0.18em] text-on-surface-variant">Consumption</span>
+                  <input type="number" step="0.001" value={editConsumptionValue} onChange={(e) => setEditConsumptionValue(e.target.value)} placeholder="Optional" className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
+                </label>
+              </div>
               <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4">
                 {statusOptions.map((status) => <option key={status} value={status}>{status}</option>)}
               </select>
-              <input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
               <input value={editPaymentReference} onChange={(e) => setEditPaymentReference(e.target.value)} placeholder="Payment reference / bank note" className="w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
               <textarea value={editReviewNotes} onChange={(e) => setEditReviewNotes(e.target.value)} placeholder="Review notes, parser corrections, escalation details..." className="min-h-32 w-full rounded-xl border border-outline-variant bg-surface-container p-4" />
               <label className="flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container p-4 font-bold">
                 <input type="checkbox" checked={editNeedsReview} onChange={(e) => setEditNeedsReview(e.target.checked)} />
                 Keep this invoice in the review queue
               </label>
-              <button className="w-full rounded-xl bg-blue-600 py-4 font-black text-white">Save Workflow State</button>
+              <button className="w-full rounded-xl bg-blue-600 py-4 font-black text-white">Save Invoice</button>
             </form>
           </div>
         </div>

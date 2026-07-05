@@ -1,6 +1,10 @@
+import hashlib
 import os
 import re
 import unicodedata
+from pathlib import Path
+from typing import Callable, Iterable, Optional, Tuple
+
 from fastapi import HTTPException, UploadFile
 
 _filename_ascii_strip_re = re.compile(r"[^A-Za-z0-9_.-]")
@@ -84,3 +88,51 @@ async def read_upload_file_limited(file: UploadFile, max_size: int) -> bytes:
             )
         chunks.append(chunk)
     return b"".join(chunks)
+
+
+async def save_and_validate_upload(
+    file: UploadFile,
+    upload_dir: str,
+    allowed_extensions: Iterable[str],
+    max_size: int,
+    filename_builder: Optional[Callable[[str, str], str]] = None,
+    invalid_extension_detail: str = "Only PDF files are allowed",
+    invalid_content_detail: str = "Invalid PDF file content",
+) -> Tuple[Path, bytes, str]:
+    """
+    Shared upload scaffolding used by the invoice and association-statement upload
+    endpoints: sanitize the filename, enforce the extension allow-list, read the
+    body with a size limit, verify the PDF magic bytes, hash the content, and
+    write it to disk.
+
+    Raises HTTPException(400) for a disallowed extension or invalid PDF content,
+    and propagates HTTPException(413) from read_upload_file_limited for oversized
+    uploads. Callers that need to dedupe by content hash against the database
+    should do so right after calling this helper (using the returned hash/path)
+    and remove the just-written file if it turns out to be a duplicate - the hash
+    can only be computed after the body has been read, so this helper cannot
+    perform that check itself without knowing the caller's model/query.
+
+    `filename_builder(file_hash, ext) -> str` controls the on-disk filename;
+    defaults to `f"{file_hash}{ext}"` when not provided.
+
+    Returns (file_path, raw_content, sha256_hash).
+    """
+    safe_filename = secure_filename(file.filename)
+    ext = os.path.splitext(safe_filename)[1].lower()
+    if ext not in allowed_extensions:
+        raise HTTPException(status_code=400, detail=invalid_extension_detail)
+
+    content = await read_upload_file_limited(file, max_size)
+
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail=invalid_content_detail)
+
+    file_hash = hashlib.sha256(content).hexdigest()
+    unique_filename = filename_builder(file_hash, ext) if filename_builder else f"{file_hash}{ext}"
+    file_path = Path(upload_dir) / unique_filename
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(content)
+
+    return file_path, content, file_hash

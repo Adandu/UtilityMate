@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from ..models import database_models
 
 
@@ -46,7 +46,7 @@ def compute_budget_statuses(db: Session, current_user: database_models.User):
     statuses = []
 
     for budget in budgets:
-        query = db.query(database_models.Invoice).join(
+        query = db.query(func.sum(database_models.Invoice.amount)).join(
             database_models.Provider, database_models.Invoice.provider_id == database_models.Provider.id
         ).filter(
             database_models.Invoice.user_id == current_user.id,
@@ -55,7 +55,7 @@ def compute_budget_statuses(db: Session, current_user: database_models.User):
         if budget.location_id:
             query = query.filter(database_models.Invoice.location_id == budget.location_id)
         query = query.filter(database_models.Provider.category_id == budget.category_id)
-        spent = sum(inv.amount for inv in query.all())
+        spent = query.scalar() or 0
         ratio = spent / budget.monthly_limit if budget.monthly_limit else 0
         remaining = budget.monthly_limit - spent
         status = "ok"

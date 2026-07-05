@@ -43,7 +43,7 @@ run_app python -m backend.init_db || { echo "Database initialization failed"; ex
 
 # Start Backend (FastAPI) in the background
 echo "Starting FastAPI backend..."
-run_app uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+run_app uvicorn backend.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips='127.0.0.1' &
 BACKEND_PID=$!
 
 # Wait for backend to be ready

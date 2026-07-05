@@ -1,4 +1,4 @@
-import hashlib
+import asyncio
 import os
 import re
 from typing import Dict, List, Optional
@@ -22,10 +22,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_EXTENSIONS = {".pdf"}
 MAX_FILE_SIZE = 50 * 1024 * 1024
-
-
-def get_file_hash(file_content: bytes):
-    return hashlib.sha256(file_content).hexdigest()
 
 
 def normalize_location_token(name: str) -> Optional[str]:
@@ -113,26 +109,24 @@ async def upload_association_statements(
     for file in files:
         file_path = ""
         try:
-            safe_filename = file_utils.secure_filename(file.filename)
-            ext = os.path.splitext(safe_filename)[1].lower()
-            if ext not in ALLOWED_EXTENSIONS:
-                results.append(api_schemas.AssociationStatementUploadResult(filename=file.filename, status="error", detail="Only PDF files are supported"))
-                continue
-
-            content = await file_utils.read_upload_file_limited(file, MAX_FILE_SIZE)
-            if not content.startswith(b"%PDF"):
-                results.append(api_schemas.AssociationStatementUploadResult(filename=file.filename, status="error", detail="Invalid PDF file content"))
-                continue
-
-            file_hash = get_file_hash(content)
-            unique_filename = f"{current_user.id}_{file_hash}{ext}"
-            file_path = os.path.join(UPLOAD_DIR, unique_filename)
+            saved_path, _content, _file_hash = await file_utils.save_and_validate_upload(
+                file,
+                UPLOAD_DIR,
+                ALLOWED_EXTENSIONS,
+                MAX_FILE_SIZE,
+                filename_builder=lambda h, e: f"{current_user.id}_{h}{e}",
+                invalid_extension_detail="Only PDF files are supported",
+                invalid_content_detail="Invalid PDF file content",
+            )
+            file_path = str(saved_path)
 
             existing = db.query(database_models.AssociationStatement).filter(
                 database_models.AssociationStatement.user_id == current_user.id,
                 database_models.AssociationStatement.pdf_path == file_path,
             ).first()
             if existing:
+                os.remove(file_path)
+                file_path = ""
                 results.append(api_schemas.AssociationStatementUploadResult(
                     filename=file.filename,
                     status="error",
@@ -142,11 +136,8 @@ async def upload_association_statements(
                 ))
                 continue
 
-            with open(file_path, "wb") as buffer:
-                buffer.write(content)
-
-            text = parser.InvoiceParser.get_pdf_text(file_path)
-            structured = parser.InvoiceParser.parse_association_statement(text)
+            text = await asyncio.to_thread(parser.InvoiceParser.get_pdf_text, file_path)
+            structured = await asyncio.to_thread(parser.InvoiceParser.parse_association_statement, text)
             apartments = structured.get("apartments", [])
             if not structured.get("display_month") or not apartments:
                 os.remove(file_path)

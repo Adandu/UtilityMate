@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Database, Download, Loader2, Search } from 'lucide-react';
 import api from '../utils/api';
 import { useSortableData } from '../hooks/useSortableData';
+import { triggerBlobDownload } from '../utils/download';
 
 interface InvoiceData {
   id: number;
@@ -46,13 +47,7 @@ const RawData: React.FC = () => {
 
   const handleExport = async () => {
     const response = await api.get('/invoices/export', { responseType: 'blob' });
-    const url = URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `utilitymate_export_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    triggerBlobDownload(response.data, `utilitymate_export_${new Date().toISOString().split('T')[0]}.csv`);
   };
 
   if (loading) {

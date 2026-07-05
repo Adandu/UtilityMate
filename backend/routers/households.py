@@ -56,6 +56,11 @@ def add_household_member(
     ).first()
     if not household:
         raise HTTPException(status_code=404, detail="Household not found")
+    member_user = db.query(database_models.User).filter(
+        database_models.User.id == member.user_id,
+    ).first()
+    if not member_user:
+        raise HTTPException(status_code=404, detail="User not found")
     existing = db.query(database_models.HouseholdMember).filter(
         database_models.HouseholdMember.household_id == household_id,
         database_models.HouseholdMember.user_id == member.user_id,

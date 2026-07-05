@@ -87,7 +87,9 @@ async def update_user_me(
     return current_user
 
 @router.post("/change-password")
+@limiter.limit("10/minute")
 async def change_password(
+    request: Request,
     old_password: str = Form(...),
     new_password: str = Form(...),
     db: Session = Depends(get_db),

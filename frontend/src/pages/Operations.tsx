@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, Home, Wallet, Download, Gauge, Loader2, Plus, Building2, AlertTriangle, ArrowRight, Pencil, Save, Trash2, X } from 'lucide-react';
 import api from '../utils/api';
+import { triggerBlobDownload } from '../utils/download';
 
 interface Category { id: number; name: string; unit: string; user_id?: number | null; }
 interface Location { id: number; name: string; }
@@ -119,13 +120,7 @@ const Operations: React.FC = () => {
 
   const downloadReport = async () => {
     const response = await api.get('/invoices/export', { responseType: 'blob' });
-    const url = URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `utilitymate-report-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    triggerBlobDownload(response.data, `utilitymate-report-${new Date().toISOString().split('T')[0]}.csv`);
   };
 
   const startEditBudget = (budget: BudgetStatus['budget']) => {

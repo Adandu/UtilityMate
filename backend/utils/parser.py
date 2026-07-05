@@ -3,6 +3,8 @@ import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
+from .logging_config import logger
+
 
 ROMANIAN_MONTHS = {
     "ianuarie": "01",
@@ -304,8 +306,20 @@ class InvoiceParser:
     def _parse_number(value: str) -> float:
         cleaned = value.strip()
         if "," in cleaned and "." in cleaned:
-            cleaned = cleaned.replace(".", "")
-        cleaned = cleaned.replace(",", ".")
+            # Locale is ambiguous when both separators appear. Whichever separator
+            # occurs last in the string is the decimal separator; every earlier
+            # occurrence of either character is a thousands separator to strip.
+            last_comma = cleaned.rfind(",")
+            last_dot = cleaned.rfind(".")
+            if last_comma > last_dot:
+                decimal_sep, thousands_sep = ",", "."
+            else:
+                decimal_sep, thousands_sep = ".", ","
+            cleaned = cleaned.replace(thousands_sep, "")
+            if decimal_sep == ",":
+                cleaned = cleaned.replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", ".")
         return float(cleaned)
 
     @staticmethod
@@ -317,8 +331,35 @@ class InvoiceParser:
                     extracted = page.extract_text()
                     if extracted:
                         text += extracted + "\n"
-        except Exception:
-            pass
+        except Exception as exc:
+            # Distinguish encrypted/password-protected PDFs from other failures
+            # (corrupted files, unexpected formats, genuinely image-only/scanned
+            # PDFs) in the logs, even though the caller only sees an empty string.
+            try:
+                import pypdfium2
+
+                if isinstance(exc, pypdfium2.PdfiumError):
+                    err_code = getattr(exc, "err_code", None)
+                    if err_code in (
+                        pypdfium2.raw.FPDF_ERR_PASSWORD,
+                        pypdfium2.raw.FPDF_ERR_SECURITY,
+                    ):
+                        logger.warning(
+                            "PDF text extraction failed for %s: encrypted/password-protected PDF (%s: %s)",
+                            file_path,
+                            type(exc).__name__,
+                            exc,
+                        )
+                        return text
+            except ImportError:
+                pass
+
+            logger.warning(
+                "PDF text extraction failed for %s (%s: %s)",
+                file_path,
+                type(exc).__name__,
+                exc,
+            )
         return text
 
     @staticmethod
@@ -752,10 +793,22 @@ class InvoiceParser:
 
     @staticmethod
     def _parse_meter_index(value: str) -> Optional[float]:
-        digits_only = re.sub(r"[^\d]", "", value or "")
-        if not digits_only:
+        raw = (value or "").strip()
+        if not raw:
             return None
-        return float(digits_only)
+        # Keep only digits and separator characters, then reuse the same
+        # locale-aware decimal detection as _parse_number so "123.45" isn't
+        # mangled into "12345".
+        candidate = re.sub(r"[^\d,.\-]", "", raw)
+        if not candidate:
+            return None
+        try:
+            return InvoiceParser._parse_number(candidate)
+        except (TypeError, ValueError):
+            digits_only = re.sub(r"[^\d]", "", raw)
+            if not digits_only:
+                return None
+            return float(digits_only)
 
     @staticmethod
     def _extract_billing_period(text: str) -> Optional[tuple[date, date]]:
@@ -1013,7 +1066,23 @@ class InvoiceParser:
             except ValueError:
                 pass
 
-        amount_match = re.search(r"total[:\s]+([\d\.,]+)", text, re.IGNORECASE)
+        # Prefer specific, unambiguous total labels first (mirrors the vocabulary
+        # already used by the Hidroelectrica/Engie parsers), then fall back to a
+        # bare "total" only when it is immediately followed by a currency marker.
+        # A bare "total[:\s]+<number>" with no further anchor is too permissive on
+        # unrecognized providers and can pick up an unrelated number.
+        amount_match = re.search(
+            r"(?:total\s+de\s+plat[aă]|total\s+factur[aă]|sum[aă]\s+total[aă]|sum[aă]\s+de\s+plat[aă])"
+            r"[:\s]+([\d\.,]+)",
+            text,
+            re.IGNORECASE,
+        )
+        if not amount_match:
+            amount_match = re.search(
+                r"total[:\s]+([\d\.,]+)\s*(?:lei|ron)\b",
+                text,
+                re.IGNORECASE,
+            )
         if amount_match:
             try:
                 result["amount"] = InvoiceParser._parse_number(amount_match.group(1))
